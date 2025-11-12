@@ -1,0 +1,732 @@
+{
+"clientName": "Thunder Client",
+"collectionName": "VLU Library - Day 4 - Document Review & Search APIs",
+"collectionId": "vlu-document-day4-apis",
+"dateExported": "2025-11-12",
+"version": "1.0",
+"folders": [
+    {
+    "name": "API 2.6 - Review Document",
+    "id": "review-document"
+    },
+    {
+    "name": "API 2.7 - Get Documents (Public)",
+    "id": "get-documents-public"
+    },
+    {
+    "name": "API 2.8 - Get Documents (Admin)",
+    "id": "get-documents-admin"
+    },
+    {
+    "name": "API 2.9 - Get Document By ID",
+    "id": "get-document-by-id"
+    }
+],
+"requests": [
+    {
+    "_id": "review-approve-success",
+    "name": "✅ Approve Document (Success)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"approved\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.status",
+        "expected": "approved"
+        }
+    ]
+    },
+    {
+    "_id": "review-reject-success",
+    "name": "✅ Reject Document (Success)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId2}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"rejected\",\n  \"reason\": \"Nội dung không phù hợp với quy định thư viện. Vui lòng kiểm tra lại và upload bản mới.\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.status",
+        "expected": "rejected"
+        }
+    ]
+    },
+    {
+    "_id": "review-reject-no-reason",
+    "name": "❌ Reject Without Reason (Fail)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"rejected\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "400"
+        }
+    ]
+    },
+    {
+    "_id": "review-invalid-status",
+    "name": "❌ Invalid Status (Fail)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"pending\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "400"
+        }
+    ]
+    },
+    {
+    "_id": "review-already-processed",
+    "name": "❌ Review Already Processed Document (Fail)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{approvedDocId}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"approved\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "400"
+        },
+        {
+        "type": "json-query",
+        "value": "$.message",
+        "expected": "Tài liệu này đã được xử lý trước đó"
+        }
+    ]
+    },
+    {
+    "_id": "review-no-auth",
+    "name": "❌ Review Without Authentication (Fail)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId}}/status",
+    "headers": [
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"approved\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "401"
+        }
+    ]
+    },
+    {
+    "_id": "review-user-role",
+    "name": "❌ Review With User Role (Forbidden)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/{{pendingDocId}}/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{userAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"approved\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "403"
+        }
+    ]
+    },
+    {
+    "_id": "review-doc-not-found",
+    "name": "❌ Review Non-existent Document (Fail)",
+    "folderId": "review-document",
+    "method": "PUT",
+    "url": "{{base_url}}/api/admin/documents/000000000000000000000000/status",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        },
+        {
+        "name": "Content-Type",
+        "value": "application/json"
+        }
+    ],
+    "body": {
+        "type": "json",
+        "raw": "{\n  \"status\": \"approved\"\n}"
+    },
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "404"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-all",
+    "name": "✅ Get All Documents (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.documents[*].status",
+        "expected": "approved"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-search",
+    "name": "✅ Search Documents (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?q=Node.js",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-filter-category",
+    "name": "✅ Filter By Category (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?category={{categoryId}}",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-filter-year",
+    "name": "✅ Filter By Year (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?year=2024",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-sort-views",
+    "name": "✅ Sort By Views Descending (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?sort=views:desc",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-pagination",
+    "name": "✅ Pagination (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?page=1&limit=5",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.pagination.currentPage",
+        "expected": "1"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-public-combined",
+    "name": "✅ Combined Filters (Public)",
+    "folderId": "get-documents-public",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents?q=programming&category={{categoryId}}&year=2024&sort=createdAt:desc&page=1&limit=10",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-all",
+    "name": "✅ Get All Documents (Admin)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-pending",
+    "name": "✅ Get Pending Documents (Admin)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents?status=pending",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.documents[*].status",
+        "expected": "pending"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-rejected",
+    "name": "✅ Get Rejected Documents (Admin)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents?status=rejected",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-approved",
+    "name": "✅ Get Approved Documents (Admin)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents?status=approved",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-search",
+    "name": "✅ Search Pending Documents (Admin)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents?status=pending&q=Node.js&page=1&limit=20",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-no-auth",
+    "name": "❌ Get Admin Documents Without Auth (Fail)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "401"
+        }
+    ]
+    },
+    {
+    "_id": "get-docs-admin-user-role",
+    "name": "❌ Get Admin Documents With User Role (Forbidden)",
+    "folderId": "get-documents-admin",
+    "method": "GET",
+    "url": "{{base_url}}/api/admin/documents",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{userAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "403"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-approved-guest",
+    "name": "✅ Get Approved Document (Guest)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{approvedDocId}}",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.status",
+        "expected": "approved"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-approved-user",
+    "name": "✅ Get Approved Document (User)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{approvedDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{userAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-pending-guest",
+    "name": "❌ Get Pending Document (Guest - Fail)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{pendingDocId}}",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "404"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-pending-admin",
+    "name": "✅ Get Pending Document (Admin)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{pendingDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.status",
+        "expected": "pending"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-pending-owner",
+    "name": "✅ Get Pending Document (Owner)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{pendingDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{authorAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-pending-other-user",
+    "name": "❌ Get Pending Document (Other User - Fail)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{pendingDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{otherUserAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "404"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-rejected-admin",
+    "name": "✅ Get Rejected Document (Admin)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{rejectedDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{adminAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.status",
+        "expected": "rejected"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-rejected-owner",
+    "name": "✅ Get Rejected Document (Owner - See Reason)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{rejectedDocId}}",
+    "headers": [
+        {
+        "name": "Authorization",
+        "value": "Bearer {{authorAccessToken}}"
+        }
+    ],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "200"
+        },
+        {
+        "type": "json-query",
+        "value": "$.data.document.rejectionReason",
+        "exists": true
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-rejected-guest",
+    "name": "❌ Get Rejected Document (Guest - Fail)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/{{rejectedDocId}}",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "404"
+        }
+    ]
+    },
+    {
+    "_id": "get-doc-by-id-not-found",
+    "name": "❌ Get Non-existent Document (Fail)",
+    "folderId": "get-document-by-id",
+    "method": "GET",
+    "url": "{{base_url}}/api/documents/000000000000000000000000",
+    "headers": [],
+    "tests": [
+        {
+        "type": "res-code",
+        "value": "404"
+        }
+    ]
+    }
+],
+"settings": {
+    "options": {
+    "baseUrl": "http://localhost:5000"
+    }
+},
+"envVariables": [
+    {
+    "name": "base_url",
+    "value": "http://localhost:5000"
+    },
+    {
+    "name": "adminAccessToken",
+    "value": "YOUR_ADMIN_TOKEN_HERE"
+    },
+    {
+    "name": "userAccessToken",
+    "value": "YOUR_USER_TOKEN_HERE"
+    },
+    {
+    "name": "authorAccessToken",
+    "value": "YOUR_AUTHOR_TOKEN_HERE"
+    },
+    {
+    "name": "otherUserAccessToken",
+    "value": "YOUR_OTHER_USER_TOKEN_HERE"
+    },
+    {
+    "name": "categoryId",
+    "value": "YOUR_CATEGORY_ID_HERE"
+    },
+    {
+    "name": "pendingDocId",
+    "value": "YOUR_PENDING_DOC_ID_HERE"
+    },
+    {
+    "name": "pendingDocId2",
+    "value": "YOUR_PENDING_DOC_ID_2_HERE"
+    },
+    {
+    "name": "approvedDocId",
+    "value": "YOUR_APPROVED_DOC_ID_HERE"
+    },
+    {
+    "name": "rejectedDocId",
+    "value": "YOUR_REJECTED_DOC_ID_HERE"
+    }
+]
+}
