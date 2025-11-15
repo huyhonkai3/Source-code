@@ -1,10 +1,16 @@
 import React from "react";
+import { Outlet } from "react-router-dom";
+import { Box } from "@mui/material";
 
-const AuthLayout = ({ children }) => {
+/**
+ * AuthLayout - Layout wrapper cho trang đăng ký và đăng nhập
+ * Chỉ cần render <Outlet /> vì các page tự handle layout riêng
+ */
+const AuthLayout = () => {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        {children}
-        </div>
+        <Box>
+            <Outlet />
+        </Box>
     );
 };
 

@@ -101,7 +101,7 @@ const ReviewDocuments = () => {
     const handleApproveDocument = async () => {
         try {
             const response = await axios.put(
-                `${import.meta.env.VITE_API_URL}/api/admin/documents/${approveDialog.documentId}/status`,
+                `http://localhost:5000/api/admin/documents/${approveDialog.documentId}/status`,
                 {
                     status: "approved",
                 },

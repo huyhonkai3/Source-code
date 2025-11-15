@@ -103,7 +103,7 @@ const HomePage = () => {
             console.error("Error details:", {
                 message: err.message,
                 response: err.response?.data,
-                apiUrl: import.meta.env.VITE_API_URL
+                apiUrl: 'http://localhost:5000'
             });
             
             let errorMessage = "Lỗi khi tải danh sách tài liệu";
