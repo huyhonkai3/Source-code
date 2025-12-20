@@ -9,6 +9,9 @@ const { checkAuth, checkRole } = require("../middleware/auth.middleware");
  * TẤT CẢ các routes trong file này đều cần:
  * 1. checkAuth - User phải đăng nhập
  * 2. checkRole(['Admin', 'Moderator']) - User phải có vai trò Admin hoặc Moderator
+ *
+ * Admin: Có toàn quyền (CRUD, thống kê, duyệt bài)
+ * Moderator: Chỉ được xem danh sách và duyệt/từ chối tài liệu
  */
 
 /**
@@ -26,8 +29,8 @@ const { checkAuth, checkRole } = require("../middleware/auth.middleware");
 router.put(
   "/:id/status",
   checkAuth,
-  checkRole(["Moderator"]),
-  documentController.reviewDocument
+  checkRole(["Moderator", "Admin"]),
+  documentController.reviewDocument,
 );
 
 /**
@@ -45,7 +48,7 @@ router.get(
   "/",
   checkAuth,
   checkRole(["Admin", "Moderator"]),
-  documentController.getDocuments
+  documentController.getDocuments,
 );
 
 /**
@@ -56,10 +59,10 @@ router.get(
  * returns { overview: Object, topViewed: Array, topDownloaded: Array, categoryDistribution: Array }
  */
 router.get(
-    "/stats",
-    checkAuth,
-    checkRole(["Admin"]), // CHỈ ADMIN
-    documentController.getDashboardStats
+  "/stats",
+  checkAuth,
+  checkRole(["Admin"]), // CHỈ ADMIN
+  documentController.getDashboardStats,
 );
 
 module.exports = router;

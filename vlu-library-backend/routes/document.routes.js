@@ -4,6 +4,7 @@ const documentController = require("../controllers/document.controller");
 const { checkAuth, checkRole } = require("../middleware/auth.middleware");
 const { checkAuthOptional } = require("../middleware/auth.optional.middleware");
 const uploadMiddleware = require("../middleware/upload.middleware");
+const commentController = require("../controllers/comment.controller");
 
 /**
  * Document Routes
@@ -21,11 +22,27 @@ const uploadMiddleware = require("../middleware/upload.middleware");
  * 4. documentController.uploadDocument - Xử lý logic
  */
 router.post(
-    "/upload",
-    checkAuth,
-    checkRole(["Author", "Admin"]),
-    uploadMiddleware,
-    documentController.uploadDocument
+  "/upload",
+  checkAuth,
+  checkRole(["Author", "Admin"]),
+  uploadMiddleware,
+  documentController.uploadDocument,
+);
+
+/**
+ * @route   GET /api/documents/my-documents
+ * @desc    Lấy danh sách tài liệu của tác giả hiện tại
+ * @access  Author, Admin
+ * @returns { documents: Array, pagination: Object, stats: Object }
+ *
+ * Route này phải đặt TRƯỚC route GET /:id
+ * để tránh Express routing conflict (my-documents bị hiểu thành :id)
+ */
+router.get(
+  "/my-documents",
+  checkAuth,
+  checkRole(["Author", "Admin"]),
+  documentController.getMyDocuments,
 );
 
 /**
@@ -37,20 +54,20 @@ router.post(
 router.get("/", documentController.getDocuments);
 
 /**
- * route   GET /api/documents/:id/read
- * desc    Đọc tài liệu trực tuyến (API 2.15 - F12)
- * access  User, Author, Moderator, Admin (phải đăng nhập)
- * returns Stream PDF với header 'inline'
- * - Chỉ tài liệu có status='approved' mới được đọc - Chưa phân quyền theo user role nâng cao
- * - Stream file PDF trực tiếp, không qua JSON response - Chưa sử dụng PDF.js
- * - Content-Disposition: inline (hiển thị trên trình duyệt)
+ * @route   PUT /api/documents/:id (API 2.10 - Author)
+ * @desc    Cập nhật tài liệu (API 2.10 - Author)
+ * @access  Author/Admin
+ * @param   id - Document ID
  */
-router.get(
-    "/:id/read",
-    checkAuth,
-    checkRole(["User", "Author", "Moderator", "Admin"]),
-    documentController.readDocument
-);
+router.put("/:id", checkAuth, documentController.updateDocument);
+
+/**
+ * @route   DELETE /api/documents/:id (API 2.11 - Author/Admin)
+ * @desc    Xóa tài liệu (API 2.11 - Author/Admin)
+ * @access  Author/Admin
+ * @param   id - Document ID
+ */
+router.delete("/:id", checkAuth, documentController.deleteDocument);
 
 /**
  * route   GET /api/documents/:id/download
@@ -62,10 +79,10 @@ router.get(
  * - Content-Disposition: attachment (tải file về máy)
  */
 router.get(
-    "/:id/download",
-    checkAuth,
-    checkRole(["User", "Author", "Moderator", "Admin"]),
-    documentController.downloadDocument
+  "/:id/download",
+  checkAuth,
+  checkRole(["User", "Author", "Moderator", "Admin"]),
+  documentController.downloadDocument,
 );
 
 /**
@@ -74,21 +91,33 @@ router.get(
  * access  User, Author, Moderator, Admin (phải đăng nhập)
  * body    { type: 'view' | 'download' }
  * returns { success: boolean, isFirstTime: boolean }
- * 
+ *
  * LOGIC CHỐNG SPAM:
  * - Sử dụng compound unique index trong Statistics model
  * - 1 user chỉ được track 1 lần/loại/tài liệu/ngày
  * - Nếu đã track trong ngày -> trả về success nhưng không tăng counter
  * - Nếu là lần đầu trong ngày -> tăng views/downloads trong document
- * 
+ *
  * Frontend gọi API này ngay sau khi:
  * - User click "Đọc" -> gọi track với type='view'
  * - User click "Tải" -> gọi track với type='download'
  */
-router.post(
-    "/:id/track",
-    checkAuth,
-    documentController.trackDocument
+router.post("/:id/track", checkAuth, documentController.trackDocument);
+
+/**
+ * route   GET /api/documents/:id/read
+ * desc    Đọc tài liệu trực tuyến (API 2.15 - F12)
+ * access  User, Author, Moderator, Admin (phải đăng nhập)
+ * returns Stream PDF với header 'inline'
+ * - Chỉ tài liệu có status='approved' mới được đọc - Chưa phân quyền theo user role nâng cao
+ * - Stream file PDF trực tiếp, không qua JSON response - Chưa sử dụng PDF.js
+ * - Content-Disposition: inline (hiển thị trên trình duyệt)
+ */
+router.get(
+  "/:id/read",
+  checkAuth,
+  checkRole(["User", "Author", "Moderator", "Admin"]),
+  documentController.readDocument,
 );
 
 /**
@@ -96,13 +125,13 @@ router.post(
  * desc    Lấy chi tiết tài liệu (API 2.9)
  * access  Public (có phân quyền xem tài liệu pending/rejected)
  * params  id - Document ID
- * 
+ *
  * - Sử dụng checkAuthOptional để parse JWT nếu có
  * - Tài liệu approved: Public - ai cũng xem được
  * - Tài liệu pending/rejected: Chỉ Admin, Moderator, hoặc chủ sở hữu
- * 
+ *
  * Route này phải đặt CUỐI CÙNG
- * Nếu đặt trước các route khác (/:id/read, /:id/download), 
+ * Nếu đặt trước các route khác (/:id/read, /:id/download),
  * Express sẽ match "read" hoặc "download" như là id
  */
 router.get("/:id", checkAuthOptional, documentController.getDocumentById);
