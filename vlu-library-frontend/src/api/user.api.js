@@ -37,6 +37,24 @@ const userAPI = {
   },
 
   /**
+   * Upload ảnh đại diện
+   * @param {FormData} formData - FormData chứa file ảnh với field name 'avatar'
+   * @returns {Promise} Response data với avatarUrl mới
+   */
+  uploadAvatar: async (formData) => {
+    try {
+      const response = await axiosInstance.post("/users/avatar", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
    * Đổi mật khẩu
    * @param {Object} data - Dữ liệu đổi mật khẩu
    * @param {string} data.currentPassword - Mật khẩu hiện tại
@@ -108,7 +126,6 @@ const userAPI = {
    * @param {number} params.limit - Số lượng mỗi trang
    * @returns {Promise} Response data
    */
-
   getUpgradeRequests: async (params) => {
     try {
       const response = await axiosInstance.get("/admin/upgrade-requests", {
@@ -204,11 +221,11 @@ const userAPI = {
       const payload = { status };
 
       if (action === "lock") {
-        payload.reason = reason; // Backend expects 'reason', not 'lockReason'
+        payload.reason = reason;
       }
 
       const response = await axiosInstance.put(
-        `/admin/users/${userId}/status`, // Use existing endpoint
+        `/admin/users/${userId}/status`,
         payload,
       );
       return response.data;

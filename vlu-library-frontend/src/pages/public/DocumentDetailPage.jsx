@@ -1,3 +1,10 @@
+/**
+ * DocumentDetailPage
+ * Trang chi tiết tài liệu cho Public/User/Author
+ *
+ * Đường dẫn: src/pages/public/DocumentDetailPage.jsx
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import {
   Container,
@@ -20,10 +27,13 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Chip,
 } from "@mui/material";
 import {
   Home as HomeIcon,
   ChevronRight as ChevronRightIcon,
+  PictureAsPdf as PdfIcon,
+  MenuBook as EpubIcon,
 } from "@mui/icons-material";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -31,10 +41,12 @@ import useDownload from "../../hooks/useDownload";
 import Header from "../../components/common/Header";
 import DocumentInfo from "../../components/documents/DocumentInfo";
 import RelatedDocuments from "../../components/documents/RelatedDocuments";
-import PDFViewer from "../../components/admin/PDFViewer";
 import ReviewSection from "../../components/reviews/ReviewSection";
 import CommentSection from "../../components/comments/CommentSection";
 import documentsAPI from "../../api/documents.api";
+
+// Import FileViewer từ common (thay thế PDFViewer cũ)
+import { FileViewer } from "../../components/common/file-viewer";
 
 const DocumentDetailPage = () => {
   const { id } = useParams();
@@ -80,6 +92,52 @@ const DocumentDetailPage = () => {
   useEffect(() => {
     fetchDocument();
   }, [fetchDocument]);
+
+  /**
+   * Tạo URL đầy đủ cho file viewer
+   * REACT_APP_API_URL có thể là:
+   * - http://localhost:5000 (không có /api)
+   * - http://localhost:5000/api (đã có /api)
+   */
+  const getFileUrl = () => {
+    if (!document) return "";
+    const baseURL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    // Kiểm tra xem baseURL đã có /api chưa
+    const apiPath = baseURL.endsWith("/api") ? "" : "/api";
+    return `${baseURL}${apiPath}/documents/${document.id || document._id}/read`;
+  };
+
+  /**
+   * Lấy định dạng file
+   */
+  const getFileFormat = () => {
+    if (document?.fileFormat) {
+      return document.fileFormat.toLowerCase();
+    }
+    const fileName = document?.fileName || "";
+    if (fileName.toLowerCase().endsWith(".epub")) {
+      return "epub";
+    }
+    return "pdf";
+  };
+
+  /**
+   * Render badge định dạng file
+   */
+  const renderFormatBadge = () => {
+    const format = getFileFormat();
+    const isEpub = format === "epub";
+
+    return (
+      <Chip
+        icon={isEpub ? <EpubIcon /> : <PdfIcon />}
+        label={isEpub ? "EPUB" : "PDF"}
+        size="small"
+        color={isEpub ? "warning" : "error"}
+        sx={{ fontWeight: 600 }}
+      />
+    );
+  };
 
   const handleRead = () => {
     if (!isAuthenticated) {
@@ -188,6 +246,7 @@ const DocumentDetailPage = () => {
           </Tabs>
 
           <Box sx={{ p: 3 }}>
+            {/* Tab 0: Thông tin chi tiết */}
             {tabValue === 0 && (
               <Table>
                 <TableBody>
@@ -229,51 +288,48 @@ const DocumentDetailPage = () => {
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Định dạng</TableCell>
-                    <TableCell>PDF</TableCell>
+                    <TableCell>{renderFormatBadge()}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             )}
 
+            {/* Tab 1: Đọc tài liệu - Sử dụng FileViewer */}
+            {/* FIX: Thêm overflow: hidden và position: relative để ngăn content tràn ra ngoài */}
             {tabValue === 1 && (
-              <Box sx={{ height: "70vh" }}>
-                {isAuthenticated ? (
-                  <PDFViewer
-                    fileUrl={document.fileUrl}
-                    fileName={document.fileName}
-                  />
-                ) : (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      height: "100%",
-                      gap: 2,
-                    }}
-                  >
-                    <Typography variant="h6" color="text.secondary">
-                      Vui lòng đăng nhập để đọc tài liệu
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={handleLoginRedirect}
-                      sx={{ bgcolor: "error.main" }}
-                    >
-                      Đăng nhập ngay
-                    </Button>
-                  </Box>
-                )}
+              <Box
+                sx={{
+                  height: "70vh",
+                  position: "relative",
+                  overflow: "hidden", // FIX: Ngăn content tràn ra ngoài
+                  borderRadius: 1,
+                  // Đảm bảo FileViewer không vượt quá container
+                  "& > *": {
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                  },
+                }}
+              >
+                <FileViewer
+                  fileUrl={getFileUrl()}
+                  fileName={document.fileName}
+                  fileFormat={getFileFormat()}
+                  title={document.title}
+                  isPreview={!isAuthenticated}
+                  onLoginClick={handleLoginRedirect}
+                  showDownload={true}
+                />
               </Box>
             )}
 
+            {/* Tab 2: Đánh giá */}
             {tabValue === 2 && (
               <Box>
                 <ReviewSection docId={id} />
               </Box>
             )}
 
+            {/* Tab 3: Bình luận */}
             {tabValue === 3 && (
               <Box>
                 <CommentSection docId={id} />
@@ -288,6 +344,7 @@ const DocumentDetailPage = () => {
         />
       </Container>
 
+      {/* Login Dialog */}
       <Dialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)}>
         <DialogTitle>Yêu cầu đăng nhập</DialogTitle>
         <DialogContent>

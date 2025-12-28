@@ -1,3 +1,13 @@
+/**
+ * ReviewDocumentPage
+ * Trang xem xét chi tiết tài liệu cho Admin/Moderator
+ *
+ * Đường dẫn: src/pages/admin/ReviewDocumentPage.jsx
+ *
+ * - Admin: Truy cập từ /admin/moderation/:id, navigate về /admin/moderation
+ * - Moderator: Truy cập từ /moderation/:id, navigate về /moderation
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -11,22 +21,23 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import {
+  ArrowBack as ArrowBackIcon,
+  PictureAsPdf as PdfIcon,
+  MenuBook as EpubIcon,
+} from "@mui/icons-material";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import PDFViewer from "../../components/admin/PDFViewer";
+import { useAuth } from "../../context/AuthContext";
+import documentsAPI from "../../api/documents.api";
+
+// Import FileViewer từ common (thay thế PDFViewer cũ)
+import { FileViewer } from "../../components/common/file-viewer";
+
+// Import các component admin
 import ReviewPanel from "../../components/admin/ReviewPanel";
 import ApproveDialog from "../../components/admin/ApproveDialog";
 import RejectDialog from "../../components/admin/RejectDialog";
-import documentsAPI from "../../api/documents.api";
-import { useAuth } from "../../context/AuthContext";
 
-/**
- * ReviewDocumentPage Component
- * Trang xem xét chi tiết tài liệu cho Admin/Moderator
- *
- * - Admin: Truy cập từ /admin/moderation/:id, navigate về /admin/moderation
- * - Moderator: Truy cập từ /moderation/:id, navigate về /moderation
- */
 const ReviewDocumentPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -35,15 +46,12 @@ const ReviewDocumentPage = () => {
 
   // Determine back route based on current path or user role
   const getBackRoute = () => {
-    // Check if current path starts with /admin
     if (location.pathname.startsWith("/admin")) {
       return "/admin/moderation";
     }
-    // For Moderator accessing /moderation/:id
     if (user?.role === "Moderator") {
       return "/moderation";
     }
-    // Default fallback for Admin
     return "/admin/moderation";
   };
 
@@ -54,10 +62,8 @@ const ReviewDocumentPage = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Reject dialog state
+  // Dialog states
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-
-  // Approve dialog state
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
 
   // Snackbar state
@@ -79,9 +85,9 @@ const ReviewDocumentPage = () => {
     setLoading(true);
     try {
       const response = await documentsAPI.getById(id);
+      console.log("fetchDocument response - ReviewDocumentPage:", response);
 
       if (response.status === "success") {
-        // Backend returns nested structure: data.document
         const documentData = response.data.document || response.data;
         setDocument(documentData);
       }
@@ -94,12 +100,31 @@ const ReviewDocumentPage = () => {
   };
 
   /**
-   * Get full PDF URL
+   * Tạo URL đầy đủ cho file viewer
+   * REACT_APP_API_URL có thể là:
+   * - http://localhost:5000 (không có /api)
+   * - http://localhost:5000/api (đã có /api)
    */
-  const getFullPdfUrl = () => {
+  const getFileUrl = () => {
     if (!document) return null;
     const baseURL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    return `${baseURL}/documents/${document.id}/read`;
+    // Kiểm tra xem baseURL đã có /api chưa
+    const apiPath = baseURL.endsWith("/api") ? "" : "/api";
+    return `${baseURL}${apiPath}/documents/${document.id || document._id}/read`;
+  };
+
+  /**
+   * Lấy định dạng file
+   */
+  const getFileFormat = () => {
+    if (document?.fileFormat) {
+      return document.fileFormat.toLowerCase();
+    }
+    const fileName = document?.fileName || "";
+    if (fileName.toLowerCase().endsWith(".epub")) {
+      return "epub";
+    }
+    return "pdf";
   };
 
   /**
@@ -118,15 +143,30 @@ const ReviewDocumentPage = () => {
   };
 
   /**
-   * Handle approve document - Open confirmation dialog
+   * Get format badge
+   */
+  const getFormatBadge = () => {
+    const format = getFileFormat();
+    const isEpub = format === "epub";
+
+    return {
+      label: isEpub ? "EPUB" : "PDF",
+      color: isEpub ? "warning" : "error",
+      icon: isEpub ? (
+        <EpubIcon fontSize="small" />
+      ) : (
+        <PdfIcon fontSize="small" />
+      ),
+    };
+  };
+
+  /**
+   * Handle approve document
    */
   const handleApprove = () => {
     setApproveDialogOpen(true);
   };
 
-  /**
-   * Handle confirm approve - Execute API call
-   */
   const handleConfirmApprove = async () => {
     setActionLoading(true);
     try {
@@ -138,7 +178,6 @@ const ReviewDocumentPage = () => {
         setApproveDialogOpen(false);
         showSnackbar("Tài liệu đã được duyệt và công khai!", "success");
 
-        // Navigate back after 1.5 seconds
         setTimeout(() => {
           navigate(backRoute);
         }, 1500);
@@ -154,15 +193,12 @@ const ReviewDocumentPage = () => {
   };
 
   /**
-   * Handle reject document - Open dialog
+   * Handle reject document
    */
   const handleRejectClick = () => {
     setRejectDialogOpen(true);
   };
 
-  /**
-   * Handle reject confirm - Execute API call with reason
-   */
   const handleRejectConfirm = async (reason) => {
     setActionLoading(true);
     try {
@@ -175,7 +211,6 @@ const ReviewDocumentPage = () => {
         setRejectDialogOpen(false);
         showSnackbar("Tài liệu đã bị từ chối", "success");
 
-        // Navigate back after 1.5 seconds
         setTimeout(() => {
           navigate(backRoute);
         }, 1500);
@@ -190,32 +225,16 @@ const ReviewDocumentPage = () => {
     }
   };
 
-  /**
-   * Handle back button
-   */
   const handleBack = () => {
     navigate(backRoute);
   };
 
-  /**
-   * Show snackbar
-   */
   const showSnackbar = (message, severity = "success") => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-    });
+    setSnackbar({ open: true, message, severity });
   };
 
-  /**
-   * Close snackbar
-   */
   const handleCloseSnackbar = () => {
-    setSnackbar((prev) => ({
-      ...prev,
-      open: false,
-    }));
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   // Loading state
@@ -235,6 +254,7 @@ const ReviewDocumentPage = () => {
   }
 
   const statusBadge = getStatusBadge();
+  const formatBadge = getFormatBadge();
 
   return (
     <Box
@@ -261,10 +281,7 @@ const ReviewDocumentPage = () => {
           <IconButton
             edge="start"
             onClick={handleBack}
-            sx={{
-              mr: 2,
-              color: "text.secondary",
-            }}
+            sx={{ mr: 2, color: "text.secondary" }}
           >
             <ArrowBackIcon />
           </IconButton>
@@ -275,9 +292,7 @@ const ReviewDocumentPage = () => {
             color="text.secondary"
             sx={{
               cursor: "pointer",
-              "&:hover": {
-                textDecoration: "underline",
-              },
+              "&:hover": { textDecoration: "underline" },
             }}
             onClick={handleBack}
           >
@@ -310,15 +325,22 @@ const ReviewDocumentPage = () => {
           {/* Spacer */}
           <Box sx={{ flex: 1 }} />
 
+          {/* Format Badge */}
+          <Chip
+            icon={formatBadge.icon}
+            label={formatBadge.label}
+            color={formatBadge.color}
+            size="small"
+            sx={{ fontWeight: 600, mr: 1 }}
+          />
+
           {/* Status Badge */}
           {statusBadge && (
             <Chip
               label={statusBadge.label}
               color={statusBadge.color}
               size="small"
-              sx={{
-                fontWeight: 600,
-              }}
+              sx={{ fontWeight: 600 }}
             />
           )}
         </Toolbar>
@@ -327,7 +349,7 @@ const ReviewDocumentPage = () => {
       {/* Main Content */}
       <Box sx={{ flex: 1, overflow: "hidden" }}>
         <Grid container sx={{ height: "100%" }}>
-          {/* Left: PDF Viewer */}
+          {/* Left: File Viewer - Sử dụng FileViewer thay vì PDFViewer */}
           <Grid
             item
             xs={12}
@@ -338,9 +360,13 @@ const ReviewDocumentPage = () => {
               borderColor: { md: "divider" },
             }}
           >
-            <PDFViewer
-              fileUrl={getFullPdfUrl()}
-              fileName={document?.fileName || "document.pdf"}
+            <FileViewer
+              fileUrl={getFileUrl()}
+              fileName={document?.fileName || "document"}
+              fileFormat={getFileFormat()}
+              title={document?.title || ""}
+              isPreview={false}
+              showDownload={true}
             />
           </Grid>
 

@@ -211,7 +211,7 @@ const DocumentsManagementPage = () => {
     try {
       const docId = deleteDialog.document._id || deleteDialog.document.id;
 
-      await documentsAPI.delete(docId);
+      await documentsAPI.deleteDocument(docId);
 
       console.log("Delete document with notifyAuthor:", notifyAuthor);
 

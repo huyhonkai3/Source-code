@@ -24,6 +24,23 @@ export const login = async (credentials) => {
 };
 
 /**
+ * Đăng nhập bằng Microsoft (Tính năng mới)
+ * @param {string} microsoftAccessToken - Access token nhận được từ MSAL
+ * @returns {Promise} Response data từ server (bao gồm user, accessToken, refreshToken)
+ */
+export const loginWithMicrosoft = async (microsoftAccessToken) => {
+  try {
+    // Gửi token của Microsoft xuống backend để xác thực
+    const response = await axiosInstance.post("/auth/microsoft-login", {
+      accessToken: microsoftAccessToken,
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
  * Đăng ký tài khoản
  * @param {Object} userData - Thông tin đăng ký
  * @param {string} userData.name - Tên người dùng
@@ -89,6 +106,7 @@ export const changePassword = async (data) => {
 
 const authAPI = {
   login,
+  loginWithMicrosoft,
   register,
   refreshAccessToken,
   logout,

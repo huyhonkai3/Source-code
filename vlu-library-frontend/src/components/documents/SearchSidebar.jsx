@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -26,7 +26,7 @@ import {
  * SearchSidebar Component
  * Sidebar with filters for document search
  *
- * @param {Array} categories - List of categories
+ * @param {Array} categories - List of categories from API
  * @param {Function} onFilter - Callback when filter applied
  * @param {Object} initialFilters - Initial filter values from URL
  * @param {boolean} loading - Loading state
@@ -49,71 +49,90 @@ const SearchSidebar = ({
   const [typeExpanded, setTypeExpanded] = useState(true);
 
   /**
-   * Initialize filters from URL params
+   * Sync state với initialFilters từ URL
+   * Chạy mỗi khi initialFilters thay đổi (do URL thay đổi)
    */
   useEffect(() => {
+    console.log("[SearchSidebar] Syncing with initialFilters:", initialFilters);
+
+    // Sync categories
     if (initialFilters.category) {
       const cats = Array.isArray(initialFilters.category)
         ? initialFilters.category
         : [initialFilters.category];
       setSelectedCategories(cats);
+    } else {
+      setSelectedCategories([]);
     }
-    if (initialFilters.yearFrom) {
-      setYearFrom(initialFilters.yearFrom);
-    }
-    if (initialFilters.yearTo) {
-      setYearTo(initialFilters.yearTo);
-    }
-    if (initialFilters.type) {
-      setDocumentType(initialFilters.type);
-    }
+
+    // Sync year range
+    setYearFrom(initialFilters.yearFrom || "");
+    setYearTo(initialFilters.yearTo || "");
+
+    // Sync document type
+    setDocumentType(initialFilters.type || "all");
   }, [initialFilters]);
 
   /**
    * Handle category checkbox change
    */
-  const handleCategoryChange = (categoryId) => {
+  const handleCategoryChange = useCallback((categoryId) => {
+    console.log("[SearchSidebar] Category changed:", categoryId);
+
     setSelectedCategories((prev) => {
-      if (prev.includes(categoryId)) {
-        return prev.filter((id) => id !== categoryId);
-      } else {
-        return [...prev, categoryId];
-      }
+      const newSelection = prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId];
+
+      console.log("[SearchSidebar] New selection:", newSelection);
+      return newSelection;
     });
-  };
+  }, []);
 
   /**
    * Handle apply filters
+   * Gửi tất cả filter values lên parent component
    */
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     const filters = {};
 
+    // Chỉ gửi categories nếu có selection
     if (selectedCategories.length > 0) {
       filters.category = selectedCategories;
     }
+
+    // Gửi year range nếu có
     if (yearFrom) {
       filters.yearFrom = yearFrom;
     }
     if (yearTo) {
       filters.yearTo = yearTo;
     }
+
+    // Gửi document type nếu không phải "all"
     if (documentType !== "all") {
       filters.type = documentType;
     }
 
+    console.log("[SearchSidebar] Applying filters:", filters);
     onFilter(filters);
-  };
+  }, [selectedCategories, yearFrom, yearTo, documentType, onFilter]);
 
   /**
    * Handle clear all filters
+   * Reset tất cả state về default và gọi onFilter với object rỗng
    */
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
+    console.log("[SearchSidebar] Clearing all filters");
+
     setSelectedCategories([]);
     setYearFrom("");
     setYearTo("");
     setDocumentType("all");
+
+    // Gọi onFilter với object rỗng để xóa tất cả filter trong URL
     onFilter({});
-  };
+  }, [onFilter]);
 
   /**
    * Check if any filter is active
@@ -199,33 +218,46 @@ const SearchSidebar = ({
                 ))}
               </>
             ) : categories.length > 0 ? (
-              categories.map((category) => (
-                <FormControlLabel
-                  key={category.id}
-                  control={
-                    <Checkbox
-                      checked={selectedCategories.includes(category.id)}
-                      onChange={() => handleCategoryChange(category.id)}
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        width: "100%",
-                      }}
-                    >
-                      <Typography variant="body2">{category.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        ({category.documentCount || 0})
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mb: 0.5 }}
-                />
-              ))
+              categories.map((category) => {
+                // Lấy ID của category (hỗ trợ cả id và _id)
+                const categoryId = category.id || category._id;
+
+                return (
+                  <FormControlLabel
+                    key={categoryId}
+                    control={
+                      <Checkbox
+                        checked={selectedCategories.includes(categoryId)}
+                        onChange={() => handleCategoryChange(categoryId)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          width: "100%",
+                          minWidth: 150,
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ mr: 1 }}>
+                          {category.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ({category.documentCount || 0})
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{
+                      mb: 0.5,
+                      mr: 0,
+                      width: "100%",
+                    }}
+                  />
+                );
+              })
             ) : (
               <Typography variant="body2" color="text.secondary">
                 Không có danh mục

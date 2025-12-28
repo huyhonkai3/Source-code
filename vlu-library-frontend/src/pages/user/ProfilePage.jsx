@@ -14,6 +14,8 @@ import {
   CircularProgress,
   MenuItem,
   InputAdornment,
+  Badge,
+  IconButton,
 } from "@mui/material";
 import {
   Person as PersonIcon,
@@ -23,6 +25,7 @@ import {
   PhotoCamera as PhotoCameraIcon,
   EmojiEvents as TrophyIcon,
   Save as SaveIcon,
+  CameraAlt as CameraAltIcon,
 } from "@mui/icons-material";
 import Header from "../../components/common/Header";
 import UserSidebar from "../../components/user/UserSidebar";
@@ -30,12 +33,42 @@ import RequestAuthorDialog from "../../components/user/RequestAuthorDialog";
 import userAPI from "../../api/user.api";
 import { useAuth } from "../../context/AuthContext";
 
+// Base URL của Backend API
+// Sử dụng process.env cho Create React App (CRA)
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
+// Server URL (không có /api) - dùng cho static files như avatar
+const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
+
+/**
+ * Helper function để tạo full URL cho avatar
+ * @param {string} avatarPath - Relative path hoặc full URL của avatar
+ * @returns {string} Full URL để hiển thị avatar
+ */
+const getFullAvatarUrl = (avatarPath) => {
+  if (!avatarPath) return "";
+
+  // Nếu đã là full URL (http:// hoặc https://) thì return luôn
+  if (avatarPath.startsWith("http://") || avatarPath.startsWith("https://")) {
+    return avatarPath;
+  }
+
+  // Sử dụng SERVER_URL (không có /api) cho static files
+  const baseUrl = SERVER_URL.endsWith("/")
+    ? SERVER_URL.slice(0, -1)
+    : SERVER_URL;
+  const path = avatarPath.startsWith("/") ? avatarPath : `/${avatarPath}`;
+
+  return `${baseUrl}${path}`;
+};
+
 /**
  * ProfilePage Component
  * Trang quản lý thông tin cá nhân của user
  */
 const ProfilePage = () => {
-  const { user: authUser } = useAuth();
+  const { user: authUser, updateUserAvatar } = useAuth();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -49,6 +82,7 @@ const ProfilePage = () => {
   // UI state
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -61,6 +95,15 @@ const ProfilePage = () => {
   const [requestStatus, setRequestStatus] = useState(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
+
+  // Avatar upload config
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_FILE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+  ];
 
   // Role badge configuration
   const getRoleBadge = (role) => {
@@ -147,6 +190,70 @@ const ProfilePage = () => {
 
     // Check if data has changed
     setHasChanges(true);
+  };
+
+  /**
+   * Handle avatar file selection and upload
+   */
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Reset input để có thể chọn lại cùng file
+    event.target.value = "";
+
+    // Validate file type
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      showSnackbar(
+        "Định dạng file không hỗ trợ. Vui lòng chọn ảnh JPG, PNG, GIF hoặc WEBP.",
+        "error",
+      );
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      showSnackbar(
+        "Kích thước file quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.",
+        "error",
+      );
+      return;
+    }
+
+    // Start upload
+    setUploadingAvatar(true);
+
+    try {
+      // Tạo FormData
+      const formDataToSend = new FormData();
+      formDataToSend.append("avatar", file);
+
+      // Gọi API upload
+      const response = await userAPI.uploadAvatar(formDataToSend);
+
+      if (response.status === "success" && response.data?.avatarUrl) {
+        const newAvatarUrl = response.data.avatarUrl;
+
+        // Cập nhật local state
+        setFormData((prev) => ({
+          ...prev,
+          avatar: newAvatarUrl,
+        }));
+
+        // Cập nhật AuthContext để Header và các component khác cũng thay đổi
+        updateUserAvatar(newAvatarUrl);
+
+        showSnackbar("Cập nhật ảnh đại diện thành công!", "success");
+      }
+    } catch (error) {
+      console.error("Upload avatar error:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        "Không thể upload ảnh. Vui lòng thử lại.";
+      showSnackbar(errorMessage, "error");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   /**
@@ -281,27 +388,21 @@ const ProfilePage = () => {
           {/* Content */}
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Yêu cầu đang chờ duyệt
+              Yêu cầu đang chờ xét duyệt
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Yêu cầu trở thành Tác giả (Author) của bạn đã được gửi và đang chờ
-              Ban quản trị xét duyệt. Chúng tôi sẽ thông báo kết quả qua email
-              trong vòng 24-48 giờ.
+              Yêu cầu trở thành Tác giả của bạn đang được Admin xem xét. Vui
+              lòng đợi từ 24-48 giờ.
             </Typography>
           </Box>
 
-          {/* Status Badge */}
-          <Chip
-            label="Đang xử lý..."
-            color="warning"
-            size="small"
-            sx={{ fontWeight: 600, flexShrink: 0 }}
-          />
+          {/* Status Chip */}
+          <Chip label="Đang chờ" color="warning" size="small" />
         </Box>
       );
     }
 
-    // CASE 2: Rejected - Bị từ chối (cho phép gửi lại)
+    // CASE 2: Đã bị từ chối - User có thể gửi lại yêu cầu
     if (requestStatus?.status === "rejected") {
       return (
         <Box
@@ -336,21 +437,20 @@ const ProfilePage = () => {
           {/* Content */}
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Yêu cầu bị từ chối
+              Yêu cầu đã bị từ chối
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {requestStatus.rejectionReason ||
-                "Yêu cầu của bạn không đáp ứng đủ điều kiện. Vui lòng xem lại thông tin và gửi lại."}
+              {requestStatus?.rejectionReason ||
+                "Yêu cầu của bạn không được duyệt. Bạn có thể gửi lại yêu cầu mới."}
             </Typography>
           </Box>
 
-          {/* Action Button */}
+          {/* Retry Button */}
           <Button
             variant="outlined"
             color="error"
             size="small"
             onClick={() => setUpgradeDialogOpen(true)}
-            sx={{ flexShrink: 0 }}
           >
             Gửi lại
           </Button>
@@ -358,8 +458,7 @@ const ProfilePage = () => {
       );
     }
 
-    // CASE 3: Chưa gửi yêu cầu - Hiển thị banner mời đăng ký Author
-    // Match design: Trang thông tin cá nhân.png
+    // CASE 3: Chưa gửi yêu cầu - Hiển thị banner mời gửi
     return (
       <Box
         sx={{
@@ -374,7 +473,7 @@ const ProfilePage = () => {
           gap: 2,
         }}
       >
-        {/* Icon Trophy */}
+        {/* Icon */}
         <Box
           sx={{
             width: 48,
@@ -393,27 +492,22 @@ const ProfilePage = () => {
         {/* Content */}
         <Box sx={{ flex: 1 }}>
           <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            Trở thành tác giả (Author)
+            Trở thành Tác giả
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Đóng góp tài liệu, chia sẻ kiến thức và xây dựng danh tiếng học
-            thuật của bạn trong cộng đồng VLU.
+            Đăng ký để có thể chia sẻ tài liệu với cộng đồng VLU. Yêu cầu sẽ
+            được Admin xét duyệt trong vòng 24-48 giờ.
           </Typography>
         </Box>
 
-        {/* Action Button */}
+        {/* CTA Button */}
         <Button
-          variant="text"
-          sx={{
-            color: "primary.main",
-            fontWeight: 600,
-            textTransform: "none",
-            flexShrink: 0,
-            whiteSpace: "nowrap",
-          }}
+          variant="contained"
+          color="primary"
+          size="small"
           onClick={() => setUpgradeDialogOpen(true)}
         >
-          Đăng ký tác giả
+          Đăng ký ngay
         </Button>
       </Box>
     );
@@ -518,30 +612,93 @@ const ProfilePage = () => {
                       mt: 2,
                     }}
                   >
-                    {/* Avatar */}
-                    <Avatar
-                      src={formData.avatar}
-                      alt={formData.name}
-                      sx={{
-                        width: 100,
-                        height: 100,
-                        border: "4px solid",
-                        borderColor: "primary.main",
-                      }}
+                    {/* Avatar with Upload Badge */}
+                    <Badge
+                      overlap="circular"
+                      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                      badgeContent={
+                        <IconButton
+                          component="label"
+                          disabled={uploadingAvatar}
+                          sx={{
+                            bgcolor: "primary.main",
+                            color: "white",
+                            width: 36,
+                            height: 36,
+                            border: "3px solid white",
+                            boxShadow: 2,
+                            "&:hover": {
+                              bgcolor: "primary.dark",
+                            },
+                            "&.Mui-disabled": {
+                              bgcolor: "grey.400",
+                              color: "white",
+                            },
+                          }}
+                        >
+                          <CameraAltIcon sx={{ fontSize: 18 }} />
+                          <input
+                            type="file"
+                            hidden
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            onChange={handleAvatarChange}
+                          />
+                        </IconButton>
+                      }
                     >
-                      {formData.name?.charAt(0).toUpperCase()}
-                    </Avatar>
+                      <Box sx={{ position: "relative" }}>
+                        {/* SỬA: Sử dụng getFullAvatarUrl để build full URL */}
+                        <Avatar
+                          src={getFullAvatarUrl(formData.avatar)}
+                          alt={formData.name}
+                          sx={{
+                            width: 100,
+                            height: 100,
+                            border: "4px solid",
+                            borderColor: "primary.main",
+                            opacity: uploadingAvatar ? 0.5 : 1,
+                            transition: "opacity 0.3s",
+                          }}
+                        >
+                          {formData.name?.charAt(0).toUpperCase()}
+                        </Avatar>
 
-                    {/* Upload Button */}
+                        {/* Loading overlay on avatar */}
+                        {uploadingAvatar && (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <CircularProgress size={40} />
+                          </Box>
+                        )}
+                      </Box>
+                    </Badge>
+
+                    {/* Upload Instructions */}
                     <Box>
                       <Button
                         variant="outlined"
                         startIcon={<PhotoCameraIcon />}
                         component="label"
                         size="small"
+                        disabled={uploadingAvatar}
                       >
-                        Tải ảnh lên
-                        <input type="file" hidden accept="image/*" />
+                        {uploadingAvatar ? "Đang tải..." : "Tải ảnh lên"}
+                        <input
+                          type="file"
+                          hidden
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={handleAvatarChange}
+                        />
                       </Button>
                       <Typography
                         variant="caption"
@@ -549,7 +706,7 @@ const ProfilePage = () => {
                         display="block"
                         sx={{ mt: 1 }}
                       >
-                        Cho phép định dạng JPG, GIF hoặc PNG.
+                        Cho phép định dạng JPG, PNG, GIF hoặc WEBP.
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         Kích thước tối đa 5MB.

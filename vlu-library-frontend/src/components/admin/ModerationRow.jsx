@@ -123,7 +123,8 @@ const ModerationRow = ({ document, currentTab = 0, onReview }) => {
               {document.title}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              PDF • {formatFileSize(document.fileSize)}
+              {document.fileFormat.toUpperCase()} •{" "}
+              {formatFileSize(document.fileSize)}
             </Typography>
           </Box>
         </Box>

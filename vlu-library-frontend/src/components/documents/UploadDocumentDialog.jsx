@@ -24,13 +24,35 @@ import {
   InsertDriveFile as FileIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
+  MenuBook as EpubIcon, // Icon cho EPUB
+  PictureAsPdf as PdfIcon, // Icon cho PDF
 } from "@mui/icons-material";
 import documentsAPI from "../../api/documents.api";
 import categoriesAPI from "../../api/categories.api";
 
 /**
+ * Danh sách MIME types và extensions được hỗ trợ
+ */
+const SUPPORTED_FORMATS = {
+  "application/pdf": {
+    extension: ".pdf",
+    label: "PDF",
+    color: "error", // Màu đỏ cho PDF
+  },
+  "application/epub+zip": {
+    extension: ".epub",
+    label: "EPUB",
+    color: "warning", // Màu cam cho EPUB
+  },
+};
+
+const ACCEPTED_EXTENSIONS = ".pdf,.epub";
+const ACCEPTED_MIME_TYPES = Object.keys(SUPPORTED_FORMATS);
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+/**
  * UploadDocumentDialog Component
- * Dialog cho phép Author tải lên tài liệu mới (PDF)
+ * Dialog cho phép Author tải lên tài liệu mới (PDF hoặc EPUB)
  * Có hỗ trợ Progress Bar và Success View
  *
  * @param {boolean} open - Trạng thái mở dialog
@@ -76,7 +98,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
     }
   }, [open]);
 
-  // Tự động điền title bằng tên file (bỏ đuôi .pdf) nếu title đang trống
+  // Tự động điền title bằng tên file (bỏ đuôi) nếu title đang trống
   useEffect(() => {
     if (file && !formData.title) {
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
@@ -133,18 +155,20 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
     }
   }, []);
 
+  /**
+   * Validate file - kiểm tra định dạng và kích thước
+   */
   const validateFile = (selectedFile) => {
     if (!selectedFile) return false;
 
-    // 1. Check type PDF
-    if (selectedFile.type !== "application/pdf") {
-      setError("Chỉ chấp nhận định dạng file PDF.");
+    // 1. Check type (PDF hoặc EPUB)
+    if (!ACCEPTED_MIME_TYPES.includes(selectedFile.type)) {
+      setError("Định dạng file không được hỗ trợ. Chỉ chấp nhận PDF và EPUB.");
       return false;
     }
 
-    // 2. Check size (50MB = 52428800 bytes)
-    const maxSize = 50 * 1024 * 1024;
-    if (selectedFile.size > maxSize) {
+    // 2. Check size (50MB)
+    if (selectedFile.size > MAX_FILE_SIZE) {
       setError("Kích thước file quá lớn (Giới hạn 50MB).");
       return false;
     }
@@ -162,7 +186,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       if (validateFile(droppedFile)) {
         setFile(droppedFile);
       } else {
-        setFile(null); // Reset file if invalid
+        setFile(null);
       }
     }
   }, []);
@@ -174,7 +198,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
         setFile(selectedFile);
       } else {
         setFile(null);
-        e.target.value = ""; // Clear input to allow re-selecting same bad file
+        e.target.value = "";
       }
     }
   };
@@ -208,7 +232,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       const data = new FormData();
       data.append("file", file);
       data.append("title", formData.title.trim());
-      data.append("category", formData.categoryId); // Backend dùng 'category'
+      data.append("category", formData.categoryId);
       data.append("description", formData.description.trim());
       data.append("publishYear", formData.publishYear);
       if (formData.author) data.append("author", formData.author);
@@ -229,7 +253,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
         err.response?.data?.errors?.[0]?.message ||
         "Có lỗi xảy ra khi tải lên. Vui lòng thử lại.";
       setError(msg);
-      setUploadStatus("idle"); // Quay về idle để user sửa lỗi và thử lại
+      setUploadStatus("idle");
     }
   };
 
@@ -240,6 +264,27 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  /**
+   * Lấy thông tin format của file hiện tại
+   */
+  const getFileFormatInfo = () => {
+    if (!file) return null;
+    return SUPPORTED_FORMATS[file.type] || SUPPORTED_FORMATS["application/pdf"];
+  };
+
+  /**
+   * Render icon tương ứng với định dạng file
+   */
+  const renderFileIcon = () => {
+    const formatInfo = getFileFormatInfo();
+    if (!formatInfo) return <FileIcon color="action" fontSize="large" />;
+
+    if (file.type === "application/epub+zip") {
+      return <EpubIcon color="warning" fontSize="large" />;
+    }
+    return <PdfIcon color="error" fontSize="large" />;
   };
 
   const isUploading = uploadStatus === "uploading";
@@ -264,82 +309,67 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          pb: 1,
-          borderBottom: isSuccess ? "none" : undefined,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          pb: 2,
         }}
       >
-        {!isSuccess && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <CloudUploadIcon color="primary" />
-            <Typography variant="h6" fontWeight="bold">
-              Tải lên tài liệu mới
-            </Typography>
-          </Box>
+        <Typography variant="h6" fontWeight="bold">
+          Tải lên tài liệu mới
+        </Typography>
+        {!isUploading && (
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
         )}
-        <IconButton onClick={onClose} disabled={isUploading} size="small">
-          <CloseIcon />
-        </IconButton>
       </DialogTitle>
 
-      {/* Content */}
-      <DialogContent dividers={!isSuccess}>
+      <DialogContent sx={{ pt: 3 }}>
+        {/* Success View */}
         {isSuccess ? (
-          /* SUCCESS VIEW */
-          <Fade in={true}>
+          <Fade in={isSuccess}>
             <Box
               sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                py: 6,
                 textAlign: "center",
+                py: 6,
               }}
             >
               <CheckCircleIcon
-                sx={{ fontSize: 100, color: "success.main", mb: 2 }}
+                sx={{
+                  fontSize: 80,
+                  color: theme.palette.success.main,
+                  mb: 3,
+                }}
               />
-              <Typography variant="h4" fontWeight="bold" gutterBottom>
+              <Typography variant="h5" fontWeight="bold" gutterBottom>
                 Tải lên thành công!
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                Tài liệu của bạn đã được gửi và đang chờ kiểm duyệt.
+                Tài liệu của bạn đã được gửi đi và đang chờ kiểm duyệt.
               </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={onClose}
-                  color="inherit"
-                  sx={{ minWidth: 120 }}
-                >
-                  Đóng
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={resetForm}
-                  color="primary"
-                  sx={{ minWidth: 180 }}
-                >
-                  Tải thêm tài liệu
-                </Button>
-              </Box>
+              <Button
+                variant="contained"
+                onClick={onClose}
+                sx={{ minWidth: 150 }}
+              >
+                Đóng
+              </Button>
             </Box>
           </Fade>
         ) : (
-          /* UPLOAD FORM */
           <>
             {/* Error Alert */}
             {error && (
               <Alert
                 severity="error"
                 sx={{ mb: 3 }}
-                icon={<ErrorIcon fontSize="inherit" />}
+                icon={<ErrorIcon />}
+                onClose={() => setError("")}
               >
                 {error}
               </Alert>
             )}
 
-            {/* Dropzone Area */}
+            {/* Dropzone */}
             {!file ? (
               <Box
                 onDragEnter={handleDrag}
@@ -376,7 +406,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
                 <input
                   id="file-upload-input"
                   type="file"
-                  accept=".pdf"
+                  accept={ACCEPTED_EXTENSIONS}
                   hidden
                   onChange={handleFileSelect}
                   disabled={isUploading}
@@ -391,10 +421,62 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
                   }}
                 />
                 <Typography variant="h6" color="text.primary" gutterBottom>
-                  Kéo thả tệp PDF vào đây hoặc nhấn để chọn
+                  Kéo thả tệp PDF hoặc EPUB vào đây
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Chỉ chấp nhận định dạng PDF. Kích thước tối đa 50MB.
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  hoặc nhấn để chọn file từ máy tính
+                </Typography>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: 2,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 2,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                    }}
+                  >
+                    <PdfIcon fontSize="small" color="error" />
+                    <Typography variant="caption" color="error.main">
+                      PDF
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 2,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    }}
+                  >
+                    <EpubIcon fontSize="small" color="warning" />
+                    <Typography variant="caption" color="warning.main">
+                      EPUB
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 2 }}
+                >
+                  Kích thước tối đa 50MB
                 </Typography>
               </Box>
             ) : (
@@ -413,14 +495,35 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <FileIcon color="error" fontSize="large" />
+                  {renderFileIcon()}
                   <Box>
                     <Typography variant="subtitle2" fontWeight="bold">
                       {file.name}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatFileSize(file.size)}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatFileSize(file.size)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          px: 1,
+                          py: 0.25,
+                          borderRadius: 0.5,
+                          bgcolor:
+                            file.type === "application/epub+zip"
+                              ? alpha(theme.palette.warning.main, 0.1)
+                              : alpha(theme.palette.error.main, 0.1),
+                          color:
+                            file.type === "application/epub+zip"
+                              ? "warning.main"
+                              : "error.main",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {getFileFormatInfo()?.label || "PDF"}
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
                 {!isUploading && (

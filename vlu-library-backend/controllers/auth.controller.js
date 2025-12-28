@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const axios = require("axios"); // THÊM: Import axios cho Microsoft Graph API
 const User = require("../models/user.model");
 const RefreshToken = require("../models/refreshToken.model");
 
@@ -598,6 +599,184 @@ const revoke = async (req, res) => {
   }
 };
 
+/**
+ * API: Đăng nhập bằng Microsoft
+ * POST /api/auth/microsoft-login
+ * Body: { accessToken } - Access token từ MSAL (frontend)
+ *
+ * Flow:
+ * 1. Frontend dùng MSAL để login Microsoft, nhận được accessToken
+ * 2. Frontend gửi accessToken xuống backend
+ * 3. Backend verify token bằng cách gọi Microsoft Graph API
+ * 4. Nếu hợp lệ -> tạo/cập nhật user -> trả về JWT của hệ thống
+ */
+const loginWithMicrosoft = async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    // Validation
+    if (!accessToken) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Access Token là bắt buộc",
+      });
+    }
+
+    // 1. Gọi Microsoft Graph API để lấy thông tin user từ token
+    // Bước này giúp xác thực token là thật, do Microsoft cấp
+    let msUser;
+    try {
+      const msResponse = await axios.get(
+        "https://graph.microsoft.com/v1.0/me",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+      );
+      msUser = msResponse.data;
+    } catch (msError) {
+      console.error(
+        "Microsoft Graph API Error:",
+        msError.response?.data || msError.message,
+      );
+      return res.status(401).json({
+        status: "error",
+        code: 401,
+        message: "Token Microsoft không hợp lệ hoặc đã hết hạn",
+      });
+    }
+
+    // msUser sẽ có: { id, displayName, mail, userPrincipalName, ... }
+    const email = (msUser.mail || msUser.userPrincipalName || "").toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Không thể lấy email từ tài khoản Microsoft",
+      });
+    }
+
+    // 2. Kiểm tra domain email (Backend validation - bắt buộc)
+    if (!email.endsWith("@vanlanguni.vn") && !email.endsWith("@vlu.edu.vn")) {
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message:
+          "Chỉ chấp nhận email @vanlanguni.vn hoặc @vlu.edu.vn của trường Đại học Văn Lang",
+      });
+    }
+
+    // 3. Tìm user trong DB
+    let user = await User.findOne({ email: email });
+    let isNewUser = false;
+
+    if (!user) {
+      // 4a. Nếu chưa có -> Tự động đăng ký (Register)
+      isNewUser = true;
+      user = new User({
+        name: msUser.displayName || email.split("@")[0], // Dùng đúng field 'name' như model
+        email: email,
+        passwordHash: null, // Không cần password vì login qua Microsoft
+        status: "active",
+        role: "User", // Mặc định là User
+        authProvider: "microsoft", // Đánh dấu user này login qua MS
+        microsoftId: msUser.id, // Lưu Microsoft ID để tracking
+        avatarUrl: null,
+      });
+      await user.save();
+      console.log(`[Microsoft Login] New user created: ${email}`);
+    } else {
+      // 4b. Nếu user đã tồn tại
+      // Cập nhật microsoftId nếu chưa có (link account)
+      if (!user.microsoftId) {
+        user.microsoftId = msUser.id;
+        user.authProvider = user.authProvider || "microsoft";
+        await user.save();
+        console.log(`[Microsoft Login] Linked Microsoft account: ${email}`);
+      }
+
+      // Kiểm tra trạng thái user
+      if (user.status === "locked") {
+        return res.status(403).json({
+          status: "error",
+          code: 403,
+          message: "Tài khoản đã bị khóa",
+          data: {
+            lockReason: user.lockReason,
+          },
+        });
+      }
+    }
+
+    // 5. Tạo JWT Token của hệ thống VLU Library
+    const jwtAccessToken = jwt.sign(
+      {
+        sub: user._id,
+        role: user.role,
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1h" },
+    );
+
+    // 6. Tạo Refresh Token
+    const jwtRefreshToken = jwt.sign(
+      {
+        sub: user._id,
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" },
+    );
+
+    // 7. Lưu Refresh Token vào database
+    const refreshTokenExpiresAt = new Date();
+    refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
+
+    await RefreshToken.createToken(
+      user._id,
+      jwtRefreshToken,
+      refreshTokenExpiresAt,
+      {
+        deviceInfo: req.headers["user-agent"],
+        ipAddress: req.ip || req.connection.remoteAddress,
+        loginMethod: "microsoft",
+      },
+    );
+
+    // 8. Trả về response (format giống login thường để frontend xử lý thống nhất)
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: isNewUser
+        ? "Đăng ký và đăng nhập thành công qua Microsoft"
+        : "Đăng nhập thành công qua Microsoft",
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+        },
+        accessToken: jwtAccessToken,
+        refreshToken: jwtRefreshToken,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Microsoft Login Error:",
+      error.response?.data || error.message,
+    );
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi đăng nhập bằng Microsoft",
+    });
+  }
+};
+
+// Export tất cả functions
 module.exports = {
   register,
   login,
@@ -606,4 +785,5 @@ module.exports = {
   me,
   logout,
   revoke,
+  loginWithMicrosoft,
 };

@@ -1,4 +1,5 @@
 const Category = require("../models/category.model");
+const Document = require("../models/document.model");
 
 /**
  * API 2.1: Tạo danh mục mới (F10)
@@ -9,7 +10,6 @@ const createCategory = async (req, res) => {
   try {
     const { name, description, parentId } = req.body;
 
-    // Validation: Kiểm tra name bắt buộc
     if (!name || !name.trim()) {
       return res.status(400).json({
         status: "error",
@@ -24,7 +24,6 @@ const createCategory = async (req, res) => {
       });
     }
 
-    // Kiểm tra tên danh mục đã tồn tại chưa
     const existingCategory = await Category.findOne({
       name: name.trim(),
     });
@@ -43,7 +42,6 @@ const createCategory = async (req, res) => {
       });
     }
 
-    // Nếu có parentId, kiểm tra danh mục cha có tồn tại không
     if (parentId) {
       const parentCategory = await Category.findById(parentId);
       if (!parentCategory) {
@@ -55,8 +53,6 @@ const createCategory = async (req, res) => {
       }
     }
 
-    // Tạo danh mục mới
-    // Slug sẽ được tự động tạo bởi pre-save hook
     const newCategory = new Category({
       name: name.trim(),
       description: description ? description.trim() : "",
@@ -65,7 +61,6 @@ const createCategory = async (req, res) => {
 
     await newCategory.save();
 
-    // Trả về response thành công
     return res.status(201).json({
       status: "success",
       code: 201,
@@ -85,7 +80,6 @@ const createCategory = async (req, res) => {
   } catch (error) {
     console.error("Create category error:", error);
 
-    // Xử lý lỗi validation của Mongoose
     if (error.name === "ValidationError") {
       const errors = Object.keys(error.errors).map((field) => ({
         field,
@@ -118,7 +112,6 @@ const updateCategory = async (req, res) => {
     const { id } = req.params;
     const { name, description, parentId } = req.body;
 
-    // Tìm danh mục cần cập nhật
     const category = await Category.findById(id);
 
     if (!category) {
@@ -129,11 +122,10 @@ const updateCategory = async (req, res) => {
       });
     }
 
-    // Nếu cập nhật name, kiểm tra trùng lặp (trừ chính nó)
     if (name && name.trim() !== category.name) {
       const existingCategory = await Category.findOne({
         name: name.trim(),
-        _id: { $ne: id }, // Loại trừ chính nó
+        _id: { $ne: id },
       });
 
       if (existingCategory) {
@@ -150,22 +142,17 @@ const updateCategory = async (req, res) => {
         });
       }
 
-      // Cập nhật name và slug sẽ được tự động tạo lại bởi pre-save hook
       category.name = name.trim();
     }
 
-    // Cập nhật description
     if (description !== undefined) {
       category.description = description.trim();
     }
 
-    // Cập nhật parentId
     if (parentId !== undefined) {
-      // Nếu parentId null, đặt thành null
       if (!parentId) {
         category.parentId = null;
       } else {
-        // Kiểm tra danh mục cha có tồn tại không
         const parentCategory = await Category.findById(parentId);
         if (!parentCategory) {
           return res.status(404).json({
@@ -175,7 +162,6 @@ const updateCategory = async (req, res) => {
           });
         }
 
-        // Không cho phép đặt chính nó làm danh mục cha
         if (parentId === id) {
           return res.status(400).json({
             status: "error",
@@ -190,7 +176,6 @@ const updateCategory = async (req, res) => {
 
     await category.save();
 
-    // Trả về response thành công
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -210,7 +195,6 @@ const updateCategory = async (req, res) => {
   } catch (error) {
     console.error("Update category error:", error);
 
-    // Xử lý lỗi validation của Mongoose
     if (error.name === "ValidationError") {
       const errors = Object.keys(error.errors).map((field) => ({
         field,
@@ -237,13 +221,11 @@ const updateCategory = async (req, res) => {
  * API 2.3: Xóa danh mục (F10)
  * DELETE /api/admin/categories/:id
  * Access: Admin
- * Không cho phép xóa danh mục đang chứa tài liệu (documentCount > 0)
  */
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Tìm danh mục cần xóa
     const category = await Category.findById(id);
 
     if (!category) {
@@ -254,7 +236,6 @@ const deleteCategory = async (req, res) => {
       });
     }
 
-    // QUAN TRỌNG: Kiểm tra documentCount
     if (category.documentCount > 0) {
       return res.status(400).json({
         status: "error",
@@ -263,10 +244,8 @@ const deleteCategory = async (req, res) => {
       });
     }
 
-    // Xóa danh mục
     await Category.findByIdAndDelete(id);
 
-    // Trả về response thành công
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -284,36 +263,81 @@ const deleteCategory = async (req, res) => {
 };
 
 /**
- * API 2.4: Lấy danh sách tất cả danh mục (F10)
- * GET /api/categories
- * Access: Public
+ * API 2.4: Lấy danh sách tất cả danh mục
+ * GET /api/categories (Public - đếm approved only)
+ * GET /api/admin/categories (Admin - đếm tất cả status)
+ *
+ * Logic phân biệt tự động dựa trên route:
+ * - Public route (/api/categories): documentCount = số tài liệu APPROVED
+ * - Admin route (/api/admin/categories): documentCount = TỔNG tất cả (như cũ)
+ *
+ * Điều này đảm bảo:
+ * - User/Author/Guest thấy đúng số tài liệu họ có thể xem
+ * - Admin thấy tổng số để quản lý
+ *
+ * KHÔNG CẦN thay đổi frontend hay thêm route mới!
  */
 const getAllCategories = async (req, res) => {
   try {
-    // Tìm tất cả danh mục
+    // Kiểm tra route để xác định mode đếm
+    const isAdminRoute = req.originalUrl.startsWith("/api/admin");
+
+    // Lấy tất cả danh mục
     const categories = await Category.find()
-      .sort({ name: 1 }) // Sắp xếp theo tên A-Z
+      .sort({ name: 1 })
       .select(
         "_id name description slug parentId documentCount createdAt updatedAt",
-      );
+      )
+      .lean();
 
-    // Trả về response thành công
+    let result;
+
+    if (isAdminRoute) {
+      // ADMIN: Trả về documentCount gốc (tổng tất cả status)
+      // Đây là giá trị được lưu trong Category model
+      result = categories.map((cat) => ({
+        id: cat._id,
+        name: cat.name,
+        description: cat.description,
+        slug: cat.slug,
+        parentId: cat.parentId,
+        documentCount: cat.documentCount, // Tổng tất cả
+        createdAt: cat.createdAt,
+        updatedAt: cat.updatedAt,
+      }));
+    } else {
+      // PUBLIC: Đếm lại số tài liệu APPROVED cho mỗi category
+      const approvedCounts = await Document.aggregate([
+        { $match: { status: "approved" } },
+        { $group: { _id: "$categoryId", count: { $sum: 1 } } },
+      ]);
+
+      // Tạo map để lookup nhanh: { categoryId: approvedCount }
+      const countMap = new Map();
+      approvedCounts.forEach((item) => {
+        countMap.set(item._id.toString(), item.count);
+      });
+
+      // Gán documentCount = số approved
+      result = categories.map((cat) => ({
+        id: cat._id,
+        name: cat.name,
+        description: cat.description,
+        slug: cat.slug,
+        parentId: cat.parentId,
+        documentCount: countMap.get(cat._id.toString()) || 0, // Chỉ approved
+        createdAt: cat.createdAt,
+        updatedAt: cat.updatedAt,
+      }));
+    }
+
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Lấy danh sách danh mục thành công",
       data: {
-        categories: categories.map((cat) => ({
-          id: cat._id,
-          name: cat.name,
-          description: cat.description,
-          slug: cat.slug,
-          parentId: cat.parentId,
-          documentCount: cat.documentCount,
-          createdAt: cat.createdAt,
-          updatedAt: cat.updatedAt,
-        })),
-        total: categories.length,
+        categories: result,
+        total: result.length,
       },
     });
   } catch (error) {

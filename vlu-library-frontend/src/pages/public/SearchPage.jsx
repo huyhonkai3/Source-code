@@ -97,7 +97,7 @@ const SearchPage = () => {
         // Build query params from URL
         const params = {
           q: searchParams.get("q") || "",
-          category: searchParams.getAll("category"),
+          category: searchParams.getAll("category"), // Lấy tất cả category values
           page: searchParams.get("page") || 1,
           limit: 12,
           sort: searchParams.get("sort") || "newest",
@@ -116,7 +116,10 @@ const SearchPage = () => {
           }
         });
 
+        console.log("[SearchPage] Fetching documents with params:", params);
+
         const response = await documentsAPI.getAll(params);
+        console.log("[SearchPage] Response:", response);
 
         if (response.status === "success") {
           setDocuments(response.data.documents || []);
@@ -163,14 +166,36 @@ const SearchPage = () => {
    */
   const handleSearch = (e) => {
     e.preventDefault();
-    const params = Object.fromEntries(searchParams);
+
+    // Tạo URLSearchParams mới, chỉ giữ lại các filter hiện tại
+    const newParams = new URLSearchParams();
+
+    // Giữ lại search keyword
     if (searchKeyword.trim()) {
-      params.q = searchKeyword.trim();
-    } else {
-      delete params.q;
+      newParams.set("q", searchKeyword.trim());
     }
-    params.page = "1"; // Reset to first page
-    setSearchParams(params);
+
+    // Giữ lại categories
+    searchParams.getAll("category").forEach((cat) => {
+      newParams.append("category", cat);
+    });
+
+    // Giữ lại các filter khác
+    if (searchParams.get("yearFrom")) {
+      newParams.set("yearFrom", searchParams.get("yearFrom"));
+    }
+    if (searchParams.get("yearTo")) {
+      newParams.set("yearTo", searchParams.get("yearTo"));
+    }
+    if (searchParams.get("type")) {
+      newParams.set("type", searchParams.get("type"));
+    }
+    if (searchParams.get("sort")) {
+      newParams.set("sort", searchParams.get("sort"));
+    }
+
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   /**
@@ -178,44 +203,66 @@ const SearchPage = () => {
    */
   const handleTagClick = (tag) => {
     setSearchKeyword(tag);
-    const params = Object.fromEntries(searchParams);
-    params.q = tag;
-    params.page = "1";
-    setSearchParams(params);
+    const newParams = new URLSearchParams();
+    newParams.set("q", tag);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   /**
-   * Handle filter apply
+   * Handle filter apply from SearchSidebar
+   *
+   * FIX: Tạo URLSearchParams hoàn toàn mới để tránh bug với multiple category values
    */
   const handleFilter = (filters) => {
-    const params = Object.fromEntries(searchParams);
+    console.log("[SearchPage] handleFilter called with:", filters);
 
-    // Remove old filter params
-    delete params.category;
-    delete params.yearFrom;
-    delete params.yearTo;
-    delete params.type;
+    // Tạo URLSearchParams MỚI HOÀN TOÀN
+    const newParams = new URLSearchParams();
 
-    // Add new filters
-    if (filters.category && filters.category.length > 0) {
-      // For multiple categories, we need to handle differently
-      // Using array format in URL
-      const newParams = new URLSearchParams(params);
-      filters.category.forEach((cat) => {
-        newParams.append("category", cat);
-      });
-      if (filters.yearFrom) newParams.set("yearFrom", filters.yearFrom);
-      if (filters.yearTo) newParams.set("yearTo", filters.yearTo);
-      if (filters.type) newParams.set("type", filters.type);
-      newParams.set("page", "1");
-      setSearchParams(newParams);
-      return;
+    // 1. Giữ lại search keyword (q) nếu có
+    const currentQ = searchParams.get("q");
+    if (currentQ) {
+      newParams.set("q", currentQ);
     }
 
-    // No categories selected
-    Object.assign(params, filters);
-    params.page = "1";
-    setSearchParams(params);
+    // 2. Giữ lại sort nếu có
+    const currentSort = searchParams.get("sort");
+    if (currentSort) {
+      newParams.set("sort", currentSort);
+    }
+
+    // 3. Thêm categories từ filter
+    // QUAN TRỌNG: Gửi từng category riêng biệt với key "category" (không có [])
+    // Express sẽ tự động gộp thành array khi có nhiều giá trị cùng key
+    if (filters.category && filters.category.length > 0) {
+      filters.category.forEach((catId) => {
+        newParams.append("category", catId);
+      });
+    }
+
+    // 4. Thêm yearFrom nếu có
+    if (filters.yearFrom) {
+      newParams.set("yearFrom", filters.yearFrom);
+    }
+
+    // 5. Thêm yearTo nếu có
+    if (filters.yearTo) {
+      newParams.set("yearTo", filters.yearTo);
+    }
+
+    // 6. Thêm type nếu có
+    if (filters.type) {
+      newParams.set("type", filters.type);
+    }
+
+    // 7. Reset về page 1
+    newParams.set("page", "1");
+
+    console.log("[SearchPage] Setting new params:", newParams.toString());
+
+    // Update URL
+    setSearchParams(newParams);
   };
 
   /**
@@ -224,19 +271,39 @@ const SearchPage = () => {
   const handleSortChange = (event) => {
     const newSort = event.target.value;
     setSortBy(newSort);
-    const params = Object.fromEntries(searchParams);
-    params.sort = newSort;
-    params.page = "1";
-    setSearchParams(params);
+
+    // Tạo URLSearchParams mới để giữ lại tất cả params
+    const newParams = new URLSearchParams();
+
+    // Copy tất cả params hiện tại
+    searchParams.forEach((value, key) => {
+      if (key !== "sort" && key !== "page") {
+        newParams.append(key, value);
+      }
+    });
+
+    newParams.set("sort", newSort);
+    newParams.set("page", "1");
+    setSearchParams(newParams);
   };
 
   /**
    * Handle page change
    */
   const handlePageChange = (event, value) => {
-    const params = Object.fromEntries(searchParams);
-    params.page = value.toString();
-    setSearchParams(params);
+    // Tạo URLSearchParams mới để giữ lại tất cả params
+    const newParams = new URLSearchParams();
+
+    // Copy tất cả params hiện tại
+    searchParams.forEach((value, key) => {
+      if (key !== "page") {
+        newParams.append(key, value);
+      }
+    });
+
+    newParams.set("page", value.toString());
+    setSearchParams(newParams);
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -246,9 +313,9 @@ const SearchPage = () => {
    */
   const getInitialFilters = () => {
     return {
-      category: searchParams.getAll("category"),
-      yearFrom: searchParams.get("yearFrom"),
-      yearTo: searchParams.get("yearTo"),
+      category: searchParams.getAll("category"), // Lấy TẤT CẢ category values
+      yearFrom: searchParams.get("yearFrom") || "",
+      yearTo: searchParams.get("yearTo") || "",
       type: searchParams.get("type") || "all",
     };
   };

@@ -77,7 +77,7 @@ const DocumentCard = ({ document }) => {
   };
 
   // Calculate average rating (mock for now)
-  const avgRating = document.avgRating || 4.5;
+  const avgRating = document.rating || 0.0;
 
   return (
     <Card

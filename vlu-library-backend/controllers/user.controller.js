@@ -1,9 +1,11 @@
 const User = require("../models/user.model");
 const UpgradeRequest = require("../models/upgradeRequest.model");
-const bcrypt = require("bcryptjs"); // Cần import để so sánh password
+const bcrypt = require("bcryptjs");
+const path = require("path");
+const fs = require("fs");
 
 /**  API 1.9 – Lấy thông tin cá nhân
- * @route GET /api/users/profile bị trùng chức năng với api 1.9 trong auth.controller.js
+ * @route GET /api/users/profile
  * @param {Object} req - Request object
  * @param {Object} res - Response object
  * @returns {Promise<void>}
@@ -52,7 +54,7 @@ exports.updateProfile = async (req, res) => {
         address,
         avatar,
       },
-      { new: true, runValidators: true }, // new: true trả về data mới
+      { new: true, runValidators: true },
     ).select("-password -passwordHash");
 
     res.json({
@@ -62,6 +64,95 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+/** API - Upload Avatar
+ * @route POST /api/users/avatar
+ * @description Upload và cập nhật ảnh đại diện
+ */
+exports.uploadAvatar = async (req, res) => {
+  try {
+    // Kiểm tra file đã được upload chưa
+    if (!req.file) {
+      return res.status(400).json({
+        status: "error",
+        message: "Vui lòng chọn ảnh để upload",
+      });
+    }
+
+    const userId = req.user.id;
+
+    // Lấy thông tin user hiện tại để xóa avatar cũ (nếu có)
+    const currentUser = await User.findById(userId);
+
+    // Xóa avatar cũ nếu tồn tại và là file local
+    if (currentUser?.avatarUrl) {
+      const oldAvatarPath = currentUser.avatarUrl;
+      // Chỉ xóa nếu là file local (bắt đầu bằng /uploads/)
+      if (oldAvatarPath.startsWith("/uploads/")) {
+        const fullOldPath = path.join(".", oldAvatarPath);
+        if (fs.existsSync(fullOldPath)) {
+          try {
+            fs.unlinkSync(fullOldPath);
+            console.log(`Deleted old avatar: ${fullOldPath}`);
+          } catch (deleteError) {
+            console.error("Error deleting old avatar:", deleteError);
+            // Không throw error, tiếp tục upload avatar mới
+          }
+        }
+      }
+    }
+
+    // Tạo URL cho avatar mới
+    // Format: /uploads/avatars/filename.jpg
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    // Cập nhật avatarUrl trong database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { avatarUrl: avatarUrl },
+      { new: true, runValidators: true },
+    ).select("-password -passwordHash");
+
+    if (!updatedUser) {
+      // Xóa file vừa upload nếu không tìm thấy user
+      const uploadedFilePath = req.file.path;
+      if (fs.existsSync(uploadedFilePath)) {
+        fs.unlinkSync(uploadedFilePath);
+      }
+
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    // Trả về kết quả thành công
+    res.json({
+      status: "success",
+      message: "Cập nhật ảnh đại diện thành công",
+      data: {
+        avatarUrl: updatedUser.avatarUrl,
+        user: updatedUser,
+      },
+    });
+  } catch (error) {
+    console.error("Upload avatar error:", error);
+
+    // Xóa file đã upload nếu có lỗi
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (deleteError) {
+        console.error("Error cleaning up uploaded file:", deleteError);
+      }
+    }
+
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Lỗi khi upload ảnh đại diện",
+    });
   }
 };
 

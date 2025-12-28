@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import MicrosoftLoginButton from "../../components/common/MicrosoftLoginButton";
 
 /**
  * Login Page Component
@@ -40,7 +41,7 @@ const LoginPage = () => {
   const [apiError, setApiError] = useState("");
 
   // Auth context
-  const { login, loading } = useAuth();
+  const { login, loginWithMicrosoft, loading } = useAuth();
   const navigate = useNavigate();
 
   /**
@@ -106,6 +107,27 @@ const LoginPage = () => {
    */
   const handleTogglePassword = () => {
     setShowPassword((prev) => !prev);
+  };
+
+  const handleMicrosoftSuccess = async (microsoftAccessToken) => {
+    setApiError("");
+    try {
+      // Gọi hàm loginWithMicrosoft từ context
+      await loginWithMicrosoft(microsoftAccessToken);
+      // Context đã tự handle việc navigate nên không cần navigate ở đây
+    } catch (err) {
+      console.error("Backend Microsoft Login Error:", err);
+      // Hiển thị lỗi từ backend trả về (ví dụ: email không hợp lệ, lỗi server...)
+      setApiError(
+        err.response?.data?.message ||
+          "Đăng nhập Microsoft thất bại. Vui lòng thử lại.",
+      );
+    }
+  };
+
+  const handleMicrosoftError = (error) => {
+    console.error("Frontend Microsoft Login Error:", error);
+    setApiError("Không thể kết nối đến Microsoft. Vui lòng thử lại.");
   };
 
   /**
@@ -395,6 +417,11 @@ const LoginPage = () => {
                 "Đăng nhập"
               )}
             </Button>
+
+            <MicrosoftLoginButton
+              onLoginSuccess={handleMicrosoftSuccess}
+              onError={handleMicrosoftError}
+            />
 
             {/* Divider */}
             <Box sx={{ textAlign: "center", my: 3 }}>

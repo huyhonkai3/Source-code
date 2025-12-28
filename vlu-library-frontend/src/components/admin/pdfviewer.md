@@ -18,15 +18,14 @@ import {
 } from "@mui/icons-material";
 import * as pdfjsLib from "pdfjs-dist";
 
-// IMPORTANT: Configure PDF.js worker for Create React App
-// Using unpkg CDN which is more reliable than cdnjs
+// Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 /**
  * PDFViewer Component
- * Hiển thị file PDF sử dụng PDF.js
+ * Hiển thị file PDF sử dụng PDF.js với authentication
  *
- * @param {string} fileUrl - URL của file PDF
+ * @param {string} fileUrl - URL của file PDF (có thể là API endpoint cần auth)
  * @param {string} fileName - Tên file để download
  */
 const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
@@ -43,8 +42,11 @@ const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
   const [error, setError] = useState(null);
   const [rendering, setRendering] = useState(false);
 
+  // Blob URL để cleanup
+  const [blobUrl, setBlobUrl] = useState(null);
+
   /**
-   * Load PDF document
+   * Load PDF document with authentication
    */
   useEffect(() => {
     if (!fileUrl) {
@@ -59,6 +61,10 @@ const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
     return () => {
       if (pdfDoc) {
         pdfDoc.destroy();
+      }
+      // Revoke blob URL để giải phóng memory
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,14 +81,55 @@ const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
   }, [currentPage, scale, pdfDoc]);
 
   /**
-   * Load PDF from URL
+   * Load PDF from URL with Authorization header
    */
   const loadPDF = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      // Lấy token từ localStorage
+      const token = localStorage.getItem("accessToken");
+
+      // Fetch PDF với Authorization header
+      const response = await fetch(fileUrl, {
+        method: "GET",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      // Kiểm tra response status
+      if (!response.ok) {
+        // Parse error message từ JSON response nếu có
+        let errorMessage = "Không thể tải file PDF";
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Response không phải JSON
+          if (response.status === 401) {
+            errorMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+          } else if (response.status === 403) {
+            errorMessage = "Bạn không có quyền xem tài liệu này.";
+          } else if (response.status === 404) {
+            errorMessage = "Không tìm thấy file PDF.";
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      // Chuyển response thành blob
+      const blob = await response.blob();
+
+      // Tạo blob URL
+      const url = URL.createObjectURL(blob);
+      setBlobUrl(url);
+
+      // Load PDF từ blob URL
+      const loadingTask = pdfjsLib.getDocument(url);
       const pdf = await loadingTask.promise;
 
       setPdfDoc(pdf);
@@ -91,7 +138,7 @@ const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
       setLoading(false);
     } catch (err) {
       console.error("Error loading PDF:", err);
-      setError("Không thể tải file PDF. Vui lòng thử lại.");
+      setError(err.message || "Không thể tải file PDF. Vui lòng thử lại.");
       setLoading(false);
     }
   };
@@ -179,25 +226,49 @@ const PDFViewer = ({ fileUrl, fileName = "document.pdf" }) => {
   };
 
   /**
-   * Handle download
+   * Handle download with authentication
    */
-  const handleDownload = () => {
-    if (fileUrl) {
+  const handleDownload = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      // Nếu đã có blobUrl, dùng luôn
+      if (blobUrl) {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      // Nếu chưa có, fetch lại với auth
+      const response = await fetch(fileUrl, {
+        method: "GET",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Không thể tải file");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-      link.href = fileUrl;
+      link.href = url;
       link.download = fileName;
-      link.target = "_blank";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }
-  };
 
-  /**
-   * Get zoom percentage
-   */
-  const getZoomPercentage = () => {
-    return Math.round(scale * 100);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download error:", err);
+    }
   };
 
   return (

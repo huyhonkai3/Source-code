@@ -65,4 +65,13 @@ router.post("/logout/revoke", authController.revoke);
  */
 router.get("/me", checkAuth, authController.me);
 
+/**
+ * route   POST /api/auth/microsoft-login
+ * desc    Đăng nhập bằng Microsoft
+ * access  Public
+ * body    { accessToken }
+ * returns { user, accessToken, refreshToken }
+ */
+router.post("/microsoft-login", authController.loginWithMicrosoft);
+
 module.exports = router;

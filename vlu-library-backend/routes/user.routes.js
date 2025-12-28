@@ -1,30 +1,71 @@
 const express = require("express");
 const router = express.Router();
+
+// Import Controllers
 const userController = require("../controllers/user.controller");
+
+// Import Middlewares
 const { checkAuth } = require("../middleware/auth.middleware");
+const { uploadAvatar } = require("../middleware/upload.middleware");
 
-// --- CÁC ROUTE NGƯỜI DÙNG CÁ NHÂN ---
+/**
+ * User Routes
+ * Base path: /api/users
+ *
+ * Các route dành cho user đã đăng nhập
+ */
 
-// 1. Xem hồ sơ (GET)- Access: Tất cả người dùng đã đăng nhập - API 1.9
-// URL: /api/users/profile
+// ==================== PROFILE ====================
+
+/**
+ * @route   GET /api/users/profile
+ * @desc    Lấy thông tin cá nhân của user đang đăng nhập
+ * @access  Private (Yêu cầu đăng nhập)
+ */
 router.get("/profile", checkAuth, userController.getProfile);
 
-// 2. Cập nhật hồ sơ (PUT)
-// URL: /api/users/profile
+/**
+ * @route   PUT /api/users/profile
+ * @desc    Cập nhật thông tin cá nhân
+ * @access  Private
+ * @body    { name, phoneNumber, address }
+ */
 router.put("/profile", checkAuth, userController.updateProfile);
 
-// 3. Đổi mật khẩu (PUT)
-// URL: /api/users/change-password
+/**
+ * @route   POST /api/users/avatar
+ * @desc    Upload và cập nhật ảnh đại diện
+ * @access  Private
+ * @body    FormData với field 'avatar' chứa file ảnh
+ * @note    Chấp nhận: JPG, PNG, GIF, WEBP. Max size: 5MB
+ */
+router.post("/avatar", checkAuth, uploadAvatar, userController.uploadAvatar);
+
+// ==================== PASSWORD ====================
+
+/**
+ * @route   PUT /api/users/change-password
+ * @desc    Đổi mật khẩu
+ * @access  Private
+ * @body    { currentPassword, newPassword, confirmPassword }
+ */
 router.put("/change-password", checkAuth, userController.changePassword);
 
-// 4. Gửi yêu cầu nâng cấp lên Author (POST)
-// URL: /api/users/upgrade-request
-// Access: User đã đăng nhập
+// ==================== AUTHOR UPGRADE ====================
+
+/**
+ * @route   POST /api/users/upgrade-request
+ * @desc    Gửi yêu cầu nâng cấp lên Author
+ * @access  Private (Chỉ User role)
+ * @body    { reason }
+ */
 router.post("/upgrade-request", checkAuth, userController.requestUpgrade);
 
-// 5. Lấy trạng thái yêu cầu nâng cấp (GET)
-// URL: /api/users/upgrade-request/status
-// Access: User đã đăng nhập
+/**
+ * @route   GET /api/users/upgrade-request/status
+ * @desc    Lấy trạng thái yêu cầu nâng cấp mới nhất
+ * @access  Private
+ */
 router.get(
   "/upgrade-request/status",
   checkAuth,

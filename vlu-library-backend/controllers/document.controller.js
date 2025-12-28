@@ -11,17 +11,10 @@ const fs = require("fs");
  * POST /api/documents/upload
  * Access: Author, Admin
  *
- * Flow (theo Sequence_Diagram_Text.docx - Kịch bản 3):
- * 1. User (role: Author/Admin) upload file PDF + metadata
- * 2. Multer middleware xử lý file, lưu vào /uploads/
- * 3. Controller validate metadata và category
- * 4. Tạo document record với status='pending'
- * 5. Tăng documentCount trong category
- * 6. Trả về document đã được populate
+ * Hỗ trợ định dạng: PDF, EPUB
  */
 const uploadDocument = async (req, res) => {
   try {
-    // 1. Kiểm tra file đã được upload bởi multer
     if (!req.file) {
       return res.status(400).json({
         status: "error",
@@ -30,17 +23,15 @@ const uploadDocument = async (req, res) => {
         errors: [
           {
             field: "file",
-            message: "Vui lòng chọn file PDF để tải lên",
+            message: "Vui lòng chọn file PDF hoặc EPUB để tải lên",
           },
         ],
       });
     }
 
-    // 2. Lấy metadata từ request body
     const { title, description, category, author, publisher, publishYear } =
       req.body;
 
-    // 3. Validation: Kiểm tra các field bắt buộc
     if (!title || !title.trim()) {
       return res.status(400).json({
         status: "error",
@@ -69,7 +60,6 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // 4. Kiểm tra category có tồn tại không
     const categoryExists = await Category.findById(category);
     if (!categoryExists) {
       return res.status(404).json({
@@ -79,7 +69,14 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // 5. Tạo document object
+    // Xác định file format dựa trên mimetype
+    let fileFormat = "pdf"; // Default
+    if (req.file.mimetype === "application/epub+zip") {
+      fileFormat = "epub";
+    } else if (req.file.mimetype === "application/pdf") {
+      fileFormat = "pdf";
+    }
+
     const newDocument = new Document({
       title: title.trim(),
       description: description ? description.trim() : "",
@@ -87,27 +84,24 @@ const uploadDocument = async (req, res) => {
       publisher: publisher ? publisher.trim() : null,
       publishYear: publishYear ? parseInt(publishYear) : null,
       categoryId: category,
-      uploadedBy: req.user.id, // Từ checkAuth middleware
-      fileUrl: `/uploads/${req.file.filename}`, // Mock local storage
+      uploadedBy: req.user.id,
+      fileUrl: `/uploads/${req.file.filename}`,
       fileName: req.file.originalname,
       fileSize: req.file.size,
-      status: "pending", // Default (sẽ được duyệt sau)
+      fileFormat: fileFormat,
+      status: "pending",
     });
 
-    // 6. Lưu document vào database
     const savedDocument = await newDocument.save();
 
-    // 7. QUAN TRỌNG: Tăng documentCount trong category
     await Category.findByIdAndUpdate(category, {
       $inc: { documentCount: 1 },
     });
 
-    // 8. Populate để trả về thông tin đẹp hơn
     const populatedDoc = await Document.findById(savedDocument._id)
       .populate("uploadedBy", "name email role")
       .populate("categoryId", "name slug");
 
-    // 9. Trả về response thành công
     return res.status(201).json({
       status: "success",
       code: 201,
@@ -134,6 +128,7 @@ const uploadDocument = async (req, res) => {
           fileUrl: populatedDoc.fileUrl,
           fileName: populatedDoc.fileName,
           fileSize: populatedDoc.fileSize,
+          fileFormat: populatedDoc.fileFormat,
           status: populatedDoc.status,
           views: populatedDoc.views,
           downloads: populatedDoc.downloads,
@@ -144,7 +139,6 @@ const uploadDocument = async (req, res) => {
   } catch (error) {
     console.error("Upload document error:", error);
 
-    // Xử lý lỗi validation của Mongoose
     if (error.name === "ValidationError") {
       const errors = Object.keys(error.errors).map((field) => ({
         field,
@@ -178,7 +172,6 @@ const reviewDocument = async (req, res) => {
     const { status, reason } = req.body;
     const reviewerId = req.user.id;
 
-    // Validation: Kiểm tra status hợp lệ
     if (!status || !["approved", "rejected"].includes(status)) {
       return res.status(400).json({
         status: "error",
@@ -193,7 +186,6 @@ const reviewDocument = async (req, res) => {
       });
     }
 
-    // Validation: Nếu rejected thì reason là bắt buộc
     if (status === "rejected" && (!reason || !reason.trim())) {
       return res.status(400).json({
         status: "error",
@@ -208,7 +200,6 @@ const reviewDocument = async (req, res) => {
       });
     }
 
-    // Tìm tài liệu
     const document = await Document.findById(id);
 
     if (!document) {
@@ -219,7 +210,6 @@ const reviewDocument = async (req, res) => {
       });
     }
 
-    // Kiểm tra trạng thái hiện tại
     if (document.status !== "pending") {
       return res.status(400).json({
         status: "error",
@@ -228,7 +218,6 @@ const reviewDocument = async (req, res) => {
       });
     }
 
-    // Cập nhật tài liệu
     document.status = status;
     document.reviewedBy = reviewerId;
     document.reviewedAt = new Date();
@@ -239,15 +228,12 @@ const reviewDocument = async (req, res) => {
       document.rejectionReason = null;
     }
 
-    // Lưu tài liệu
     await document.save();
 
-    // Populate để trả về response đẹp
     await document.populate("reviewedBy", "name email role");
     await document.populate("categoryId", "name slug");
     await document.populate("uploadedBy", "name email role");
 
-    // Trả về response thành công
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -277,6 +263,7 @@ const reviewDocument = async (req, res) => {
           fileUrl: document.fileUrl,
           fileName: document.fileName,
           fileSize: document.fileSize,
+          fileFormat: document.fileFormat,
           status: document.status,
           rejectionReason: document.rejectionReason,
           reviewedBy: document.reviewedBy
@@ -313,57 +300,59 @@ const reviewDocument = async (req, res) => {
  */
 const getDocuments = async (req, res) => {
   try {
-    let { page, limit, q, category, year, sort, status } = req.query;
-    const filters = {};
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      category,
+      status,
+      sort = "-createdAt",
+    } = req.query;
 
-    // Phân quyền Public vs Admin
-    const isAdminRoute = req.originalUrl.startsWith("/api/admin/documents");
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
-    if (isAdminRoute) {
-      if (status && ["pending", "approved", "rejected"].includes(status)) {
-        filters.status = status;
+    const query = {};
+
+    if (!req.originalUrl.includes("/admin")) {
+      query.status = "approved";
+    } else if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { author: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    let categoryId = category;
+    if (req.query["category[]"]) {
+      categoryId = req.query["category[]"];
+    }
+
+    if (categoryId) {
+      if (Array.isArray(categoryId)) {
+        query.categoryId = { $in: categoryId };
+      } else {
+        query.categoryId = categoryId;
       }
-    } else {
-      filters.status = "approved";
     }
 
-    // Build Filters
-    if (q && q.trim()) {
-      filters.$text = { $search: q.trim() };
-    }
-    if (category) {
-      filters.categoryId = category;
-    }
-    if (year) {
-      filters.publishYear = parseInt(year);
-    }
+    const [documents, totalDocs] = await Promise.all([
+      Document.find(query)
+        .populate("categoryId", "name slug")
+        .populate("uploadedBy", "name email")
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum),
+      Document.countDocuments(query),
+    ]);
 
-    // Build Sort
-    let sortOptions = {};
-    if (sort) {
-      const [field, order] = sort.split(":");
-      sortOptions[field] = order === "asc" ? 1 : -1;
-    } else {
-      sortOptions = { createdAt: -1 };
-    }
-
-    // Build Pagination
-    page = parseInt(page) || 1;
-    limit = parseInt(limit) || 10;
-    limit = Math.min(limit, 50);
-    const skip = (page - 1) * limit;
-
-    // Execute Query
-    const totalDocuments = await Document.countDocuments(filters);
-    const documents = await Document.find(filters)
-      .populate("categoryId", "name slug")
-      .populate("uploadedBy", "name email role")
-      .populate("reviewedBy", "name email role") // ← FIX: Add populate reviewedBy
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit);
-
-    const totalPages = Math.ceil(totalDocuments / limit);
+    const totalPages = Math.ceil(totalDocs / limitNum);
 
     return res.status(200).json({
       status: "success",
@@ -389,40 +378,32 @@ const getDocuments = async (req, res) => {
                 id: doc.uploadedBy._id,
                 name: doc.uploadedBy.name,
                 email: doc.uploadedBy.email,
-                role: doc.uploadedBy.role,
               }
             : null,
-          reviewedBy: doc.reviewedBy // ← FIX: Add reviewedBy
-            ? {
-                id: doc.reviewedBy._id,
-                name: doc.reviewedBy.name,
-                email: doc.reviewedBy.email,
-                role: doc.reviewedBy.role,
-              }
-            : null,
-          reviewedAt: doc.reviewedAt, // ← FIX: Add reviewedAt
           fileUrl: doc.fileUrl,
           fileName: doc.fileName,
           fileSize: doc.fileSize,
+          fileFormat: doc.fileFormat,
           coverImage: doc.coverImage,
           status: doc.status,
           views: doc.views,
           downloads: doc.downloads,
+          rating: doc.rating,
           createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
         })),
         pagination: {
-          currentPage: page,
+          currentPage: pageNum,
           totalPages,
-          totalDocuments,
-          limit,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
+          totalDocs,
+          limit: limitNum,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1,
         },
       },
     });
   } catch (error) {
     console.error("Get documents error:", error);
-
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -432,145 +413,90 @@ const getDocuments = async (req, res) => {
 };
 
 /**
- * API: Get My Documents (Author Dashboard) => Chưa mô tả trong file đặc tả
+ * API: Lấy tài liệu của tác giả hiện tại
  * GET /api/documents/my-documents
  * Access: Author, Admin
- *
- * Trả về danh sách tài liệu của author hiện tại
- * Kèm theo thống kê: total, approved, pending
  */
 const getMyDocuments = async (req, res) => {
   try {
-    const userId = req.user.id; // Từ checkAuth middleware
+    const userId = req.user.id;
+    const { page = 1, limit = 10, status, sort = "-createdAt" } = req.query;
 
-    // Parse query parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const searchQuery = req.query.q || "";
-    const status = req.query.status || ""; // Filter by status (optional)
-    const sort = req.query.sort || "-createdAt"; // Default: newest first
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
-    // Build query filter
-    const filter = { uploadedBy: userId };
+    const query = { uploadedBy: userId };
 
-    // Add search query if provided
-    if (searchQuery) {
-      filter.$or = [
-        { title: { $regex: searchQuery, $options: "i" } },
-        { description: { $regex: searchQuery, $options: "i" } },
-      ];
+    if (status) {
+      query.status = status;
     }
 
-    // Add status filter if provided
-    if (status && ["pending", "approved", "rejected"].includes(status)) {
-      filter.status = status;
-    }
+    const [documents, totalDocs] = await Promise.all([
+      Document.find(query)
+        .populate("categoryId", "name slug")
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum),
+      Document.countDocuments(query),
+    ]);
 
-    // Execute query with pagination
-    const documents = await Document.find(filter)
-      .populate("categoryId", "name slug")
-      .populate("uploadedBy", "name email")
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .lean(); // Use lean() for better performance
+    const totalPages = Math.ceil(totalDocs / limitNum);
 
-    // Get total count for pagination
-    const totalDocuments = await Document.countDocuments(filter);
-    const totalPages = Math.ceil(totalDocuments / limit);
-
-    // Calculate statistics for dashboard cards
     const stats = await Document.aggregate([
       { $match: { uploadedBy: new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
-          _id: null,
-          total: { $sum: 1 },
-          approved: {
-            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
-          },
-          pending: {
-            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
-          },
-          rejected: {
-            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
-          },
-          totalViews: { $sum: "$views" },
-          totalDownloads: { $sum: "$downloads" },
+          _id: "$status",
+          count: { $sum: 1 },
         },
       },
     ]);
 
-    // Default stats if no documents
-    const statistics =
-      stats.length > 0
-        ? stats[0]
-        : {
-            total: 0,
-            approved: 0,
-            pending: 0,
-            rejected: 0,
-            totalViews: 0,
-            totalDownloads: 0,
-          };
+    const statsObj = {
+      total: totalDocs,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+    };
 
-    // Format response
-    const formattedDocuments = documents.map((doc) => ({
-      id: doc._id,
-      title: doc.title,
-      description: doc.description,
-      author: doc.author,
-      publisher: doc.publisher,
-      publishYear: doc.publishYear,
-      category: doc.categoryId
-        ? {
-            id: doc.categoryId._id,
-            name: doc.categoryId.name,
-            slug: doc.categoryId.slug,
-          }
-        : null,
-      uploadedBy: doc.uploadedBy
-        ? {
-            id: doc.uploadedBy._id,
-            name: doc.uploadedBy.name,
-            email: doc.uploadedBy.email,
-          }
-        : null,
-      fileName: doc.fileName,
-      fileSize: doc.fileSize,
-      coverImage: doc.coverImage,
-      status: doc.status,
-      rejectionReason: doc.rejectionReason,
-      views: doc.views,
-      downloads: doc.downloads,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-    }));
+    stats.forEach((s) => {
+      statsObj[s._id] = s.count;
+    });
 
-    // Return success response
     return res.status(200).json({
       status: "success",
       code: 200,
       message: "Lấy danh sách tài liệu thành công",
       data: {
-        documents: formattedDocuments,
+        documents: documents.map((doc) => ({
+          id: doc._id,
+          title: doc.title,
+          description: doc.description,
+          author: doc.author,
+          category: doc.categoryId
+            ? {
+                id: doc.categoryId._id,
+                name: doc.categoryId.name,
+                slug: doc.categoryId.slug,
+              }
+            : null,
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          fileFormat: doc.fileFormat,
+          status: doc.status,
+          rejectionReason: doc.rejectionReason,
+          views: doc.views,
+          downloads: doc.downloads,
+          createdAt: doc.createdAt,
+        })),
         pagination: {
-          currentPage: page,
+          currentPage: pageNum,
           totalPages,
-          totalDocuments,
-          limit,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
+          totalDocs,
+          limit: limitNum,
         },
-        stats: {
-          total: statistics.total,
-          approved: statistics.approved,
-          pending: statistics.pending,
-          rejected: statistics.rejected,
-          totalViews: statistics.totalViews,
-          totalDownloads: statistics.totalDownloads,
-        },
+        stats: statsObj,
       },
     });
   } catch (error) {
@@ -584,13 +510,15 @@ const getMyDocuments = async (req, res) => {
 };
 
 /**
- * API 2.9: Lấy chi tiết tài liệu theo ID
+ * API 2.9: Lấy chi tiết tài liệu
  * GET /api/documents/:id
- * Access: Public (nhưng có phân quyền xem tài liệu pending/rejected)
+ * Access: Public (có phân quyền)
  */
 const getDocumentById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
 
     const document = await Document.findById(id)
       .populate("categoryId", "name slug")
@@ -605,29 +533,16 @@ const getDocumentById = async (req, res) => {
       });
     }
 
-    // QUAN TRỌNG: Phân quyền xem tài liệu
-    if (document.status === "approved") {
-      // Public - ai cũng xem được
-    } else {
-      // pending/rejected: Chỉ Admin, Moderator, hoặc chủ sở hữu
-      if (!req.user) {
-        return res.status(404).json({
-          status: "error",
-          code: 404,
-          message: "Không tìm thấy tài liệu",
-        });
-      }
+    const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
+    const isOwner = document.uploadedBy?._id?.toString() === userId;
+    const isApproved = document.status === "approved";
 
-      const isAdmin = ["Admin", "Moderator"].includes(req.user.role);
-      const isOwner = document.uploadedBy._id.toString() === req.user.id;
-
-      if (!isAdmin && !isOwner) {
-        return res.status(404).json({
-          status: "error",
-          code: 404,
-          message: "Không tìm thấy tài liệu",
-        });
-      }
+    if (!isAdminOrModerator && !isOwner && !isApproved) {
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Bạn không có quyền xem tài liệu này",
+      });
     }
 
     return res.status(200).json({
@@ -642,6 +557,7 @@ const getDocumentById = async (req, res) => {
           author: document.author,
           publisher: document.publisher,
           publishYear: document.publishYear,
+          pageCount: document.pageCount,
           category: document.categoryId
             ? {
                 id: document.categoryId._id,
@@ -660,16 +576,14 @@ const getDocumentById = async (req, res) => {
           fileUrl: document.fileUrl,
           fileName: document.fileName,
           fileSize: document.fileSize,
+          fileFormat: document.fileFormat,
           coverImage: document.coverImage,
-          pageCount: document.pageCount,
           status: document.status,
           rejectionReason: document.rejectionReason,
           reviewedBy: document.reviewedBy
             ? {
                 id: document.reviewedBy._id,
                 name: document.reviewedBy.name,
-                email: document.reviewedBy.email,
-                role: document.reviewedBy.role,
               }
             : null,
           reviewedAt: document.reviewedAt,
@@ -677,14 +591,14 @@ const getDocumentById = async (req, res) => {
           downloads: document.downloads,
           rating: document.rating,
           commentCount: document.commentCount,
+          wikidataInfo: document.wikidataInfo,
           createdAt: document.createdAt,
           updatedAt: document.updatedAt,
         },
       },
     });
   } catch (error) {
-    console.error("Get document by ID error:", error);
-
+    console.error("Get document by id error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -694,19 +608,18 @@ const getDocumentById = async (req, res) => {
 };
 
 /**
- * API 2.10 – Cập nhật tài liệu (Author/Admin)
+ * API 2.10: Cập nhật tài liệu
  * PUT /api/documents/:id
- * @param {string} id - ID của tài liệu cần cập nhật
- * @param {string} userId - ID của người dùng hiện tại
- * @param {string} userRole - Vai trò của người dùng hiện tại
+ * Access: Author (owner), Admin
  */
 const updateDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id.toString();
+    const userId = req.user.id;
     const userRole = req.user.role;
 
     const document = await Document.findById(id);
+
     if (!document) {
       return res.status(404).json({
         status: "error",
@@ -716,48 +629,99 @@ const updateDocument = async (req, res) => {
     }
 
     const isOwner = document.uploadedBy.toString() === userId;
-    const isPending = document.status === "pending";
+    const isAdmin = userRole === "Admin";
 
-    // Admin được sửa mọi tài liệu, Author chỉ được sửa tài liệu của mình khi đang chờ duyệt
-    if (!(userRole === "Admin" || (isOwner && isPending))) {
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         status: "error",
         code: 403,
-        message: "Bạn không có quyền chỉnh sửa tài liệu này",
+        message: "Bạn không có quyền cập nhật tài liệu này",
       });
     }
 
-    Object.assign(document, req.body);
-    await document.save();
+    const allowedUpdates = [
+      "title",
+      "description",
+      "author",
+      "publisher",
+      "publishYear",
+    ];
+    const updates = {};
 
-    res.status(200).json({
+    allowedUpdates.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    if (req.body.category) {
+      const categoryExists = await Category.findById(req.body.category);
+      if (!categoryExists) {
+        return res.status(404).json({
+          status: "error",
+          code: 404,
+          message: "Không tìm thấy danh mục",
+        });
+      }
+      updates.categoryId = req.body.category;
+    }
+
+    const updatedDocument = await Document.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true },
+    )
+      .populate("categoryId", "name slug")
+      .populate("uploadedBy", "name email role");
+
+    return res.status(200).json({
       status: "success",
       code: 200,
       message: "Cập nhật tài liệu thành công",
-      data: document,
+      data: {
+        document: {
+          id: updatedDocument._id,
+          title: updatedDocument.title,
+          description: updatedDocument.description,
+          author: updatedDocument.author,
+          publisher: updatedDocument.publisher,
+          publishYear: updatedDocument.publishYear,
+          category: updatedDocument.categoryId
+            ? {
+                id: updatedDocument.categoryId._id,
+                name: updatedDocument.categoryId.name,
+                slug: updatedDocument.categoryId.slug,
+              }
+            : null,
+          fileFormat: updatedDocument.fileFormat,
+          status: updatedDocument.status,
+          updatedAt: updatedDocument.updatedAt,
+        },
+      },
     });
   } catch (error) {
-    console.error("Update error:", error);
+    console.error("Update document error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
-      message: "Lỗi server",
+      message: "Lỗi server khi cập nhật tài liệu",
     });
   }
 };
 
 /**
- * API 2.11 – Xóa tài liệu (Author/Admin)
+ * API 2.11: Xóa tài liệu
  * DELETE /api/documents/:id
- * @param {string} id - ID của tài liệu cần xóa
+ * Access: Author (owner), Admin
  */
 const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id.toString();
+    const userId = req.user.id;
     const userRole = req.user.role;
 
     const document = await Document.findById(id);
+
     if (!document) {
       return res.status(404).json({
         status: "error",
@@ -765,16 +729,11 @@ const deleteDocument = async (req, res) => {
         message: "Không tìm thấy tài liệu",
       });
     }
-    console.log("======== DELETE DEBUG ========");
-    console.log("User ID:", req.user.id);
-    console.log("User Role:", req.user.role);
-    console.log("Uploaded By:", document.uploadedBy.toString());
-    console.log("Status:", document.status);
-    const isOwner = document.uploadedBy.toString() === userId;
-    const isPending = document.status === "pending";
 
-    // Admin được xóa mọi tài liệu, Author chỉ được xóa tài liệu của mình khi đang chờ duyệt
-    if (!(userRole === "Admin" || (isOwner && isPending))) {
+    const isOwner = document.uploadedBy.toString() === userId;
+    const isAdmin = userRole === "Admin";
+
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({
         status: "error",
         code: 403,
@@ -782,44 +741,43 @@ const deleteDocument = async (req, res) => {
       });
     }
 
-    await Category.findByIdAndUpdate(document.categoryId, {
-      $inc: { documentCount: -1 },
-    });
-
     const filePath = path.join(process.cwd(), document.fileUrl);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
+    await Category.findByIdAndUpdate(document.categoryId, {
+      $inc: { documentCount: -1 },
+    });
+
     await Document.findByIdAndDelete(id);
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       code: 200,
       message: "Xóa tài liệu thành công",
     });
   } catch (error) {
-    console.error("Delete error:", error);
+    console.error("Delete document error:", error);
     return res.status(500).json({
       status: "error",
       code: 500,
-      message: "Lỗi server",
+      message: "Lỗi server khi xóa tài liệu",
     });
   }
 };
 
 /**
- * API 2.12: Tải xuống (F13)
+ * API: Tải xuống tài liệu
  * GET /api/documents/:id/download
- * Access: User, Author, Moderator, Admin (phải đăng nhập)
- *
- * Flow: Tương tự readDocument, chỉ khác header Content-Disposition
+ * Access: Authenticated users
  */
 const downloadDocument = async (req, res) => {
   try {
     const { id } = req.params;
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
 
-    // 1. Tìm tài liệu
     const document = await Document.findById(id);
 
     if (!document) {
@@ -830,19 +788,20 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    // 2. Kiểm tra trạng thái tài liệu
-    if (document.status !== "approved") {
+    const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
+    const isOwner = document.uploadedBy?.toString() === userId;
+    const isApproved = document.status === "approved";
+
+    if (!isAdminOrModerator && !isOwner && !isApproved) {
       return res.status(403).json({
         status: "error",
         code: 403,
-        message: "Tài liệu chưa được duyệt",
+        message: "Bạn không có quyền tải tài liệu này",
       });
     }
 
-    // 3. Lấy đường dẫn file
     const filePath = path.join(process.cwd(), document.fileUrl);
 
-    // 4. Kiểm tra file tồn tại
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         status: "error",
@@ -851,18 +810,20 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    // 5. Set headers để tải xuống file
-    res.setHeader("Content-Type", "application/pdf");
+    let contentType = "application/pdf";
+    if (document.fileFormat === "epub") {
+      contentType = "application/epub+zip";
+    }
+
+    res.setHeader("Content-Type", contentType);
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(document.fileName)}"`,
     );
 
-    // 6. Stream file về client
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
 
-    // 7. Xử lý lỗi stream
     stream.on("error", (error) => {
       console.error("Stream error:", error);
       if (!res.headersSent) {
@@ -880,26 +841,16 @@ const downloadDocument = async (req, res) => {
       return res.status(500).json({
         status: "error",
         code: 500,
-        message: "Lỗi server khi tải xuống tài liệu",
+        message: "Lỗi server khi tải tài liệu",
       });
     }
   }
 };
 
 /**
- * API 2.12 (Track): Ghi nhận thống kê (F14)
+ * API: Track document action (view/download)
  * POST /api/documents/:id/track
- * Access: User, Author, Moderator, Admin (phải đăng nhập)
- *
- * Flow:
- * 1. Lấy docId, userId, type từ request
- * 2. Sử dụng Statistic.trackAction() để ghi nhận
- * 3. Nếu là lần đầu trong ngày -> tăng counter trong document
- * 4. Nếu đã ghi nhận trước đó -> trả về success (không làm gì)
- *
- * Logic chống spam:
- * - Compound unique index (docId, userId, type, date) trong Statistics model
- * - 1 user chỉ có thể track 1 lần/loại/tài liệu/ngày
+ * Access: Authenticated users
  */
 const trackDocument = async (req, res) => {
   try {
@@ -907,7 +858,6 @@ const trackDocument = async (req, res) => {
     const userId = req.user.id;
     const { type } = req.body;
 
-    // 1. Validation: Kiểm tra type hợp lệ
     if (!type || !["view", "download"].includes(type)) {
       return res.status(400).json({
         status: "error",
@@ -922,7 +872,6 @@ const trackDocument = async (req, res) => {
       });
     }
 
-    // 2. Kiểm tra tài liệu tồn tại
     const document = await Document.findById(docId);
     if (!document) {
       return res.status(404).json({
@@ -932,10 +881,8 @@ const trackDocument = async (req, res) => {
       });
     }
 
-    // 3. Ghi nhận thống kê (sử dụng static method trong Statistic model)
     const result = await Statistic.trackAction(docId, userId, type);
 
-    // 4. Trả về response thành công (kể cả khi bị duplicate)
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -957,15 +904,12 @@ const trackDocument = async (req, res) => {
 };
 
 /**
- * API 2.13: Lấy dashboard thống kê (F15)
+ * API: Dashboard Stats
  * GET /api/admin/stats
  * Access: Admin
- *
- * MVP: Bỏ qua query param 'period', thống kê toàn thời gian.
  */
 const getDashboardStats = async (req, res) => {
   try {
-    // 1. Overview Stats (Sử dụng Promise.all để chạy song song)
     const [
       totalDocuments,
       pendingDocuments,
@@ -977,14 +921,12 @@ const getDashboardStats = async (req, res) => {
       Document.countDocuments(),
       Document.countDocuments({ status: "pending" }),
       User.countDocuments({ status: "active" }),
-      // Tính tổng views/downloads từ tất cả tài liệu
       Document.aggregate([
         { $group: { _id: null, total: { $sum: "$views" } } },
       ]),
       Document.aggregate([
         { $group: { _id: null, total: { $sum: "$downloads" } } },
       ]),
-      // Lấy dữ liệu danh mục
       Category.find({}).sort({ documentCount: -1 }),
     ]);
 
@@ -996,21 +938,18 @@ const getDashboardStats = async (req, res) => {
       totalDownloads: totalDownloadsAgg[0]?.total || 0,
     };
 
-    // 2. Top Viewed Documents (Top 10)
     const topViewed = await Document.find({ status: "approved" })
       .sort({ views: -1 })
       .limit(10)
       .populate("categoryId", "name")
       .select("title categoryId views author");
 
-    // 3. Top Downloaded Documents (Top 10)
     const topDownloaded = await Document.find({ status: "approved" })
       .sort({ downloads: -1 })
       .limit(10)
       .populate("categoryId", "name")
       .select("title categoryId downloads author");
 
-    // 4. Category Distribution
     const totalDocsInCategory = categories.reduce(
       (sum, cat) => sum + cat.documentCount,
       0,
@@ -1027,7 +966,6 @@ const getDashboardStats = async (req, res) => {
           : 0,
     }));
 
-    // 5. Trả về response theo Đặc tả API 2.13
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -1049,7 +987,7 @@ const getDashboardStats = async (req, res) => {
           author: doc.author,
         })),
         categoryDistribution,
-        period: "all", // Mặc định là 'all' cho MVP
+        period: "all",
         generatedAt: new Date().toISOString(),
       },
     });
@@ -1064,29 +1002,13 @@ const getDashboardStats = async (req, res) => {
 };
 
 /**
- * API 2.15: Đọc trực tuyến (F12)
+ * API 2.15: Đọc trực tuyến (PDF & EPUB)
  * GET /api/documents/:id/read
- * Access: User, Author, Moderator, Admin (phải đăng nhập)
+ * Access: Authenticated users
  *
- * Flow:
- * 1. Kiểm tra tài liệu tồn tại và status='approved'
- * 2. Kiểm tra file tồn tại trên server
- * 3. Stream file PDF về client với header 'inline'
- */
-/**
- * API 2.15: Đọc trực tuyến (F12)
- * GET /api/documents/:id/read
- * Access: User, Author, Moderator, Admin (phải đăng nhập)
- *
- * Phân quyền:
- * - Admin/Moderator: Đọc được tất cả tài liệu (approved, pending, rejected)
- * - User/Author: Chỉ đọc được tài liệu approved
- *
- * Flow:
- * 1. Kiểm tra tài liệu tồn tại
- * 2. Kiểm tra quyền truy cập dựa trên role và status
- * 3. Kiểm tra file tồn tại trên server
- * 4. Stream file PDF về client với header 'inline'
+ * QUAN TRỌNG cho EPUB:
+ * - Phải dùng stream với đúng Content-Type
+ * - react-reader yêu cầu binary data hoàn chỉnh
  */
 const readDocument = async (req, res) => {
   try {
@@ -1094,7 +1016,6 @@ const readDocument = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
 
-    // 1. Tìm tài liệu
     const document = await Document.findById(id);
 
     if (!document) {
@@ -1105,15 +1026,10 @@ const readDocument = async (req, res) => {
       });
     }
 
-    // 2. Phân quyền đọc tài liệu
     const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
     const isOwner = document.uploadedBy?.toString() === userId;
     const isApproved = document.status === "approved";
 
-    // Logic phân quyền:
-    // - Admin/Moderator: Đọc được tất cả
-    // - Owner (Author): Đọc được tài liệu của mình (mọi status)
-    // - User/Author khác: Chỉ đọc được tài liệu approved
     if (!isAdminOrModerator && !isOwner && !isApproved) {
       return res.status(403).json({
         status: "error",
@@ -1122,11 +1038,14 @@ const readDocument = async (req, res) => {
       });
     }
 
-    // 3. Lấy đường dẫn file (giả định fileUrl = "/uploads/xxx.pdf")
+    // Xây dựng đường dẫn file tuyệt đối
     const filePath = path.join(process.cwd(), document.fileUrl);
 
-    // 4. Kiểm tra file tồn tại
+    console.log("[READ] Document ID:", id);
+    console.log("[READ] File path:", filePath);
+
     if (!fs.existsSync(filePath)) {
+      console.error("[READ] File not found:", filePath);
       return res.status(404).json({
         status: "error",
         code: 404,
@@ -1134,28 +1053,52 @@ const readDocument = async (req, res) => {
       });
     }
 
-    // 5. Set headers để hiển thị PDF trực tiếp trên trình duyệt
-    res.setHeader("Content-Type", "application/pdf");
+    // Set Content-Type
+    // Dù res.sendFile tự detect, nhưng ta set explicit để đảm bảo đúng logic business
+    let contentType = "application/pdf";
+    if (
+      document.fileFormat === "epub" ||
+      document.fileName.toLowerCase().endsWith(".epub")
+    ) {
+      contentType = "application/epub+zip";
+    }
+
+    // CORS headers - giữ nguyên để frontend đọc được thông tin
     res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${encodeURIComponent(document.fileName)}"`,
+      "Access-Control-Expose-Headers",
+      "Content-Length, Content-Type, Content-Disposition",
     );
 
-    // 6. Stream file về client
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-
-    // 7. Xử lý lỗi stream
-    stream.on("error", (error) => {
-      console.error("Stream error:", error);
-      if (!res.headersSent) {
-        return res.status(500).json({
-          status: "error",
-          code: 500,
-          message: "Lỗi khi đọc file",
-        });
-      }
-    });
+    // Sử dụng res.sendFile để gửi file
+    // Express sẽ tự động xử lý:
+    // 1. Content-Type (dựa trên extension file hoặc headers đã set)
+    // 2. Content-Length
+    // 3. Range requests (206 Partial Content) - rất quan trọng cho EPUB
+    // 4. ETag & Caching
+    res.sendFile(
+      filePath,
+      {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `inline; filename="${encodeURIComponent(document.fileName)}"`,
+        },
+      },
+      (err) => {
+        if (err) {
+          console.error("[READ] Send file error:", err);
+          // Chỉ gửi lỗi JSON nếu header chưa được gửi
+          if (!res.headersSent) {
+            res.status(500).json({
+              status: "error",
+              code: 500,
+              message: "Lỗi khi đọc file",
+            });
+          }
+        } else {
+          console.log("[READ] Sent file successfully");
+        }
+      },
+    );
   } catch (error) {
     console.error("Read document error:", error);
 

@@ -166,7 +166,7 @@ const DocumentInfo = ({
               <StarIcon sx={{ color: "warning.main" }} />
               <Box>
                 <Typography variant="h6" fontWeight="bold">
-                  {document.rating?.toFixed(1) || "4.5"}
+                  {document.rating?.toFixed(1) || "0.0"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Đánh giá

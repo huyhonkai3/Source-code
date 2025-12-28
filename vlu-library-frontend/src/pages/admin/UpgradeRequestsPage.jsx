@@ -155,7 +155,7 @@ const UpgradeRequestsPage = () => {
 
     setActionLoading(true);
     try {
-      const response = await userAPI.reviewUpgradeRequest(selectedRequest._id, {
+      const response = await userAPI.reviewUpgradeRequest(selectedRequest.id, {
         status: "approved",
       });
 

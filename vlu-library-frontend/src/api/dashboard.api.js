@@ -48,40 +48,57 @@ export const getSystemStatus = async () => {
 };
 
 /**
- * Get pending upgrade requests (mock for MVP)
+ * Get pending upgrade requests for dashboard
+ * Gọi API thật từ backend để lấy danh sách yêu cầu nâng cấp
+ * @param {Object} params - Query parameters
+ * @param {number} params.limit - Số lượng yêu cầu cần lấy (default: 5)
  * @returns {Promise} Upgrade requests data
  */
-export const getUpgradeRequests = async () => {
+export const getUpgradeRequests = async (params = {}) => {
   try {
-    // TODO: Replace with actual endpoint when backend is ready
-    // const response = await axiosInstance.get('/admin/upgrade-requests');
-    // return response.data;
+    // Gọi API thật từ backend
+    const response = await axiosInstance.get("/admin/upgrade-requests", {
+      params: {
+        status: "pending", // Chỉ lấy các yêu cầu đang chờ duyệt
+        limit: params.limit || 5, // Giới hạn số lượng cho dashboard
+        page: 1,
+      },
+    });
 
-    // Mock data for MVP
+    // Transform data để phù hợp với format của DashboardPage
+    if (response.data.status === "success") {
+      const { requests, pagination } = response.data.data;
+
+      // Map data từ backend sang format dashboard cần
+      const recentRequests = requests.map((req) => ({
+        id: req.id || req._id,
+        userName: req.userId?.name || "Unknown",
+        email: req.userId?.email || "",
+        avatarUrl: req.userId?.avatarUrl || "",
+        reason: req.reason || "",
+        requestedAt: req.createdAt,
+      }));
+
+      return {
+        status: "success",
+        data: {
+          pending: pagination.totalRequests || 0,
+          recent: recentRequests,
+        },
+      };
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Get upgrade requests error:", error);
+    // Trả về empty data nếu có lỗi (không crash dashboard)
     return {
       status: "success",
       data: {
-        pending: 3,
-        recent: [
-          {
-            id: "1",
-            userName: "Nguyễn Văn A",
-            email: "sv.nguyenvana@vanlanguni.vn",
-            requestedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 minutes ago
-          },
-          {
-            id: "2",
-            userName: "Trần Thị B",
-            email: "sv.tranthib@vanlanguni.vn",
-            requestedAt: new Date(
-              Date.now() - 2 * 60 * 60 * 1000,
-            ).toISOString(), // 2 hours ago
-          },
-        ],
+        pending: 0,
+        recent: [],
       },
     };
-  } catch (error) {
-    throw error;
   }
 };
 
