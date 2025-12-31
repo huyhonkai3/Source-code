@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -7,48 +7,48 @@ import {
   IconButton,
   Avatar,
   Tooltip,
+  Chip,
+  alpha,
 } from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   ArrowForward as ArrowIcon,
+  Folder as FolderIcon,
+  Description as DocumentIcon,
+  Schedule as ScheduleIcon,
+  MoreVert as MoreIcon,
 } from "@mui/icons-material";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 
 /**
- * CategoryCard Component
- * Display category information with edit/delete actions
- *
- * @param {Object} category - Category data
- * @param {Function} onEdit - Edit handler
- * @param {Function} onDelete - Delete handler
+ * CategoryCard Component - VLU Design System v2.0.1
+ * UPDATED: Tăng font sizes - giữ nguyên 100% logic và interface
  */
-const CategoryCard = ({ category, onEdit, onDelete }) => {
-  // Category icon colors (can be randomized or based on category)
-  const iconColors = [
-    "#1976d2", // Blue
-    "#2e7d32", // Green
-    "#9c27b0", // Purple
-    "#ed6c02", // Orange
+const CategoryCard = ({ category, onEdit, onDelete, viewMode = "grid" }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const gradientColors = [
+    { from: "#7C4DFF", to: "#448AFF" },
+    { from: "#2196F3", to: "#00BCD4" },
+    { from: "#10B981", to: "#34D399" },
+    { from: "#F59E0B", to: "#FBBF24" },
+    { from: "#EC4899", to: "#F472B6" },
+    { from: "#EF4444", to: "#F87171" },
   ];
 
-  // Get color based on category name
-  const getIconColor = (name) => {
-    const index = name.charCodeAt(0) % iconColors.length;
-    return iconColors[index];
+  const getGradient = (name) => {
+    const index = name.charCodeAt(0) % gradientColors.length;
+    return gradientColors[index];
   };
 
-  // Get category icon (can be customized based on category type)
-  const getCategoryIcon = (name) => {
-    const firstChar = name.charAt(0).toUpperCase();
-    return firstChar;
+  const getCategoryInitial = (name) => {
+    return name.charAt(0).toUpperCase();
   };
 
-  // Format last updated time
   const getLastUpdated = (date) => {
     if (!date) return "N/A";
-
     try {
       return formatDistanceToNow(new Date(date), {
         addSuffix: true,
@@ -59,148 +59,330 @@ const CategoryCard = ({ category, onEdit, onDelete }) => {
     }
   };
 
+  const gradient = getGradient(category.name);
+  const hasDocuments = category.documentCount > 0;
+
+  // List View Layout
+  if (viewMode === "list") {
+    return (
+      <Card
+        elevation={0}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          p: 2,
+          borderRadius: "16px",
+          border: "1px solid",
+          borderColor: isHovered ? alpha(gradient.from, 0.3) : "#E0E0E0",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          cursor: "pointer",
+          bgcolor: "white",
+          "&:hover": {
+            transform: "translateX(8px)",
+            boxShadow: `0 8px 24px ${alpha(gradient.from, 0.15)}`,
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 56,
+            height: 56,
+            borderRadius: "14px",
+            background: `linear-gradient(135deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            boxShadow: `0 4px 14px ${alpha(gradient.from, 0.4)}`,
+            mr: 2.5,
+          }}
+        >
+          {getCategoryInitial(category.name)}
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
+              color: "#1A1A2E",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontSize: "1.125rem",
+            }}
+          >
+            {category.name}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "#8E8EA9",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontSize: "0.9375rem",
+            }}
+          >
+            {category.description || "Chưa có mô tả"}
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 3, mx: 3 }}>
+          <Box sx={{ textAlign: "center" }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                color: hasDocuments ? gradient.from : "#8E8EA9",
+                fontSize: "1.5rem",
+              }}
+            >
+              {category.documentCount || 0}
+            </Typography>
+            <Typography sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}>
+              Tài liệu
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: "center" }}>
+            <Typography sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}>
+              Cập nhật
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: "#4A4A68", fontWeight: 500, fontSize: "0.875rem" }}
+            >
+              {getLastUpdated(category.updatedAt)}
+            </Typography>
+          </Box>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered ? "translateX(0)" : "translateX(10px)",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <Tooltip title="Chỉnh sửa" arrow>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(category);
+              }}
+              sx={{
+                bgcolor: alpha("#2196F3", 0.1),
+                color: "#2196F3",
+                "&:hover": { bgcolor: alpha("#2196F3", 0.2) },
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xóa" arrow>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(category);
+              }}
+              sx={{
+                bgcolor: alpha("#EF4444", 0.1),
+                color: "#EF4444",
+                "&:hover": { bgcolor: alpha("#EF4444", 0.2) },
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Card>
+    );
+  }
+
+  // Grid View Layout
   return (
     <Card
+      elevation={0}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       sx={{
         height: "100%",
         display: "flex",
         flexDirection: "column",
         position: "relative",
-        transition: "all 0.3s ease",
+        borderRadius: "20px",
+        border: "1px solid",
+        borderColor: isHovered ? alpha(gradient.from, 0.3) : "#E0E0E0",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        cursor: "pointer",
+        overflow: "visible",
+        bgcolor: "white",
         "&:hover": {
-          boxShadow: 3,
-          transform: "translateY(-4px)",
+          transform: "translateY(-8px)",
+          boxShadow: `0 16px 48px ${alpha(gradient.from, 0.2)}`,
         },
       }}
     >
-      {/* Action Buttons - Top Right */}
+      <Box
+        sx={{
+          height: 4,
+          background: `linear-gradient(90deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
+          borderRadius: "20px 20px 0 0",
+        }}
+      />
       <Box
         sx={{
           position: "absolute",
-          top: 8,
-          right: 8,
+          top: 16,
+          right: 16,
           display: "flex",
           gap: 0.5,
-          zIndex: 1,
+          zIndex: 10,
+          opacity: isHovered ? 1 : 0,
+          transform: isHovered ? "translateY(0)" : "translateY(-10px)",
+          transition: "all 0.2s ease",
         }}
       >
-        <Tooltip title="Chỉnh sửa">
+        <Tooltip title="Chỉnh sửa" arrow>
           <IconButton
             size="small"
-            onClick={() => onEdit(category)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(category);
+            }}
             sx={{
-              backgroundColor: "background.paper",
-              "&:hover": {
-                backgroundColor: "primary.lighter",
-                color: "primary.main",
-              },
+              bgcolor: "white",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              color: "#4A4A68",
+              "&:hover": { bgcolor: alpha("#2196F3", 0.1), color: "#2196F3" },
             }}
           >
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-
-        <Tooltip title="Xóa">
+        <Tooltip title="Xóa" arrow>
           <IconButton
             size="small"
-            onClick={() => onDelete(category)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(category);
+            }}
             sx={{
-              backgroundColor: "background.paper",
-              "&:hover": {
-                backgroundColor: "error.lighter",
-                color: "error.main",
-              },
+              bgcolor: "white",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              color: "#4A4A68",
+              "&:hover": { bgcolor: alpha("#EF4444", 0.1), color: "#EF4444" },
             }}
           >
             <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Box>
-
-      {/* Card Content */}
-      <CardContent sx={{ flex: 1, pt: 3 }}>
-        {/* Category Icon */}
+      <CardContent sx={{ flex: 1, p: 3, pt: 2.5 }}>
         <Avatar
           sx={{
-            width: 48,
-            height: 48,
-            backgroundColor: getIconColor(category.name),
-            mb: 2,
-            fontSize: "1.25rem",
-            fontWeight: "bold",
+            width: 56,
+            height: 56,
+            borderRadius: "16px",
+            background: `linear-gradient(135deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
+            mb: 2.5,
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            boxShadow: `0 4px 14px ${alpha(gradient.from, 0.4)}`,
+            transition: "transform 0.3s ease",
+            transform: isHovered ? "scale(1.05) rotate(-3deg)" : "scale(1)",
           }}
         >
-          {getCategoryIcon(category.name)}
+          {getCategoryInitial(category.name)}
         </Avatar>
-
-        {/* Category Name */}
         <Typography
           variant="h6"
-          fontWeight="bold"
-          gutterBottom
           sx={{
+            fontWeight: 700,
+            color: "#1A1A2E",
+            mb: 1,
             overflow: "hidden",
             textOverflow: "ellipsis",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
-            minHeight: "3.6em",
+            minHeight: "3.2em",
+            lineHeight: 1.3,
+            fontSize: "1.125rem",
           }}
         >
           {category.name}
         </Typography>
-
-        {/* Description */}
         <Typography
           variant="body2"
-          color="text.secondary"
           sx={{
-            mb: 2,
+            color: "#8E8EA9",
+            mb: 2.5,
             overflow: "hidden",
             textOverflow: "ellipsis",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
-            minHeight: "2.8em",
+            minHeight: "2.6em",
+            lineHeight: 1.3,
+            fontSize: "0.9375rem",
           }}
         >
           {category.description || "Chưa có mô tả"}
         </Typography>
-
-        {/* Footer Info */}
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             pt: 2,
-            borderTop: 1,
-            borderColor: "divider",
+            borderTop: "1px solid",
+            borderColor: "#F0F0F5",
           }}
         >
-          {/* Document Count */}
+          <Chip
+            icon={<DocumentIcon sx={{ fontSize: "16px !important" }} />}
+            label={`${category.documentCount || 0} tài liệu`}
+            size="small"
+            sx={{
+              bgcolor: hasDocuments ? alpha(gradient.from, 0.1) : "#F0F0F5",
+              color: hasDocuments ? gradient.from : "#8E8EA9",
+              fontWeight: 600,
+              borderRadius: "8px",
+              fontSize: "0.8125rem",
+              "& .MuiChip-icon": {
+                color: hasDocuments ? gradient.from : "#8E8EA9",
+              },
+            }}
+          />
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Typography variant="h6" color="error.main" fontWeight="bold">
-              {category.documentCount || 0}
+            <ScheduleIcon sx={{ fontSize: 14, color: "#C4C4D4" }} />
+            <Typography sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}>
+              {getLastUpdated(category.updatedAt)}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Tài liệu
-            </Typography>
-            <ArrowIcon
-              sx={{
-                fontSize: 16,
-                color: "error.main",
-                ml: 0.5,
-              }}
-            />
           </Box>
-
-          {/* Last Updated */}
-          <Typography variant="caption" color="text.secondary">
-            Cập nhật: {getLastUpdated(category.updatedAt)}
-          </Typography>
         </Box>
       </CardContent>
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: 24,
+          right: 24,
+          width: 32,
+          height: 32,
+          borderRadius: "8px",
+          bgcolor: alpha(gradient.from, 0.1),
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: isHovered ? 1 : 0,
+          transform: isHovered ? "translateX(0)" : "translateX(-10px)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        <ArrowIcon sx={{ fontSize: 18, color: gradient.from }} />
+      </Box>
     </Card>
   );
 };

@@ -6,12 +6,18 @@ import {
   Button,
   Typography,
   Box,
+  alpha,
+  CircularProgress,
 } from "@mui/material";
-import { Warning as WarningIcon } from "@mui/icons-material";
+import {
+  Warning as WarningIcon,
+  Delete as DeleteIcon,
+  FormatQuote as QuoteIcon,
+} from "@mui/icons-material";
 
 /**
- * DeleteCommentDialog Component
- * Dialog xác nhận xóa bình luận
+ * DeleteCommentDialog Component - VLU Design System v2.0
+ * Modern & Bold dialog xác nhận xóa bình luận
  *
  * @param {boolean} open - Dialog open state
  * @param {Object} comment - Comment object to delete
@@ -54,95 +60,159 @@ const DeleteCommentDialog = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
+          borderRadius: "20px",
+          boxShadow: "0 24px 48px rgba(26,26,46,0.2)",
         },
       }}
     >
-      {/* Header */}
-      <DialogTitle>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      {/* ========== HEADER ========== */}
+      <DialogTitle sx={{ p: 0 }}>
+        <Box
+          sx={{
+            p: 3,
+            textAlign: "center",
+          }}
+        >
+          {/* Warning Icon */}
           <Box
             sx={{
-              width: 40,
-              height: 40,
+              width: 72,
+              height: 72,
+              mx: "auto",
+              mb: 2,
               borderRadius: "50%",
-              backgroundColor: (theme) => `${theme.palette.error.main}15`,
+              bgcolor: alpha("#D32F2F", 0.1),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <WarningIcon sx={{ color: "error.main", fontSize: 24 }} />
+            <WarningIcon sx={{ fontSize: 36, color: "#D32F2F" }} />
           </Box>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
+          >
             Xóa bình luận?
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+            Hành động này không thể hoàn tác
           </Typography>
         </Box>
       </DialogTitle>
 
-      {/* Content */}
-      <DialogContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Bạn có chắc chắn muốn xóa bình luận này không?
-        </Typography>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ fontStyle: "italic" }}
-        >
-          Hành động này không thể hoàn tác.
-        </Typography>
-
-        {/* Show comment preview */}
+      {/* ========== CONTENT ========== */}
+      <DialogContent sx={{ px: 3, py: 0 }}>
+        {/* Comment Preview */}
         <Box
           sx={{
-            mt: 2,
-            p: 2,
-            backgroundColor: "grey.50",
-            borderRadius: 1,
-            border: "1px solid",
-            borderColor: "divider",
+            p: 2.5,
+            borderRadius: "14px",
+            bgcolor: "#FAFAFC",
+            border: "1px solid #F0F0F5",
+            position: "relative",
           }}
         >
+          {/* Quote Icon */}
+          <QuoteIcon
+            sx={{
+              position: "absolute",
+              top: 12,
+              left: 12,
+              fontSize: 24,
+              color: "#E0E0E0",
+              transform: "rotate(180deg)",
+            }}
+          />
+
           <Typography
             variant="body2"
             sx={{
-              color: "text.secondary",
+              color: "#4A4A68",
+              fontStyle: "italic",
               display: "-webkit-box",
-              WebkitLineClamp: 2,
+              WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              lineHeight: 1.7,
+              pl: 3,
             }}
           >
-            "{comment.content}"
+            {comment.content}
           </Typography>
         </Box>
+
+        {/* Warning Text */}
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            mt: 2,
+            color: "#8E8EA9",
+            textAlign: "center",
+          }}
+        >
+          Bình luận sẽ bị xóa vĩnh viễn khỏi tài liệu này
+        </Typography>
       </DialogContent>
 
-      {/* Actions */}
-      <DialogActions sx={{ px: 3, pb: 3 }}>
+      {/* ========== ACTIONS ========== */}
+      <DialogActions
+        sx={{
+          p: 3,
+          gap: 1.5,
+        }}
+      >
         <Button
           onClick={handleClose}
           disabled={loading}
           sx={{
-            textTransform: "none",
+            flex: 1,
+            color: "#4A4A68",
+            borderRadius: "12px",
+            py: 1.25,
             fontWeight: 600,
+            textTransform: "none",
+            border: "1px solid #E0E0E0",
+            "&:hover": {
+              bgcolor: "#FAFAFC",
+              borderColor: "#C4C4D4",
+            },
           }}
         >
-          Hủy bỏ
+          Hủy
         </Button>
         <Button
           onClick={handleConfirm}
           variant="contained"
-          color="error"
           disabled={loading}
+          startIcon={
+            loading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              <DeleteIcon />
+            )
+          }
           sx={{
-            textTransform: "none",
+            flex: 1,
+            bgcolor: "#D32F2F",
+            color: "white",
+            borderRadius: "12px",
+            py: 1.25,
             fontWeight: 600,
+            textTransform: "none",
+            boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+            "&:hover": {
+              bgcolor: "#B71C1C",
+            },
+            "&.Mui-disabled": {
+              bgcolor: "#E0E0E0",
+              color: "#8E8EA9",
+            },
           }}
         >
-          {loading ? "Đang xóa..." : "Xóa"}
+          {loading ? "Đang xóa..." : "Xóa bình luận"}
         </Button>
       </DialogActions>
     </Dialog>

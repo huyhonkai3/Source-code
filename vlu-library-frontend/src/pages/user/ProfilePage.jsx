@@ -16,6 +16,9 @@ import {
   InputAdornment,
   Badge,
   IconButton,
+  alpha,
+  Skeleton,
+  LinearProgress,
 } from "@mui/material";
 import {
   Person as PersonIcon,
@@ -26,6 +29,11 @@ import {
   EmojiEvents as TrophyIcon,
   Save as SaveIcon,
   CameraAlt as CameraAltIcon,
+  Edit as EditIcon,
+  CheckCircle as CheckCircleIcon,
+  AccessTime as PendingIcon,
+  Cancel as CancelIcon,
+  Verified as VerifiedIcon,
 } from "@mui/icons-material";
 import Header from "../../components/common/Header";
 import UserSidebar from "../../components/user/UserSidebar";
@@ -34,7 +42,6 @@ import userAPI from "../../api/user.api";
 import { useAuth } from "../../context/AuthContext";
 
 // Base URL của Backend API
-// Sử dụng process.env cho Create React App (CRA)
 const API_BASE_URL =
   process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
@@ -43,18 +50,14 @@ const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 
 /**
  * Helper function để tạo full URL cho avatar
- * @param {string} avatarPath - Relative path hoặc full URL của avatar
- * @returns {string} Full URL để hiển thị avatar
  */
 const getFullAvatarUrl = (avatarPath) => {
   if (!avatarPath) return "";
 
-  // Nếu đã là full URL (http:// hoặc https://) thì return luôn
   if (avatarPath.startsWith("http://") || avatarPath.startsWith("https://")) {
     return avatarPath;
   }
 
-  // Sử dụng SERVER_URL (không có /api) cho static files
   const baseUrl = SERVER_URL.endsWith("/")
     ? SERVER_URL.slice(0, -1)
     : SERVER_URL;
@@ -64,8 +67,8 @@ const getFullAvatarUrl = (avatarPath) => {
 };
 
 /**
- * ProfilePage Component
- * Trang quản lý thông tin cá nhân của user
+ * ProfilePage Component - VLU Design System v2.0
+ * Modern & Bold profile page với glass morphism effects
  */
 const ProfilePage = () => {
   const { user: authUser, updateUserAvatar } = useAuth();
@@ -75,7 +78,7 @@ const ProfilePage = () => {
     name: "",
     email: "",
     phoneNumber: "",
-    address: "", // Map với Khoa/Ngành
+    address: "",
     avatar: "",
   });
 
@@ -97,7 +100,7 @@ const ProfilePage = () => {
   const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   // Avatar upload config
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
   const ALLOWED_FILE_TYPES = [
     "image/jpeg",
     "image/png",
@@ -105,19 +108,44 @@ const ProfilePage = () => {
     "image/webp",
   ];
 
-  // Role badge configuration
-  const getRoleBadge = (role) => {
-    const badges = {
-      Admin: { label: "Quản trị viên", color: "error" },
-      Moderator: { label: "Kiểm duyệt viên", color: "warning" },
-      Author: { label: "Tác giả", color: "success" },
-      User: { label: "Thành viên", color: "primary" },
-      Guest: { label: "Khách", color: "default" },
+  // Role configuration với Design System v2.0 colors
+  const getRoleConfig = (role) => {
+    const configs = {
+      Admin: {
+        label: "Quản trị viên",
+        color: "#D32F2F",
+        bgColor: "#FFEBEE",
+        icon: VerifiedIcon,
+      },
+      Moderator: {
+        label: "Kiểm duyệt viên",
+        color: "#7C4DFF",
+        bgColor: "#EDE7F6",
+        icon: VerifiedIcon,
+      },
+      Author: {
+        label: "Tác giả",
+        color: "#4CAF50",
+        bgColor: "#E8F5E9",
+        icon: EditIcon,
+      },
+      User: {
+        label: "Thành viên",
+        color: "#2196F3",
+        bgColor: "#E3F2FD",
+        icon: PersonIcon,
+      },
+      Guest: {
+        label: "Khách",
+        color: "#8E8EA9",
+        bgColor: "#F0F0F5",
+        icon: PersonIcon,
+      },
     };
-    return badges[role] || badges.User;
+    return configs[role] || configs.User;
   };
 
-  // Departments/Faculties options
+  // Departments options
   const departments = [
     "Công nghệ thông tin",
     "Kinh tế",
@@ -187,8 +215,6 @@ const ProfilePage = () => {
       ...prev,
       [field]: value,
     }));
-
-    // Check if data has changed
     setHasChanges(true);
   };
 
@@ -199,10 +225,8 @@ const ProfilePage = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Reset input để có thể chọn lại cùng file
     event.target.value = "";
 
-    // Validate file type
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
       showSnackbar(
         "Định dạng file không hỗ trợ. Vui lòng chọn ảnh JPG, PNG, GIF hoặc WEBP.",
@@ -211,7 +235,6 @@ const ProfilePage = () => {
       return;
     }
 
-    // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       showSnackbar(
         "Kích thước file quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.",
@@ -220,29 +243,23 @@ const ProfilePage = () => {
       return;
     }
 
-    // Start upload
     setUploadingAvatar(true);
 
     try {
-      // Tạo FormData
       const formDataToSend = new FormData();
       formDataToSend.append("avatar", file);
 
-      // Gọi API upload
       const response = await userAPI.uploadAvatar(formDataToSend);
 
       if (response.status === "success" && response.data?.avatarUrl) {
         const newAvatarUrl = response.data.avatarUrl;
 
-        // Cập nhật local state
         setFormData((prev) => ({
           ...prev,
           avatar: newAvatarUrl,
         }));
 
-        // Cập nhật AuthContext để Header và các component khác cũng thay đổi
         updateUserAvatar(newAvatarUrl);
-
         showSnackbar("Cập nhật ảnh đại diện thành công!", "success");
       }
     } catch (error) {
@@ -274,7 +291,6 @@ const ProfilePage = () => {
       setOriginalData(formData);
       setHasChanges(false);
 
-      // Refresh profile
       await fetchProfile();
     } catch (error) {
       console.error("Update profile error:", error);
@@ -306,10 +322,7 @@ const ProfilePage = () => {
         "Gửi yêu cầu thành công! Admin sẽ xem xét trong vòng 24-48 giờ.",
       );
 
-      // Refresh status
       await fetchRequestStatus();
-
-      // Close dialog
       setUpgradeDialogOpen(false);
     } catch (error) {
       console.error("Submit upgrade request error:", error);
@@ -344,168 +357,195 @@ const ProfilePage = () => {
   };
 
   /**
-   * Render Author Upgrade Banner
-   * Chỉ hiển thị cho User role (chưa phải Author)
+   * Render Author Upgrade Banner - Design System v2.0
    */
   const renderAuthorBanner = () => {
-    // Chỉ hiển thị banner nếu role = 'User'
     if (authUser?.role !== "User") {
       return null;
     }
 
-    // CASE 1: Đang chờ duyệt - User đã gửi yêu cầu và status = 'pending'
+    // CASE 1: Đang chờ duyệt
     if (requestStatus?.status === "pending") {
       return (
         <Box
           sx={{
-            mb: 3,
+            mb: 4,
             p: 3,
-            bgcolor: "warning.lighter",
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "warning.light",
+            background: "linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%)",
+            borderRadius: "16px",
+            border: "1px solid #FFE082",
             display: "flex",
             alignItems: "center",
-            gap: 2,
+            gap: 2.5,
           }}
         >
-          {/* Icon */}
           <Box
             sx={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              bgcolor: "warning.light",
+              width: 56,
+              height: 56,
+              borderRadius: "14px",
+              bgcolor: "#FFC107",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <TrophyIcon sx={{ fontSize: 28, color: "warning.dark" }} />
+            <PendingIcon sx={{ fontSize: 28, color: "white" }} />
           </Box>
 
-          {/* Content */}
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
+            >
               Yêu cầu đang chờ xét duyệt
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: "#4A4A68" }}>
               Yêu cầu trở thành Tác giả của bạn đang được Admin xem xét. Vui
               lòng đợi từ 24-48 giờ.
             </Typography>
           </Box>
 
-          {/* Status Chip */}
-          <Chip label="Đang chờ" color="warning" size="small" />
+          <Chip
+            icon={<PendingIcon sx={{ fontSize: 16 }} />}
+            label="Đang chờ"
+            sx={{
+              bgcolor: "#FFC107",
+              color: "white",
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: "white" },
+            }}
+          />
         </Box>
       );
     }
 
-    // CASE 2: Đã bị từ chối - User có thể gửi lại yêu cầu
+    // CASE 2: Đã bị từ chối
     if (requestStatus?.status === "rejected") {
       return (
         <Box
           sx={{
-            mb: 3,
+            mb: 4,
             p: 3,
-            bgcolor: "error.lighter",
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "error.light",
+            background: "linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%)",
+            borderRadius: "16px",
+            border: "1px solid #EF9A9A",
             display: "flex",
             alignItems: "center",
-            gap: 2,
+            gap: 2.5,
           }}
         >
-          {/* Icon */}
           <Box
             sx={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              bgcolor: "error.light",
+              width: 56,
+              height: 56,
+              borderRadius: "14px",
+              bgcolor: "#EF5350",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <TrophyIcon sx={{ fontSize: 28, color: "error.dark" }} />
+            <CancelIcon sx={{ fontSize: 28, color: "white" }} />
           </Box>
 
-          {/* Content */}
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
+            >
               Yêu cầu đã bị từ chối
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: "#4A4A68" }}>
               {requestStatus?.rejectionReason ||
                 "Yêu cầu của bạn không được duyệt. Bạn có thể gửi lại yêu cầu mới."}
             </Typography>
           </Box>
 
-          {/* Retry Button */}
           <Button
-            variant="outlined"
-            color="error"
-            size="small"
+            variant="contained"
             onClick={() => setUpgradeDialogOpen(true)}
+            sx={{
+              bgcolor: "#D32F2F",
+              color: "white",
+              borderRadius: "12px",
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              textTransform: "none",
+              boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+              "&:hover": {
+                bgcolor: "#B71C1C",
+              },
+            }}
           >
-            Gửi lại
+            Gửi lại yêu cầu
           </Button>
         </Box>
       );
     }
 
-    // CASE 3: Chưa gửi yêu cầu - Hiển thị banner mời gửi
+    // CASE 3: Chưa gửi yêu cầu
     return (
       <Box
         sx={{
-          mb: 3,
+          mb: 4,
           p: 3,
-          bgcolor: "primary.lighter",
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "primary.light",
+          background: "linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)",
+          borderRadius: "16px",
+          border: "1px solid #90CAF9",
           display: "flex",
           alignItems: "center",
-          gap: 2,
+          gap: 2.5,
         }}
       >
-        {/* Icon */}
         <Box
           sx={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            bgcolor: "primary.light",
+            width: 56,
+            height: 56,
+            borderRadius: "14px",
+            background: "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
+            boxShadow: "0 4px 14px rgba(33,150,243,0.3)",
           }}
         >
-          <TrophyIcon sx={{ fontSize: 28, color: "primary.dark" }} />
+          <TrophyIcon sx={{ fontSize: 28, color: "white" }} />
         </Box>
 
-        {/* Content */}
         <Box sx={{ flex: 1 }}>
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
+          >
             Trở thành Tác giả
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: "#4A4A68" }}>
             Đăng ký để có thể chia sẻ tài liệu với cộng đồng VLU. Yêu cầu sẽ
             được Admin xét duyệt trong vòng 24-48 giờ.
           </Typography>
         </Box>
 
-        {/* CTA Button */}
         <Button
           variant="contained"
-          color="primary"
-          size="small"
           onClick={() => setUpgradeDialogOpen(true)}
+          sx={{
+            bgcolor: "#2196F3",
+            color: "white",
+            borderRadius: "12px",
+            px: 3,
+            py: 1,
+            fontWeight: 600,
+            textTransform: "none",
+            boxShadow: "0 4px 14px rgba(33,150,243,0.3)",
+            "&:hover": {
+              bgcolor: "#1976D2",
+            },
+          }}
         >
           Đăng ký ngay
         </Button>
@@ -516,320 +556,409 @@ const ProfilePage = () => {
   // Loading state
   if (loading) {
     return (
-      <>
+      <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
         <Header />
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "60vh",
-            }}
-          >
-            <CircularProgress />
-          </Box>
+        <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={3}>
+              <Skeleton
+                variant="rounded"
+                height={400}
+                sx={{ borderRadius: "20px" }}
+              />
+            </Grid>
+            <Grid item xs={12} md={9}>
+              <Skeleton
+                variant="rounded"
+                height={600}
+                sx={{ borderRadius: "20px" }}
+              />
+            </Grid>
+          </Grid>
         </Container>
-      </>
+      </Box>
     );
   }
 
-  const roleBadge = getRoleBadge(authUser?.role);
+  const roleConfig = getRoleConfig(authUser?.role);
+  const RoleIcon = roleConfig.icon;
 
   return (
-    <>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
       <Header />
 
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
         <Grid container spacing={3}>
-          {/* Left Sidebar */}
+          {/* ========== LEFT SIDEBAR ========== */}
           <Grid item xs={12} md={3}>
             <UserSidebar active="profile" />
           </Grid>
 
-          {/* Right Content */}
+          {/* ========== RIGHT CONTENT ========== */}
           <Grid item xs={12} md={9}>
             <Paper
               elevation={0}
               sx={{
-                p: { xs: 2, sm: 3, md: 4 },
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: "20px",
+                overflow: "hidden",
+                bgcolor: "white",
+                boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+                border: "1px solid #F0F0F5",
               }}
             >
-              {/* Header */}
+              {/* ========== PROFILE HEADER ========== */}
               <Box
                 sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 4,
-                  pb: 2,
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
+                  position: "relative",
+                  p: { xs: 3, md: 4 },
+                  pb: { xs: 4, md: 5 },
+                  background:
+                    "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 50%, #FFC107 100%)",
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                  },
                 }}
               >
-                <Box>
-                  <Typography variant="h5" fontWeight="bold" gutterBottom>
-                    Hồ sơ cá nhân
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Quản lý thông tin cá nhân và cài đặt quyền riêng tư.
-                  </Typography>
-                </Box>
-                <Chip
-                  label={roleBadge.label}
-                  color={roleBadge.color}
-                  size="small"
+                <Box
                   sx={{
-                    fontWeight: 600,
-                    fontSize: "0.75rem",
+                    position: "relative",
+                    zIndex: 1,
+                    display: "flex",
+                    alignItems: { xs: "flex-start", sm: "center" },
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: 3,
                   }}
-                />
-              </Box>
-
-              {/* Author Upgrade Banner */}
-              {renderAuthorBanner()}
-
-              {/* Form */}
-              <Box component="form" onSubmit={handleSubmit}>
-                {/* Avatar Section */}
-                <Box sx={{ mb: 4 }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                  >
-                    Ảnh đại diện
-                  </Typography>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 3,
-                      mt: 2,
-                    }}
-                  >
-                    {/* Avatar with Upload Badge */}
-                    <Badge
-                      overlap="circular"
-                      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                      badgeContent={
-                        <IconButton
-                          component="label"
-                          disabled={uploadingAvatar}
-                          sx={{
-                            bgcolor: "primary.main",
-                            color: "white",
-                            width: 36,
-                            height: 36,
-                            border: "3px solid white",
-                            boxShadow: 2,
-                            "&:hover": {
-                              bgcolor: "primary.dark",
-                            },
-                            "&.Mui-disabled": {
-                              bgcolor: "grey.400",
-                              color: "white",
-                            },
-                          }}
-                        >
-                          <CameraAltIcon sx={{ fontSize: 18 }} />
-                          <input
-                            type="file"
-                            hidden
-                            accept="image/jpeg,image/png,image/gif,image/webp"
-                            onChange={handleAvatarChange}
-                          />
-                        </IconButton>
-                      }
-                    >
-                      <Box sx={{ position: "relative" }}>
-                        {/* SỬA: Sử dụng getFullAvatarUrl để build full URL */}
-                        <Avatar
-                          src={getFullAvatarUrl(formData.avatar)}
-                          alt={formData.name}
-                          sx={{
-                            width: 100,
-                            height: 100,
-                            border: "4px solid",
-                            borderColor: "primary.main",
-                            opacity: uploadingAvatar ? 0.5 : 1,
-                            transition: "opacity 0.3s",
-                          }}
-                        >
-                          {formData.name?.charAt(0).toUpperCase()}
-                        </Avatar>
-
-                        {/* Loading overlay on avatar */}
-                        {uploadingAvatar && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <CircularProgress size={40} />
-                          </Box>
-                        )}
-                      </Box>
-                    </Badge>
-
-                    {/* Upload Instructions */}
-                    <Box>
-                      <Button
-                        variant="outlined"
-                        startIcon={<PhotoCameraIcon />}
+                >
+                  {/* Avatar with Upload */}
+                  <Badge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                    badgeContent={
+                      <IconButton
                         component="label"
-                        size="small"
                         disabled={uploadingAvatar}
+                        sx={{
+                          bgcolor: "white",
+                          color: "#D32F2F",
+                          width: 40,
+                          height: 40,
+                          border: "3px solid white",
+                          boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+                          "&:hover": {
+                            bgcolor: "#FFF5F5",
+                          },
+                          "&.Mui-disabled": {
+                            bgcolor: "rgba(255,255,255,0.7)",
+                            color: "#8E8EA9",
+                          },
+                        }}
                       >
-                        {uploadingAvatar ? "Đang tải..." : "Tải ảnh lên"}
+                        {uploadingAvatar ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <CameraAltIcon sx={{ fontSize: 20 }} />
+                        )}
                         <input
                           type="file"
                           hidden
                           accept="image/jpeg,image/png,image/gif,image/webp"
                           onChange={handleAvatarChange}
                         />
-                      </Button>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                        sx={{ mt: 1 }}
-                      >
-                        Cho phép định dạng JPG, PNG, GIF hoặc WEBP.
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Kích thước tối đa 5MB.
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Personal Information */}
-                <Grid container spacing={3}>
-                  {/* Họ và tên */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Họ và tên"
-                      value={formData.name}
-                      onChange={handleChange("name")}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <PersonIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                      required
-                    />
-                  </Grid>
-
-                  {/* Email đăng nhập (Readonly) */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Email đăng nhập"
-                      value={formData.email}
-                      disabled
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmailIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                      helperText="Email trường cấp không thể thay đổi."
-                    />
-                  </Grid>
-
-                  {/* Số điện thoại */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Số điện thoại"
-                      value={formData.phoneNumber}
-                      onChange={handleChange("phoneNumber")}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <PhoneIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                      placeholder="0123456789"
-                    />
-                  </Grid>
-
-                  {/* Khoa/Ngành */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      select
-                      label="Khoa/ Ngành"
-                      value={formData.address}
-                      onChange={handleChange("address")}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SchoolIcon />
-                          </InputAdornment>
-                        ),
+                      </IconButton>
+                    }
+                  >
+                    <Avatar
+                      src={getFullAvatarUrl(formData.avatar)}
+                      alt={formData.name}
+                      sx={{
+                        width: 120,
+                        height: 120,
+                        border: "4px solid white",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                        fontSize: "2.5rem",
+                        fontWeight: 700,
+                        bgcolor: "#1A1A2E",
+                        opacity: uploadingAvatar ? 0.7 : 1,
+                        transition: "opacity 0.3s ease",
                       }}
                     >
-                      <MenuItem value="">-- Chọn khoa/ngành --</MenuItem>
-                      {departments.map((dept) => (
-                        <MenuItem key={dept} value={dept}>
-                          {dept}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                </Grid>
+                      {formData.name?.charAt(0).toUpperCase()}
+                    </Avatar>
+                  </Badge>
 
-                {/* Action Buttons */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 2,
-                    mt: 4,
-                    pt: 3,
-                    borderTop: "1px solid",
-                    borderColor: "divider",
-                  }}
-                >
-                  {hasChanges && (
-                    <Button variant="outlined" onClick={handleCancel}>
-                      Hủy bỏ
-                    </Button>
-                  )}
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={!hasChanges || saving}
-                    startIcon={
-                      saving ? <CircularProgress size={20} /> : <SaveIcon />
-                    }
+                  {/* User Info */}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        fontWeight: 700,
+                        color: "white",
+                        mb: 0.5,
+                        textShadow: "0 2px 10px rgba(0,0,0,0.2)",
+                        fontSize: { xs: "1.5rem", md: "2rem" },
+                      }}
+                    >
+                      {formData.name || "Chưa cập nhật"}
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        color: "rgba(255,255,255,0.9)",
+                        mb: 2,
+                      }}
+                    >
+                      {formData.email}
+                    </Typography>
+
+                    {/* Role Badge */}
+                    <Chip
+                      icon={<RoleIcon sx={{ fontSize: 18 }} />}
+                      label={roleConfig.label}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.95)",
+                        color: roleConfig.color,
+                        fontWeight: 600,
+                        fontSize: "0.875rem",
+                        height: 32,
+                        "& .MuiChip-icon": {
+                          color: roleConfig.color,
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* ========== FORM CONTENT ========== */}
+              <Box sx={{ p: { xs: 3, md: 4 } }}>
+                {/* Author Upgrade Banner */}
+                {renderAuthorBanner()}
+
+                {/* Form */}
+                <Box component="form" onSubmit={handleSubmit}>
+                  {/* Section Title */}
+                  <Typography
+                    variant="h6"
                     sx={{
-                      bgcolor: "error.main",
-                      "&:hover": {
-                        bgcolor: "error.dark",
-                      },
+                      fontWeight: 700,
+                      color: "#1A1A2E",
+                      mb: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
                     }}
                   >
-                    {saving ? "Đang lưu..." : "Lưu thay đổi"}
-                  </Button>
+                    <PersonIcon sx={{ color: "#D32F2F" }} />
+                    Thông tin cá nhân
+                  </Typography>
+
+                  {/* Form Fields */}
+                  <Grid container spacing={3}>
+                    {/* Họ và tên */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Họ và tên"
+                        value={formData.name}
+                        onChange={handleChange("name")}
+                        required
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <PersonIcon sx={{ color: "#8E8EA9" }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "12px",
+                            bgcolor: "#FAFAFC",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#C4C4D4",
+                            },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#D32F2F",
+                              borderWidth: "2px",
+                            },
+                          },
+                          "& .MuiInputLabel-root.Mui-focused": {
+                            color: "#D32F2F",
+                          },
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Email (Readonly) */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Email đăng nhập"
+                        value={formData.email}
+                        disabled
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <EmailIcon sx={{ color: "#8E8EA9" }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        helperText="Email trường cấp không thể thay đổi."
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "12px",
+                            bgcolor: "#F0F0F5",
+                          },
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Số điện thoại */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Số điện thoại"
+                        value={formData.phoneNumber}
+                        onChange={handleChange("phoneNumber")}
+                        placeholder="0123456789"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <PhoneIcon sx={{ color: "#8E8EA9" }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "12px",
+                            bgcolor: "#FAFAFC",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#C4C4D4",
+                            },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#D32F2F",
+                              borderWidth: "2px",
+                            },
+                          },
+                          "& .MuiInputLabel-root.Mui-focused": {
+                            color: "#D32F2F",
+                          },
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Khoa/Ngành */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        select
+                        label="Khoa / Ngành"
+                        value={formData.address}
+                        onChange={handleChange("address")}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SchoolIcon sx={{ color: "#8E8EA9" }} />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "12px",
+                            bgcolor: "#FAFAFC",
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#C4C4D4",
+                            },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#D32F2F",
+                              borderWidth: "2px",
+                            },
+                          },
+                          "& .MuiInputLabel-root.Mui-focused": {
+                            color: "#D32F2F",
+                          },
+                        }}
+                      >
+                        <MenuItem value="">-- Chọn khoa/ngành --</MenuItem>
+                        {departments.map((dept) => (
+                          <MenuItem key={dept} value={dept}>
+                            {dept}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                  </Grid>
+
+                  {/* ========== ACTION BUTTONS ========== */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 2,
+                      mt: 5,
+                      pt: 3,
+                      borderTop: "1px solid #F0F0F5",
+                    }}
+                  >
+                    {hasChanges && (
+                      <Button
+                        variant="outlined"
+                        onClick={handleCancel}
+                        sx={{
+                          borderColor: "#E0E0E0",
+                          color: "#4A4A68",
+                          borderRadius: "12px",
+                          px: 3,
+                          py: 1.25,
+                          fontWeight: 600,
+                          textTransform: "none",
+                          "&:hover": {
+                            borderColor: "#C4C4D4",
+                            bgcolor: "#FAFAFC",
+                          },
+                        }}
+                      >
+                        Hủy bỏ
+                      </Button>
+                    )}
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={!hasChanges || saving}
+                      startIcon={
+                        saving ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <SaveIcon />
+                        )
+                      }
+                      sx={{
+                        bgcolor: "#D32F2F",
+                        color: "white",
+                        borderRadius: "12px",
+                        px: 4,
+                        py: 1.25,
+                        fontWeight: 600,
+                        textTransform: "none",
+                        boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+                        "&:hover": {
+                          bgcolor: "#B71C1C",
+                          boxShadow: "0 6px 20px rgba(211,47,47,0.4)",
+                        },
+                        "&.Mui-disabled": {
+                          bgcolor: "#E0E0E0",
+                          color: "#8E8EA9",
+                        },
+                      }}
+                    >
+                      {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </Button>
+                  </Box>
                 </Box>
               </Box>
             </Paper>
@@ -855,12 +984,16 @@ const ProfilePage = () => {
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </>
+    </Box>
   );
 };
 

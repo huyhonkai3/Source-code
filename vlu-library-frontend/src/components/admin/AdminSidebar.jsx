@@ -10,6 +10,7 @@ import {
   Divider,
   Badge,
   Collapse,
+  alpha,
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -17,24 +18,25 @@ import {
   Category as CategoryIcon,
   People as PeopleIcon,
   PersonAdd as PersonAddIcon,
-  BarChart as BarChartIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   ExpandLess,
   ExpandMore,
   FiberManualRecord as DotIcon,
+  AdminPanelSettings as AdminIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 /**
- * AdminSidebar Component
- * Sidebar navigation dành riêng cho Admin với nested menu
+ * AdminSidebar Component - VLU Design System v2.0.1
+ * Modern & Bold sidebar navigation cho Admin
+ * UPDATED: Tăng font sizes để UX tốt hơn
  *
- * @param {string} active - Menu item đang active ('dashboard', 'all-documents', 'moderation', etc.)
- * @param {number} pendingCount - Số tài liệu chờ duyệt (optional)
- * @param {number} upgradeCount - Số yêu cầu nâng cấp Author (optional)
+ * @param {string} active - Menu item đang active
+ * @param {number} pendingCount - Số tài liệu chờ duyệt
+ * @param {number} upgradeCount - Số yêu cầu nâng cấp Author
  */
 const AdminSidebar = ({
   active = "dashboard",
@@ -110,23 +112,14 @@ const AdminSidebar = ({
     },
   ];
 
-  /**
-   * Handle menu item click
-   */
   const handleMenuClick = (path) => {
     navigate(path);
   };
 
-  /**
-   * Handle dropdown toggle
-   */
   const handleDocumentsToggle = () => {
     setDocumentsOpen(!documentsOpen);
   };
 
-  /**
-   * Handle logout
-   */
   const handleLogout = async () => {
     try {
       await logout();
@@ -135,9 +128,6 @@ const AdminSidebar = ({
     }
   };
 
-  /**
-   * Get section label
-   */
   const getSectionLabel = (section) => {
     const labels = {
       main: "TỔNG QUAN",
@@ -159,57 +149,61 @@ const AdminSidebar = ({
     <Paper
       elevation={0}
       sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: "20px",
         overflow: "hidden",
+        bgcolor: "white",
+        boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+        border: "1px solid #F0F0F5",
       }}
     >
-      {/* Header */}
+      {/* ========== HEADER ========== */}
       <Box
         sx={{
-          p: 2.5,
-          backgroundColor: "error.main",
+          p: 3,
+          background: "linear-gradient(135deg, #D32F2F 0%, #EF5350 100%)",
           color: "white",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
           <Box
             sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1,
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              width: 40,
+              height: 40,
+              borderRadius: "12px",
+              bgcolor: "rgba(255, 255, 255, 0.2)",
+              backdropFilter: "blur(8px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <DashboardIcon fontSize="small" />
+            <AdminIcon sx={{ fontSize: 22 }} />
           </Box>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 700,
-              fontSize: "1.1rem",
-            }}
-          >
-            VLU Admin
-          </Typography>
+          <Box>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 700,
+                fontSize: "1.1875rem", // UPDATED: 19px (was 17.6px)
+                lineHeight: 1.2,
+              }}
+            >
+              VLU Admin
+            </Typography>
+            <Typography
+              sx={{
+                opacity: 0.9,
+                fontSize: "0.8125rem", // UPDATED: 13px (was 12px)
+              }}
+            >
+              Quản trị viên
+            </Typography>
+          </Box>
         </Box>
-        <Typography
-          variant="caption"
-          sx={{
-            opacity: 0.9,
-            fontSize: "0.7rem",
-          }}
-        >
-          Quản trị viên
-        </Typography>
       </Box>
 
-      {/* Menu List */}
-      <List sx={{ p: 1.5 }}>
+      {/* ========== MENU LIST ========== */}
+      <List sx={{ p: 2 }}>
         {sections.map((section, sectionIndex) => (
           <Box key={section}>
             {groupedItems[section].length > 0 && (
@@ -217,17 +211,17 @@ const AdminSidebar = ({
                 {/* Section Label */}
                 {sectionIndex > 0 && (
                   <>
-                    <Divider sx={{ my: 1.5 }} />
+                    <Divider sx={{ my: 2 }} />
                     <Typography
                       variant="overline"
                       sx={{
                         px: 2,
                         py: 1,
                         display: "block",
-                        fontSize: "0.65rem",
+                        fontSize: "0.75rem", // UPDATED: 12px (was 10px)
                         fontWeight: 700,
-                        color: "text.secondary",
-                        letterSpacing: 0.8,
+                        color: "#8E8EA9",
+                        letterSpacing: 1,
                       }}
                     >
                       {getSectionLabel(section)}
@@ -248,31 +242,28 @@ const AdminSidebar = ({
                         }
                         selected={active === item.id && !item.hasDropdown}
                         sx={{
-                          borderRadius: 1.5,
+                          borderRadius: "12px",
                           py: 1.25,
                           px: 2,
                           "&.Mui-selected": {
-                            backgroundColor: "error.main",
+                            bgcolor: "#D32F2F",
                             color: "white",
                             "&:hover": {
-                              backgroundColor: "error.dark",
+                              bgcolor: "#B71C1C",
                             },
                             "& .MuiListItemIcon-root": {
                               color: "white",
                             },
-                            "& .MuiListItemText-primary": {
-                              fontWeight: 600,
-                            },
                           },
                           "&:hover": {
-                            backgroundColor: "action.hover",
+                            bgcolor: "#F0F0F5",
                           },
                         }}
                       >
                         <ListItemIcon
                           sx={{
-                            minWidth: 36,
-                            color: "text.secondary",
+                            minWidth: 40,
+                            color: active === item.id ? "white" : "#8E8EA9",
                           }}
                         >
                           {item.icon}
@@ -280,50 +271,45 @@ const AdminSidebar = ({
                         <ListItemText
                           primary={item.label}
                           primaryTypographyProps={{
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
+                            fontSize: "0.9375rem", // UPDATED: 15px (was 14px)
+                            fontWeight: active === item.id ? 600 : 500,
                           }}
                         />
-                        {/* Badge for parent item */}
-                        {item.badge !== null &&
-                          item.badge !== undefined &&
-                          !item.hasDropdown && (
-                            <Badge
-                              badgeContent={item.badge}
-                              color="error"
-                              max={99}
+                        {/* Badge */}
+                        {item.badge !== null && item.badge !== undefined && (
+                          <Box
+                            sx={{
+                              minWidth: 24,
+                              height: 24,
+                              borderRadius: "8px",
+                              bgcolor:
+                                active === item.id
+                                  ? "rgba(255,255,255,0.3)"
+                                  : alpha("#D32F2F", 0.1),
+                              color: active === item.id ? "white" : "#D32F2F",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              mr: item.hasDropdown ? 1 : 0,
+                            }}
+                          >
+                            <Typography
                               sx={{
-                                "& .MuiBadge-badge": {
-                                  fontSize: "0.65rem",
-                                  height: 18,
-                                  minWidth: 18,
-                                  padding: "0 4px",
-                                },
+                                fontWeight: 700,
+                                fontSize: "0.75rem", // UPDATED: 12px (was 11px)
                               }}
-                            />
-                          )}
-                        {/* Parent with badge and dropdown */}
-                        {item.badge !== null &&
-                          item.badge !== undefined &&
-                          item.hasDropdown && (
-                            <Badge
-                              badgeContent={item.badge}
-                              color="error"
-                              max={99}
-                              sx={{
-                                mr: 1,
-                                "& .MuiBadge-badge": {
-                                  fontSize: "0.65rem",
-                                  height: 18,
-                                  minWidth: 18,
-                                  padding: "0 4px",
-                                },
-                              }}
-                            />
-                          )}
+                            >
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </Typography>
+                          </Box>
+                        )}
                         {/* Dropdown arrow */}
                         {item.hasDropdown &&
-                          (documentsOpen ? <ExpandLess /> : <ExpandMore />)}
+                          (documentsOpen ? (
+                            <ExpandLess sx={{ color: "#8E8EA9" }} />
+                          ) : (
+                            <ExpandMore sx={{ color: "#8E8EA9" }} />
+                          ))}
                       </ListItemButton>
                     </ListItem>
 
@@ -341,32 +327,27 @@ const AdminSidebar = ({
                                 onClick={() => handleMenuClick(child.path)}
                                 selected={active === child.id}
                                 sx={{
-                                  borderRadius: 1.5,
+                                  borderRadius: "12px",
                                   py: 1,
                                   pl: 6,
                                   pr: 2,
                                   "&.Mui-selected": {
-                                    backgroundColor: "error.main",
+                                    bgcolor: "#D32F2F",
                                     color: "white",
                                     "&:hover": {
-                                      backgroundColor: "error.dark",
-                                    },
-                                    "& .MuiListItemIcon-root": {
-                                      color: "white",
-                                    },
-                                    "& .MuiListItemText-primary": {
-                                      fontWeight: 600,
+                                      bgcolor: "#B71C1C",
                                     },
                                   },
                                   "&:hover": {
-                                    backgroundColor: "action.hover",
+                                    bgcolor: "#F0F0F5",
                                   },
                                 }}
                               >
                                 <ListItemIcon
                                   sx={{
                                     minWidth: 24,
-                                    color: "text.secondary",
+                                    color:
+                                      active === child.id ? "white" : "#C4C4D4",
                                   }}
                                 >
                                   <DotIcon sx={{ fontSize: 8 }} />
@@ -374,25 +355,39 @@ const AdminSidebar = ({
                                 <ListItemText
                                   primary={child.label}
                                   primaryTypographyProps={{
-                                    fontSize: "0.8125rem",
+                                    fontSize: "0.875rem", // UPDATED: 14px (was 13px)
                                     fontWeight: active === child.id ? 600 : 500,
                                   }}
                                 />
                                 {child.badge !== null &&
                                   child.badge !== undefined && (
-                                    <Badge
-                                      badgeContent={child.badge}
-                                      color="error"
-                                      max={99}
+                                    <Box
                                       sx={{
-                                        "& .MuiBadge-badge": {
-                                          fontSize: "0.65rem",
-                                          height: 18,
-                                          minWidth: 18,
-                                          padding: "0 4px",
-                                        },
+                                        minWidth: 24,
+                                        height: 24,
+                                        borderRadius: "8px",
+                                        bgcolor:
+                                          active === child.id
+                                            ? "rgba(255,255,255,0.3)"
+                                            : alpha("#D32F2F", 0.1),
+                                        color:
+                                          active === child.id
+                                            ? "white"
+                                            : "#D32F2F",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
                                       }}
-                                    />
+                                    >
+                                      <Typography
+                                        sx={{
+                                          fontWeight: 700,
+                                          fontSize: "0.75rem", // UPDATED: 12px (was 11px)
+                                        }}
+                                      >
+                                        {child.badge > 99 ? "99+" : child.badge}
+                                      </Typography>
+                                    </Box>
                                   )}
                               </ListItemButton>
                             </ListItem>
@@ -408,26 +403,26 @@ const AdminSidebar = ({
         ))}
 
         {/* Divider before Logout */}
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 2 }} />
 
         {/* Logout Button */}
         <ListItem disablePadding>
           <ListItemButton
             onClick={handleLogout}
             sx={{
-              borderRadius: 1.5,
+              borderRadius: "12px",
               py: 1.25,
               px: 2,
-              color: "error.main",
+              color: "#D32F2F",
               "&:hover": {
-                backgroundColor: (theme) => `${theme.palette.error.main}08`,
+                bgcolor: alpha("#D32F2F", 0.08),
               },
             }}
           >
             <ListItemIcon
               sx={{
-                minWidth: 36,
-                color: "error.main",
+                minWidth: 40,
+                color: "#D32F2F",
               }}
             >
               <LogoutIcon />
@@ -435,7 +430,7 @@ const AdminSidebar = ({
             <ListItemText
               primary="Đăng xuất"
               primaryTypographyProps={{
-                fontSize: "0.875rem",
+                fontSize: "0.9375rem", // UPDATED: 15px (was 14px)
                 fontWeight: 600,
               }}
             />

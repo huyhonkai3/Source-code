@@ -1,9 +1,13 @@
-import { Paper, Box, Typography } from "@mui/material";
-import { TrendingUp as TrendingUpIcon } from "@mui/icons-material";
+import { Paper, Box, Typography, alpha, Skeleton } from "@mui/material";
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+} from "@mui/icons-material";
 
 /**
- * StatCard Component
- * Reusable statistics card for admin dashboard
+ * StatCard Component - VLU Design System v2.0.1
+ * Modern & Bold statistics card for admin dashboard
+ * UPDATED: Tăng font sizes để UX tốt hơn
  *
  * @param {string} title - Card title/label
  * @param {string|number} value - Main value to display
@@ -13,6 +17,7 @@ import { TrendingUp as TrendingUpIcon } from "@mui/icons-material";
  * @param {function} onClick - Optional click handler
  * @param {boolean} clickable - Whether card is clickable
  * @param {string} subtitle - Optional subtitle text
+ * @param {boolean} loading - Loading state
  */
 const StatCard = ({
   title,
@@ -23,33 +28,29 @@ const StatCard = ({
   onClick,
   clickable = false,
   subtitle = null,
+  loading = false,
 }) => {
-  // Color mapping
+  // Color mapping - Design System v2.0
   const colorMap = {
     primary: {
-      main: "primary.main",
-      light: "primary.lighter",
-      bg: "#E3F2FD",
+      main: "#2196F3",
+      gradient: "linear-gradient(135deg, #2196F3 0%, #64B5F6 100%)",
     },
     success: {
-      main: "success.main",
-      light: "success.lighter",
-      bg: "#E8F5E9",
+      main: "#4CAF50",
+      gradient: "linear-gradient(135deg, #4CAF50 0%, #81C784 100%)",
     },
     warning: {
-      main: "warning.main",
-      light: "warning.lighter",
-      bg: "#FFF3E0",
+      main: "#FF9800",
+      gradient: "linear-gradient(135deg, #FF9800 0%, #FFB74D 100%)",
     },
     error: {
-      main: "error.main",
-      light: "error.lighter",
-      bg: "#FFEBEE",
+      main: "#D32F2F",
+      gradient: "linear-gradient(135deg, #D32F2F 0%, #EF5350 100%)",
     },
     info: {
-      main: "info.main",
-      light: "info.lighter",
-      bg: "#E1F5FE",
+      main: "#7C4DFF",
+      gradient: "linear-gradient(135deg, #7C4DFF 0%, #B388FF 100%)",
     },
   };
 
@@ -61,19 +62,20 @@ const StatCard = ({
       onClick={clickable ? onClick : undefined}
       sx={{
         p: 3,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: "16px",
         height: "100%",
         display: "flex",
         flexDirection: "column",
         gap: 2,
+        bgcolor: "white",
+        boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+        border: "1px solid #F0F0F5",
         cursor: clickable ? "pointer" : "default",
-        transition: "all 0.2s ease-in-out",
+        transition: "all 0.2s ease",
         "&:hover": clickable
           ? {
-              transform: "translateY(-2px)",
-              boxShadow: 2,
+              transform: "translateY(-4px)",
+              boxShadow: "0 8px 24px rgba(26,26,46,0.12)",
               borderColor: colors.main,
             }
           : {},
@@ -87,17 +89,18 @@ const StatCard = ({
           alignItems: "flex-start",
         }}
       >
-        {/* Icon Box */}
+        {/* Icon Box with Gradient */}
         <Box
           sx={{
             width: 56,
             height: 56,
-            borderRadius: 2,
-            backgroundColor: colors.bg,
+            borderRadius: "14px",
+            background: colors.gradient,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: colors.main,
+            color: "white",
+            boxShadow: `0 4px 14px ${alpha(colors.main, 0.3)}`,
           }}
         >
           {icon}
@@ -110,22 +113,27 @@ const StatCard = ({
               display: "flex",
               alignItems: "center",
               gap: 0.5,
-              color: trend.direction === "up" ? "success.main" : "error.main",
-              backgroundColor:
-                trend.direction === "up" ? "success.lighter" : "error.lighter",
-              px: 1,
+              px: 1.5,
               py: 0.5,
-              borderRadius: 1,
+              borderRadius: "8px",
+              bgcolor:
+                trend.direction === "up"
+                  ? alpha("#4CAF50", 0.1)
+                  : alpha("#D32F2F", 0.1),
+              color: trend.direction === "up" ? "#4CAF50" : "#D32F2F",
             }}
           >
-            <TrendingUpIcon
-              fontSize="small"
+            {trend.direction === "up" ? (
+              <TrendingUpIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <TrendingDownIcon sx={{ fontSize: 16 }} />
+            )}
+            <Typography
               sx={{
-                transform:
-                  trend.direction === "down" ? "rotate(180deg)" : "none",
+                fontWeight: 700,
+                fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
               }}
-            />
-            <Typography variant="caption" fontWeight={600}>
+            >
               {trend.value}
             </Typography>
           </Box>
@@ -134,29 +142,48 @@ const StatCard = ({
 
       {/* Value and Title */}
       <Box>
-        <Typography
-          variant="h3"
-          fontWeight="bold"
-          color={colors.main}
-          sx={{
-            mb: 0.5,
-            fontSize: { xs: "1.75rem", sm: "2rem", md: "2.5rem" },
-          }}
-        >
-          {value}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" fontWeight={500}>
-          {title}
-        </Typography>
-        {subtitle && (
-          <Typography
-            variant="caption"
-            color="text.disabled"
-            display="block"
-            sx={{ mt: 0.5 }}
-          >
-            {subtitle}
-          </Typography>
+        {loading ? (
+          <>
+            <Skeleton variant="text" width={80} height={48} />
+            <Skeleton variant="text" width={120} height={20} />
+          </>
+        ) : (
+          <>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 800,
+                color: "#1A1A2E",
+                mb: 0.5,
+                fontSize: { xs: "1.875rem", sm: "2.125rem", md: "2.375rem" }, // UPDATED: 30px/34px/38px (was 28px/32px/36px)
+                lineHeight: 1.2,
+              }}
+            >
+              {value}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#8E8EA9",
+                fontWeight: 500,
+                fontSize: "0.9375rem", // UPDATED: 15px (was 14px body2)
+              }}
+            >
+              {title}
+            </Typography>
+            {subtitle && (
+              <Typography
+                sx={{
+                  color: "#C4C4D4",
+                  display: "block",
+                  mt: 0.5,
+                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
+                }}
+              >
+                {subtitle}
+              </Typography>
+            )}
+          </>
         )}
       </Box>
     </Paper>

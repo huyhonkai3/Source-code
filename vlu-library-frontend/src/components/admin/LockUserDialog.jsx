@@ -13,6 +13,7 @@ import {
   IconButton,
   Paper,
   CircularProgress,
+  alpha,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -20,27 +21,14 @@ import {
   LockOpen as LockOpenIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
+  Info as InfoIcon,
+  Block as BlockIcon,
+  VerifiedUser as VerifiedIcon,
 } from "@mui/icons-material";
 
 /**
- * LockUserDialog Component
- * Smart dialog tự động switch giữa Lock/Unlock mode dựa trên user status
- *
- * LOCK MODE (status === 'active'):
- * - Red theme
- * - Require reason input
- * - Warning alert
- *
- * UNLOCK MODE (status === 'locked'):
- * - Green theme
- * - Display previous lock reason
- * - Confirmation message
- *
- * @param {boolean} open - Dialog open state
- * @param {Function} onClose - Close handler
- * @param {Object} user - User object (requires: _id/id, name, email, status, lockReason)
- * @param {Function} onConfirm - Confirm handler (userId, action, reason)
- * @param {boolean} loading - Loading state
+ * LockUserDialog Component - VLU Design System v2.0.1
+ * UPDATED: Tăng font sizes - giữ nguyên 100% logic và interface
  */
 const LockUserDialog = ({
   open,
@@ -52,11 +40,9 @@ const LockUserDialog = ({
   const [lockReason, setLockReason] = useState("");
   const [error, setError] = useState("");
 
-  // Determine mode based on user status
   const isLocked = user?.status === "locked";
   const mode = isLocked ? "unlock" : "lock";
 
-  // Reset state when dialog opens/closes or user changes
   useEffect(() => {
     if (open && user) {
       setLockReason("");
@@ -64,63 +50,52 @@ const LockUserDialog = ({
     }
   }, [open, user]);
 
-  /**
-   * Handle confirm button click
-   */
   const handleConfirm = () => {
-    // Validate lock reason for lock action
     if (mode === "lock" && !lockReason.trim()) {
       setError("Vui lòng nhập lý do khóa tài khoản");
       return;
     }
-
     if (mode === "lock" && lockReason.trim().length < 10) {
       setError("Lý do khóa phải có ít nhất 10 ký tự");
       return;
     }
-
-    // Clear error and proceed
     setError("");
     onConfirm(user._id || user.id, mode, lockReason.trim());
   };
 
-  /**
-   * Get user initials for avatar
-   */
   const getInitials = (name) => {
     if (!name) return "?";
     const words = name.trim().split(" ");
-    if (words.length >= 2) {
+    if (words.length >= 2)
       return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
-    }
     return name[0].toUpperCase();
   };
 
-  /**
-   * Theme colors based on mode
-   */
   const theme = {
     lock: {
-      color: "error.main",
-      bgColor: "error.lighter",
-      borderColor: "error.light",
-      icon: <LockIcon />,
+      color: "#EF4444",
+      gradient: "linear-gradient(135deg, #EF4444 0%, #F87171 100%)",
+      bgLight: "#FEF2F2",
+      borderLight: "#FECACA",
+      icon: LockIcon,
       title: "Khóa tài khoản",
+      subtitle: "Tạm ngưng quyền truy cập",
       buttonText: "Xác nhận Khóa",
-      buttonColor: "error",
     },
     unlock: {
-      color: "success.main",
-      bgColor: "success.lighter",
-      borderColor: "success.light",
-      icon: <LockOpenIcon />,
+      color: "#10B981",
+      gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+      bgLight: "#D1FAE5",
+      borderLight: "#A7F3D0",
+      icon: LockOpenIcon,
       title: "Mở khóa tài khoản",
+      subtitle: "Khôi phục quyền truy cập",
       buttonText: "Xác nhận Mở khóa",
-      buttonColor: "success",
     },
   };
 
   const currentTheme = theme[mode];
+  const ThemeIcon = currentTheme.icon;
 
   if (!user) return null;
 
@@ -130,99 +105,126 @@ const LockUserDialog = ({
       onClose={loading ? undefined : onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          boxShadow: 24,
-        },
-      }}
+      PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}
     >
-      {/* Dialog Header */}
       <DialogTitle
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          pb: 2,
-          borderBottom: "1px solid",
-          borderColor: "divider",
-        }}
+        sx={{ background: currentTheme.gradient, color: "white", p: 0 }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 1.5,
-              backgroundColor: currentTheme.color,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-            }}
-          >
-            {currentTheme.icon}
-          </Box>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 600,
-              color: currentTheme.color,
-            }}
-          >
-            {currentTheme.title}
-          </Typography>
-        </Box>
-        <IconButton
-          onClick={onClose}
-          disabled={loading}
-          size="small"
+        <Box
           sx={{
-            color: "text.secondary",
-            "&:hover": {
-              backgroundColor: "action.hover",
-            },
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: 3,
           }}
         >
-          <CloseIcon />
-        </IconButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "14px",
+                bgcolor: "rgba(255,255,255,0.2)",
+                backdropFilter: "blur(10px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <ThemeIcon sx={{ fontSize: 24 }} />
+            </Box>
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                  fontSize: "1.25rem",
+                }}
+              >
+                {currentTheme.title}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ opacity: 0.9, mt: 0.25, fontSize: "0.9375rem" }}
+              >
+                {currentTheme.subtitle}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            disabled={loading}
+            sx={{
+              color: "white",
+              bgcolor: "rgba(255,255,255,0.1)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
       </DialogTitle>
 
-      {/* Dialog Content */}
-      <DialogContent sx={{ pt: 3, pb: 2 }}>
-        {/* Warning/Success Alert */}
-        <Alert
-          severity={mode === "lock" ? "warning" : "success"}
-          icon={mode === "lock" ? <WarningIcon /> : <CheckCircleIcon />}
+      <DialogContent sx={{ p: 3, pt: 4 }}>
+        <Box
           sx={{
+            display: "flex",
+            gap: 2,
+            p: 2,
             mb: 3,
-            backgroundColor: currentTheme.bgColor,
+            borderRadius: "12px",
+            bgcolor: currentTheme.bgLight,
             border: "1px solid",
-            borderColor: currentTheme.borderColor,
+            borderColor: currentTheme.borderLight,
           }}
         >
-          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
-            {mode === "lock"
-              ? "Bạn đang thực hiện khóa tài khoản của người dùng"
-              : "Bạn có chắc chắn muốn kích hoạt lại tài khoản này?"}
-          </Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            {mode === "lock"
-              ? "Hành động này sẽ ngăn người dùng đăng nhập vào hệ thống ngay lập tức."
-              : "Người dùng sẽ có thể đăng nhập lại vào hệ thống ngay lập tức."}
-          </Typography>
-        </Alert>
+          {mode === "lock" ? (
+            <WarningIcon
+              sx={{ color: "#B91C1C", fontSize: 22, flexShrink: 0, mt: 0.25 }}
+            />
+          ) : (
+            <CheckCircleIcon
+              sx={{ color: "#047857", fontSize: 22, flexShrink: 0, mt: 0.25 }}
+            />
+          )}
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: mode === "lock" ? "#B91C1C" : "#047857",
+                mb: 0.5,
+                fontSize: "0.9375rem",
+              }}
+            >
+              {mode === "lock"
+                ? "Bạn đang thực hiện khóa tài khoản"
+                : "Bạn có chắc chắn muốn kích hoạt lại tài khoản này?"}
+            </Typography>
+            <Typography
+              sx={{
+                color: mode === "lock" ? "#DC2626" : "#059669",
+                lineHeight: 1.5,
+                fontSize: "0.8125rem",
+              }}
+            >
+              {mode === "lock"
+                ? "Hành động này sẽ ngăn người dùng đăng nhập vào hệ thống ngay lập tức."
+                : "Người dùng sẽ có thể đăng nhập lại vào hệ thống ngay lập tức."}
+            </Typography>
+          </Box>
+        </Box>
 
-        {/* User Info Card */}
         <Paper
           elevation={0}
           sx={{
-            p: 2,
+            p: 2.5,
             mb: 3,
-            backgroundColor: "grey.50",
+            borderRadius: "16px",
+            bgcolor: "#FAFAFC",
             border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
+            borderColor: "#E0E0E0",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -232,9 +234,10 @@ const LockUserDialog = ({
               sx={{
                 width: 56,
                 height: 56,
-                backgroundColor: currentTheme.color,
+                background: currentTheme.gradient,
                 fontWeight: 600,
                 fontSize: "1.25rem",
+                boxShadow: `0 4px 14px ${alpha(currentTheme.color, 0.3)}`,
               }}
             >
               {getInitials(user.name)}
@@ -244,15 +247,16 @@ const LockUserDialog = ({
                 variant="body1"
                 sx={{
                   fontWeight: 600,
-                  color: "text.primary",
+                  color: "#1A1A2E",
                   mb: 0.5,
+                  fontSize: "1rem",
                 }}
               >
                 {user.name}
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "text.secondary", mb: 0.5 }}
+                sx={{ color: "#8E8EA9", mb: 1, fontSize: "0.9375rem" }}
               >
                 {user.email}
               </Typography>
@@ -260,20 +264,23 @@ const LockUserDialog = ({
                 sx={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 0.5,
-                  px: 1,
-                  py: 0.25,
-                  backgroundColor: "white",
-                  borderRadius: 1,
-                  border: "1px solid",
-                  borderColor: "divider",
+                  gap: 0.75,
+                  px: 1.5,
+                  py: 0.5,
+                  bgcolor: isLocked ? "#FEE2E2" : "#D1FAE5",
+                  borderRadius: "8px",
                 }}
               >
+                {isLocked ? (
+                  <BlockIcon sx={{ fontSize: 14, color: "#EF4444" }} />
+                ) : (
+                  <VerifiedIcon sx={{ fontSize: 14, color: "#10B981" }} />
+                )}
                 <Typography
-                  variant="caption"
                   sx={{
                     fontWeight: 600,
-                    color: isLocked ? "error.main" : "success.main",
+                    color: isLocked ? "#EF4444" : "#10B981",
+                    fontSize: "0.8125rem",
                   }}
                 >
                   {isLocked ? "Đã khóa" : "Hoạt động"}
@@ -283,18 +290,25 @@ const LockUserDialog = ({
           </Box>
         </Paper>
 
-        {/* LOCK MODE: Reason Input */}
         {mode === "lock" && (
           <Box>
             <Typography
-              variant="subtitle2"
+              variant="body2"
               sx={{
                 fontWeight: 600,
+                color: "#1A1A2E",
                 mb: 1.5,
-                color: "text.primary",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                fontSize: "0.9375rem",
               }}
             >
-              Lý do khóa tài khoản <span style={{ color: "red" }}>*</span>
+              <InfoIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
+              Lý do khóa tài khoản
+              <Typography component="span" sx={{ color: "#EF4444" }}>
+                *
+              </Typography>
             </Typography>
             <TextField
               fullWidth
@@ -308,45 +322,62 @@ const LockUserDialog = ({
               }}
               disabled={loading}
               error={!!error}
-              helperText={error || "Tối thiểu 10 ký tự"}
+              helperText={
+                error || `${lockReason.length}/500 ký tự (tối thiểu 10)`
+              }
               sx={{
                 "& .MuiOutlinedInput-root": {
-                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  bgcolor: "white",
+                  fontSize: "0.9375rem",
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#EF4444",
+                  },
+                },
+                "& .MuiFormHelperText-root": {
+                  textAlign: "right",
+                  mx: 0,
+                  fontSize: "0.8125rem",
                 },
               }}
             />
           </Box>
         )}
 
-        {/* UNLOCK MODE: Display Previous Lock Reason */}
         {mode === "unlock" && user.lockReason && (
           <Box>
             <Typography
-              variant="subtitle2"
+              variant="body2"
               sx={{
                 fontWeight: 600,
+                color: "#8E8EA9",
                 mb: 1.5,
-                color: "text.secondary",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                fontSize: "0.9375rem",
               }}
             >
+              <InfoIcon sx={{ fontSize: 18 }} />
               Lý do bị khóa trước đó
             </Typography>
             <Paper
               elevation={0}
               sx={{
-                p: 2,
-                backgroundColor: "grey.50",
+                p: 2.5,
+                borderRadius: "12px",
+                bgcolor: "#FEF2F2",
                 border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1.5,
+                borderColor: "#FECACA",
               }}
             >
               <Typography
                 variant="body2"
                 sx={{
-                  color: "text.secondary",
+                  color: "#B91C1C",
                   fontStyle: "italic",
                   lineHeight: 1.6,
+                  fontSize: "0.9375rem",
                 }}
               >
                 "{user.lockReason}"
@@ -356,24 +387,20 @@ const LockUserDialog = ({
         )}
       </DialogContent>
 
-      {/* Dialog Actions */}
-      <DialogActions
-        sx={{
-          px: 3,
-          py: 2,
-          borderTop: "1px solid",
-          borderColor: "divider",
-          gap: 1,
-        }}
-      >
+      <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1.5 }}>
         <Button
           onClick={onClose}
           disabled={loading}
           variant="outlined"
           sx={{
-            minWidth: 100,
-            textTransform: "none",
+            minWidth: 120,
+            borderRadius: "12px",
             fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            borderColor: "#E0E0E0",
+            color: "#4A4A68",
+            "&:hover": { borderColor: "#C4C4D4", bgcolor: "#F0F0F5" },
           }}
         >
           Hủy bỏ
@@ -382,10 +409,9 @@ const LockUserDialog = ({
           onClick={handleConfirm}
           disabled={loading || (mode === "lock" && !lockReason.trim())}
           variant="contained"
-          color={currentTheme.buttonColor}
           startIcon={
             loading ? (
-              <CircularProgress size={16} color="inherit" />
+              <CircularProgress size={18} color="inherit" />
             ) : mode === "lock" ? (
               <LockIcon />
             ) : (
@@ -393,9 +419,18 @@ const LockUserDialog = ({
             )
           }
           sx={{
-            minWidth: 160,
-            textTransform: "none",
+            minWidth: 180,
+            borderRadius: "12px",
             fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            bgcolor: currentTheme.color,
+            boxShadow: `0 4px 14px ${alpha(currentTheme.color, 0.4)}`,
+            "&:hover": {
+              bgcolor: mode === "lock" ? "#DC2626" : "#059669",
+              boxShadow: `0 6px 20px ${alpha(currentTheme.color, 0.5)}`,
+            },
+            "&:disabled": { bgcolor: "#C4C4D4" },
           }}
         >
           {loading ? "Đang xử lý..." : currentTheme.buttonText}

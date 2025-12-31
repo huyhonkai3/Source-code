@@ -4,13 +4,15 @@ import {
   Typography,
   Alert,
   Button,
-  CircularProgress,
   Snackbar,
   Paper,
+  Skeleton,
+  alpha,
 } from "@mui/material";
 import {
   ChatBubbleOutline as ChatIcon,
   Login as LoginIcon,
+  Forum as ForumIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -21,7 +23,7 @@ import EditCommentDialog from "./EditCommentDialog";
 import DeleteCommentDialog from "./DeleteCommentDialog";
 
 /**
- * CommentSection Component
+ * CommentSection Component - VLU Design System v2.0
  * Container chính quản lý toàn bộ comment system
  *
  * @param {string} docId - ID của tài liệu
@@ -95,11 +97,9 @@ const CommentSection = ({ docId }) => {
       });
 
       if (response.status === "success") {
-        // Add new comment to top of list (optimistic update)
         setComments([response.data.comment, ...comments]);
         setTotalCount(totalCount + 1);
 
-        // Show success message
         setSnackbar({
           open: true,
           message: "Bình luận của bạn đã được đăng",
@@ -140,15 +140,12 @@ const CommentSection = ({ docId }) => {
       const response = await commentsAPI.update(commentId, { content });
 
       if (response.status === "success") {
-        // Update comment in list (optimistic update)
         setComments(
           comments.map((c) => (c._id === commentId ? { ...c, content } : c)),
         );
 
-        // Close dialog
         setEditDialog({ open: false, comment: null });
 
-        // Show success message
         setSnackbar({
           open: true,
           message: "Đã cập nhật bình luận",
@@ -189,14 +186,11 @@ const CommentSection = ({ docId }) => {
       const response = await commentsAPI.delete(commentId);
 
       if (response.status === "success") {
-        // Remove comment from list (optimistic update)
         setComments(comments.filter((c) => c._id !== commentId));
         setTotalCount(totalCount - 1);
 
-        // Close dialog
         setDeleteDialog({ open: false, comment: null });
 
-        // Show success message
         setSnackbar({
           open: true,
           message: "Đã xóa bình luận",
@@ -236,121 +230,252 @@ const CommentSection = ({ docId }) => {
   };
 
   return (
-    <Box sx={{ py: 4 }}>
-      {/* Section Header */}
+    <Box>
+      {/* ========== SECTION HEADER ========== */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1,
-          mb: 3,
+          justifyContent: "space-between",
+          mb: 4,
         }}
       >
-        <ChatIcon sx={{ color: "primary.main" }} />
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 700,
-          }}
-        >
-          Bình luận ({totalCount})
-        </Typography>
-      </Box>
-
-      {/* Comment Form or Login Prompt */}
-      {isAuthenticated ? (
-        <CommentForm
-          onSubmit={handleSubmitComment}
-          loading={submitLoading}
-          user={user}
-        />
-      ) : (
-        <Alert
-          severity="info"
-          action={
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<LoginIcon />}
-              onClick={handleLoginClick}
-              sx={{
-                bgcolor: "error.main",
-                "&:hover": {
-                  bgcolor: "error.dark",
-                },
-              }}
-            >
-              Đăng nhập
-            </Button>
-          }
-          sx={{ mb: 3 }}
-        >
-          Đăng nhập để viết bình luận
-        </Alert>
-      )}
-
-      {/* Comments List */}
-      <Box sx={{ mt: 4 }}>
-        {loading ? (
-          // Loading state
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box
             sx={{
+              width: 44,
+              height: 44,
+              borderRadius: "12px",
+              bgcolor: alpha("#7C4DFF", 0.1),
               display: "flex",
+              alignItems: "center",
               justifyContent: "center",
-              py: 8,
             }}
           >
-            <CircularProgress />
+            <ForumIcon sx={{ fontSize: 24, color: "#7C4DFF" }} />
+          </Box>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: "#1A1A2E" }}>
+              Bình luận
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+              Thảo luận và trao đổi về tài liệu
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Comment Count Badge */}
+        <Box
+          sx={{
+            px: 2,
+            py: 0.75,
+            borderRadius: "10px",
+            bgcolor: alpha("#7C4DFF", 0.1),
+            color: "#7C4DFF",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            {totalCount} bình luận
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* ========== COMMENT FORM OR LOGIN PROMPT ========== */}
+      {isAuthenticated ? (
+        <Box sx={{ mb: 4 }}>
+          <CommentForm
+            onSubmit={handleSubmitComment}
+            loading={submitLoading}
+            user={user}
+          />
+        </Box>
+      ) : (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            mb: 4,
+            borderRadius: "20px",
+            bgcolor: "white",
+            boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+            border: "1px solid #F0F0F5",
+            textAlign: "center",
+          }}
+        >
+          <Box
+            sx={{
+              width: 64,
+              height: 64,
+              mx: "auto",
+              mb: 2,
+              borderRadius: "16px",
+              bgcolor: alpha("#D32F2F", 0.1),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <LoginIcon sx={{ fontSize: 32, color: "#D32F2F" }} />
+          </Box>
+
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
+          >
+            Đăng nhập để bình luận
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: "#8E8EA9", mb: 3, maxWidth: 300, mx: "auto" }}
+          >
+            Tham gia thảo luận và chia sẻ ý kiến của bạn về tài liệu này
+          </Typography>
+
+          <Button
+            variant="contained"
+            startIcon={<LoginIcon />}
+            onClick={handleLoginClick}
+            sx={{
+              bgcolor: "#D32F2F",
+              color: "white",
+              borderRadius: "12px",
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: "none",
+              boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+              "&:hover": {
+                bgcolor: "#B71C1C",
+              },
+            }}
+          >
+            Đăng nhập ngay
+          </Button>
+        </Paper>
+      )}
+
+      {/* ========== COMMENTS LIST ========== */}
+      <Box>
+        {loading ? (
+          // Loading Skeleton
+          <Box>
+            {[1, 2, 3].map((n) => (
+              <Paper
+                key={n}
+                elevation={0}
+                sx={{
+                  p: 3,
+                  mb: 2,
+                  borderRadius: "16px",
+                  bgcolor: "white",
+                  border: "1px solid #F0F0F5",
+                }}
+              >
+                <Box sx={{ display: "flex", gap: 2 }}>
+                  <Skeleton variant="circular" width={44} height={44} />
+                  <Box sx={{ flex: 1 }}>
+                    <Skeleton variant="text" width={150} height={24} />
+                    <Skeleton variant="text" width={100} height={20} />
+                    <Skeleton
+                      variant="text"
+                      width="100%"
+                      height={60}
+                      sx={{ mt: 1 }}
+                    />
+                  </Box>
+                </Box>
+              </Paper>
+            ))}
           </Box>
         ) : comments.length === 0 ? (
-          // Empty state
+          // Empty State
           <Paper
             elevation={0}
             sx={{
               p: 6,
               textAlign: "center",
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 2,
+              borderRadius: "20px",
+              bgcolor: "white",
+              boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+              border: "1px solid #F0F0F5",
             }}
           >
-            <ChatIcon
+            <Box
               sx={{
-                fontSize: 64,
-                color: "text.disabled",
+                width: 80,
+                height: 80,
+                mx: "auto",
                 mb: 2,
+                borderRadius: "50%",
+                bgcolor: alpha("#7C4DFF", 0.1),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-            <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+            >
+              <ChatIcon sx={{ fontSize: 40, color: "#7C4DFF" }} />
+            </Box>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
+            >
               Chưa có bình luận nào
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Hãy là người đầu tiên bình luận về tài liệu này
+            <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+              Hãy là người đầu tiên bình luận về tài liệu này!
             </Typography>
           </Paper>
         ) : (
-          // Comments list
+          // Comments List
           <>
-            {comments.map((comment) => (
-              <CommentItem
+            {comments.map((comment, index) => (
+              <Box
                 key={comment._id}
-                comment={comment}
-                currentUserId={user?.id}
-                currentUserRole={user?.role}
-                onEdit={handleEditComment}
-                onDelete={handleDeleteComment}
-              />
+                sx={{
+                  animation: "fadeInUp 0.4s ease forwards",
+                  animationDelay: `${index * 0.05}s`,
+                  opacity: 0,
+                  "@keyframes fadeInUp": {
+                    from: {
+                      opacity: 0,
+                      transform: "translateY(10px)",
+                    },
+                    to: {
+                      opacity: 1,
+                      transform: "translateY(0)",
+                    },
+                  },
+                }}
+              >
+                <CommentItem
+                  comment={comment}
+                  currentUserId={user?.id}
+                  currentUserRole={user?.role}
+                  onEdit={handleEditComment}
+                  onDelete={handleDeleteComment}
+                />
+              </Box>
             ))}
 
-            {/* Load More Button - Optional */}
+            {/* Load More Button */}
             {totalCount > comments.length && (
               <Box sx={{ textAlign: "center", mt: 3 }}>
                 <Button
                   variant="outlined"
                   onClick={fetchComments}
                   sx={{
-                    textTransform: "none",
+                    borderColor: "#E0E0E0",
+                    color: "#4A4A68",
+                    borderRadius: "12px",
+                    px: 4,
+                    py: 1.25,
                     fontWeight: 600,
+                    textTransform: "none",
+                    "&:hover": {
+                      borderColor: "#7C4DFF",
+                      color: "#7C4DFF",
+                      bgcolor: alpha("#7C4DFF", 0.04),
+                    },
                   }}
                 >
                   Xem thêm bình luận cũ hơn
@@ -361,7 +486,7 @@ const CommentSection = ({ docId }) => {
         )}
       </Box>
 
-      {/* Edit Comment Dialog */}
+      {/* ========== DIALOGS ========== */}
       <EditCommentDialog
         open={editDialog.open}
         comment={editDialog.comment}
@@ -370,7 +495,6 @@ const CommentSection = ({ docId }) => {
         loading={editLoading}
       />
 
-      {/* Delete Comment Dialog */}
       <DeleteCommentDialog
         open={deleteDialog.open}
         comment={deleteDialog.comment}
@@ -379,17 +503,20 @@ const CommentSection = ({ docId }) => {
         loading={deleteLoading}
       />
 
-      {/* Snackbar */}
+      {/* ========== SNACKBAR ========== */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          variant="filled"
+          sx={{
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          }}
         >
           {snackbar.message}
         </Alert>

@@ -4,24 +4,16 @@ import * as authAPI from "../api/auth.api";
 
 /**
  * Authentication Context
- * Quản lý global state cho authentication
+ * FIXED: Bỏ setLoading trong hàm login để tránh re-render gây mất state lỗi
  */
 const AuthContext = createContext(null);
 
-/**
- * AuthProvider Component
- * Wrap ứng dụng để cung cấp authentication state và functions
- */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
-  /**
-   * Check authentication khi app khởi động
-   * Kiểm tra xem có token trong localStorage không
-   */
   useEffect(() => {
     const checkAuth = () => {
       try {
@@ -35,7 +27,6 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error("Error checking auth:", error);
-        // Nếu có lỗi, clear localStorage
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
@@ -47,78 +38,68 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
-   * Hàm đăng nhập thông thường
-   * @param {string} email - Email người dùng
-   * @param {string} password - Mật khẩu
-   * @returns {Promise<boolean>} - True nếu đăng nhập thành công
+   * Hàm đăng nhập
+   * FIXED: KHÔNG setLoading ở đây - để component tự quản lý loading state
+   * Điều này tránh re-render gây mất apiError state
    */
   const login = async (email, password) => {
-    setLoading(true);
     try {
-      // Gọi API login
       const response = await authAPI.login({ email, password });
 
-      // Kiểm tra kết quả response
       if (response?.status === "success" && response.data) {
         const { user: userData, accessToken, refreshToken } = response.data;
 
-        // Lưu token vào localStorage
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", refreshToken);
         localStorage.setItem("user", JSON.stringify(userData));
 
-        // Cập nhật state
         setUser(userData);
         setIsAuthenticated(true);
 
-        // Chuyển hướng về trang chủ
-        const redirectPath = "/documents";
+        const redirectPath =
+          localStorage.getItem("redirectPath") || "/documents";
         localStorage.removeItem("redirectPath");
         navigate(redirectPath, { replace: true });
 
         return true;
       } else {
-        throw new Error("Invalid response structure");
+        throw new Error("Sai email hoặc mật khẩu");
       }
     } catch (error) {
-      console.error("Login error:", error);
-      // Xử lý error message từ backend
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Đăng nhập thất bại. Vui lòng thử lại.";
+      // FIXED: Xử lý error message rõ ràng
+      let errorMessage = "Sai email hoặc mật khẩu";
+
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message && error.message !== "Network Error") {
+        errorMessage = error.message;
+      } else if (error?.message === "Network Error") {
+        errorMessage =
+          "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.";
+      }
+
+      // Throw error để LoginPage có thể catch và hiển thị
       throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
   /**
-   * Hàm xử lý đăng nhập Microsoft
-   * @param {string} microsoftAccessToken - Access token từ MSAL
-   * @returns {Promise<object>} - User object
+   * Hàm đăng nhập Microsoft
    */
   const loginWithMicrosoft = async (microsoftAccessToken) => {
-    setLoading(true);
     try {
-      // Gọi API loginWithMicrosoft từ auth.api.js
       const response = await authAPI.loginWithMicrosoft(microsoftAccessToken);
 
-      // Kiểm tra response format đúng
-      // Backend trả về: { status: "success", data: { user, accessToken, refreshToken } }
       if (response?.status === "success" && response.data) {
         const { user: userData, accessToken, refreshToken } = response.data;
 
-        // Lưu tokens vào localStorage
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", refreshToken);
         localStorage.setItem("user", JSON.stringify(userData));
 
-        // Cập nhật state
         setUser(userData);
         setIsAuthenticated(true);
 
-        // Chuyển hướng dựa trên role
         if (userData.role === "Admin") {
           navigate("/admin/dashboard", { replace: true });
         } else if (userData.role === "Moderator") {
@@ -129,79 +110,61 @@ export const AuthProvider = ({ children }) => {
 
         return userData;
       } else {
-        throw new Error("Invalid response structure from server");
+        throw new Error("Đăng nhập Microsoft thất bại");
       }
     } catch (error) {
-      console.error("Microsoft Login error:", error);
-
-      // Xử lý error message từ backend
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
+        error?.response?.data?.message ||
+        error?.message ||
         "Đăng nhập Microsoft thất bại. Vui lòng thử lại.";
 
       throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
   /**
    * Hàm đăng ký
-   * @param {Object} userData - Thông tin đăng ký
-   * @returns {Promise<boolean>}
    */
   const register = async (userData) => {
-    setLoading(true);
     try {
       const response = await authAPI.register(userData);
       if (response?.status === "success") {
-        // Sau khi đăng ký thành công, tự động đăng nhập
         await login(userData.email, userData.password);
         return true;
       } else {
-        throw new Error("Invalid response structure");
+        throw new Error("Đăng ký thất bại");
       }
     } catch (error) {
-      console.error("Register error:", error);
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
+        error?.response?.data?.message ||
+        error?.message ||
         "Đăng ký thất bại. Vui lòng thử lại";
       throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
   /**
    * Hàm đăng xuất
-   * Clear tất cả dữ liệu authentication
    */
   const logout = async () => {
     try {
-      // Gọi API logout
       await authAPI.logout();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      // Clear localStorage
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
 
-      // Reset state
       setUser(null);
       setIsAuthenticated(false);
 
-      // Chuyển về trang login
       navigate("/login", { replace: true });
     }
   };
 
   /**
-   * Hàm refresh access token
-   * @returns {Promise<boolean>}
+   * Hàm refresh token
    */
   const refreshToken = async () => {
     try {
@@ -214,7 +177,6 @@ export const AuthProvider = ({ children }) => {
       if (response.status === "success" && response.data) {
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
-        // Cập nhật token
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", newRefreshToken);
         return true;
@@ -222,36 +184,28 @@ export const AuthProvider = ({ children }) => {
       return false;
     } catch (error) {
       console.error("Refresh token error:", error);
-      // Nếu refresh token thất bại, đăng xuất
       logout();
       return false;
     }
   };
 
   /**
-   * Hàm cập nhật avatar trong context
-   * Dùng sau khi upload avatar thành công
-   * @param {string} newAvatarUrl - URL avatar mới
+   * Cập nhật avatar
    */
   const updateUserAvatar = (newAvatarUrl) => {
     if (!user) return;
 
-    // Cập nhật state user với avatar mới
     const updatedUser = {
       ...user,
       avatarUrl: newAvatarUrl,
     };
 
     setUser(updatedUser);
-
-    // Cập nhật localStorage để persist
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   /**
-   * Hàm cập nhật thông tin user trong context
-   * Dùng khi cần cập nhật các field khác của user
-   * @param {Object} updates - Object chứa các field cần cập nhật
+   * Cập nhật thông tin user
    */
   const updateUser = (updates) => {
     if (!user) return;
@@ -265,7 +219,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
-  // Context value
   const value = {
     user,
     isAuthenticated,
@@ -282,10 +235,6 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-/**
- * Hook để sử dụng AuthContext
- * @returns {Object} Auth context value
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

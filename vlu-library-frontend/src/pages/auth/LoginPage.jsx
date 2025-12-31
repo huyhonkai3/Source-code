@@ -27,10 +27,9 @@ import MicrosoftLoginButton from "../../components/common/MicrosoftLoginButton";
 
 /**
  * Login Page Component
- * Trang đăng nhập với layout 2 cột: Banner + Form
+ * FIXED: Hiển thị thông báo "Sai email hoặc mật khẩu" khi đăng nhập thất bại
  */
 const LoginPage = () => {
-  // State management
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -39,35 +38,25 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auth context
   const { login, loginWithMicrosoft, loading } = useAuth();
   const navigate = useNavigate();
 
-  /**
-   * Validate email format
-   * Email phải có đuôi @vanlanguni.vn
-   */
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@vanlanguni\.vn$/;
     return emailRegex.test(email);
   };
 
-  /**
-   * Validate form
-   * @returns {boolean} - True nếu form hợp lệ
-   */
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate email
     if (!formData.email) {
       newErrors.email = "Vui lòng nhập email";
     } else if (!validateEmail(formData.email)) {
       newErrors.email = "Email phải có đuôi @vanlanguni.vn";
     }
 
-    // Validate password
     if (!formData.password) {
       newErrors.password = "Vui lòng nhập mật khẩu";
     } else if (formData.password.length < 8) {
@@ -78,9 +67,6 @@ const LoginPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Handle input change
-   */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -88,7 +74,6 @@ const LoginPage = () => {
       [name]: value,
     }));
 
-    // Clear error khi user bắt đầu nhập
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -96,62 +81,64 @@ const LoginPage = () => {
       }));
     }
 
-    // Clear API error
     if (apiError) {
       setApiError("");
     }
   };
 
-  /**
-   * Handle toggle password visibility
-   */
   const handleTogglePassword = () => {
     setShowPassword((prev) => !prev);
   };
 
   const handleMicrosoftSuccess = async (microsoftAccessToken) => {
     setApiError("");
+    setIsSubmitting(true);
     try {
-      // Gọi hàm loginWithMicrosoft từ context
       await loginWithMicrosoft(microsoftAccessToken);
-      // Context đã tự handle việc navigate nên không cần navigate ở đây
     } catch (err) {
-      console.error("Backend Microsoft Login Error:", err);
-      // Hiển thị lỗi từ backend trả về (ví dụ: email không hợp lệ, lỗi server...)
       setApiError(
-        err.response?.data?.message ||
+        err?.response?.data?.message ||
+          err?.message ||
           "Đăng nhập Microsoft thất bại. Vui lòng thử lại.",
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleMicrosoftError = (error) => {
-    console.error("Frontend Microsoft Login Error:", error);
     setApiError("Không thể kết nối đến Microsoft. Vui lòng thử lại.");
   };
 
   /**
-   * Handle form submit
+   * FIXED: Xử lý submit và hiển thị lỗi đăng nhập
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError("");
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
 
-    try {
-      // Gọi login từ AuthContext
-      await login(formData.email, formData.password);
+    setIsSubmitting(true);
 
-      // Login thành công - AuthContext sẽ tự động navigate
+    try {
+      await login(formData.email, formData.password);
     } catch (error) {
-      // Hiển thị lỗi từ API
-      setApiError(error.message);
+      // FIXED: Hiển thị thông báo lỗi trên giao diện
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Sai email hoặc mật khẩu";
+
+      setApiError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const isLoading = loading || isSubmitting;
 
   return (
     <Grid container sx={{ height: "100vh" }}>
@@ -163,7 +150,7 @@ const LoginPage = () => {
         md={7}
         sx={{
           position: "relative",
-          backgroundImage: "url(/assets/library-banner.jpg)", // Thay bằng đường dẫn ảnh thực tế
+          backgroundImage: "url(/assets/library-banner.jpg)",
           backgroundRepeat: "no-repeat",
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -175,7 +162,7 @@ const LoginPage = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(211, 47, 47, 0.7)", // VLU Red overlay
+            backgroundColor: "rgba(211, 47, 47, 0.7)",
           },
         }}
       >
@@ -255,7 +242,6 @@ const LoginPage = () => {
               boxShadow: "0 4px 12px rgba(211, 47, 47, 0.3)",
             }}
           >
-            {/* Thay bằng đường dẫn Logo */}
             <Typography
               variant="h3"
               sx={{ color: "white", fontWeight: "bold" }}
@@ -264,7 +250,6 @@ const LoginPage = () => {
             </Typography>
           </Box>
 
-          {/* Tên ứng dụng */}
           <Typography
             component="h1"
             variant="h4"
@@ -273,7 +258,6 @@ const LoginPage = () => {
             VLU Library
           </Typography>
 
-          {/* Chào mừng */}
           <Typography variant="body1" sx={{ color: "text.secondary", mb: 4 }}>
             Chào mừng trở lại
           </Typography>
@@ -285,21 +269,23 @@ const LoginPage = () => {
             Đăng nhập với tài khoản VLU để tiếp tục
           </Typography>
 
-          {/* Alert hiển thị lỗi từ API */}
+          {/* FIXED: Alert hiển thị lỗi - QUAN TRỌNG */}
           {apiError && (
-            <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
+            <Alert
+              severity="error"
+              sx={{ width: "100%", mb: 2 }}
+              onClose={() => setApiError("")}
+            >
               {apiError}
             </Alert>
           )}
 
-          {/* Form */}
           <Box
             component="form"
             noValidate
             onSubmit={handleSubmit}
             sx={{ width: "100%" }}
           >
-            {/* Email Field */}
             <TextField
               margin="normal"
               required
@@ -314,6 +300,7 @@ const LoginPage = () => {
               error={!!errors.email}
               helperText={errors.email}
               placeholder="email@vanlanguni.vn"
+              disabled={isLoading}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -323,7 +310,6 @@ const LoginPage = () => {
               }}
             />
 
-            {/* Password Field */}
             <TextField
               margin="normal"
               required
@@ -338,6 +324,7 @@ const LoginPage = () => {
               error={!!errors.password}
               helperText={errors.password}
               placeholder="Nhập mật khẩu của bạn"
+              disabled={isLoading}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -350,6 +337,7 @@ const LoginPage = () => {
                       aria-label="toggle password visibility"
                       onClick={handleTogglePassword}
                       edge="end"
+                      disabled={isLoading}
                     >
                       {showPassword ? <Visibility /> : <VisibilityOff />}
                     </IconButton>
@@ -358,7 +346,6 @@ const LoginPage = () => {
               }}
             />
 
-            {/* Remember Me & Forgot Password */}
             <Box
               sx={{
                 display: "flex",
@@ -375,6 +362,7 @@ const LoginPage = () => {
                     color="primary"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={isLoading}
                   />
                 }
                 label="Ghi nhớ tôi"
@@ -395,23 +383,21 @@ const LoginPage = () => {
               </Link>
             </Box>
 
-            {/* Login Button */}
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              disabled={loading}
+              disabled={isLoading}
               sx={{
                 mt: 2,
                 mb: 2,
                 py: 1.5,
                 fontSize: "1rem",
                 fontWeight: 600,
-                position: "relative",
               }}
-              startIcon={!loading && <LoginIcon />}
+              startIcon={!isLoading && <LoginIcon />}
             >
-              {loading ? (
+              {isLoading ? (
                 <CircularProgress size={24} sx={{ color: "white" }} />
               ) : (
                 "Đăng nhập"
@@ -423,14 +409,12 @@ const LoginPage = () => {
               onError={handleMicrosoftError}
             />
 
-            {/* Divider */}
             <Box sx={{ textAlign: "center", my: 3 }}>
               <Typography variant="body2" color="text.secondary">
                 Hoặc
               </Typography>
             </Box>
 
-            {/* Register Link */}
             <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
                 Bạn không có tài khoản?{" "}
@@ -451,7 +435,6 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
-            {/* Copyright */}
             <Box sx={{ mt: 5, textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
                 © {new Date().getFullYear()} Van Lang University. All rights

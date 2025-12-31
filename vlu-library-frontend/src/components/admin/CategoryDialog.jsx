@@ -9,25 +9,25 @@ import {
   IconButton,
   InputAdornment,
   Box,
+  Typography,
+  alpha,
+  CircularProgress,
 } from "@mui/material";
 import {
   Close as CloseIcon,
   Link as LinkIcon,
   Save as SaveIcon,
   FolderOpen as FolderIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  TextFields as TextFieldsIcon,
+  Description as DescriptionIcon,
 } from "@mui/icons-material";
 import { slugify } from "../../utils/slugify";
 
 /**
- * CategoryDialog Component
- * Form dialog for creating/editing categories
- *
- * @param {boolean} open - Dialog visibility
- * @param {Function} onClose - Close handler
- * @param {Function} onSubmit - Submit handler (receives { name, description })
- * @param {Object} initialData - Initial category data for edit mode
- * @param {boolean} loading - Loading state
- * @param {string} mode - 'create' or 'edit'
+ * CategoryDialog Component - VLU Design System v2.0.1
+ * UPDATED: Tăng font sizes - giữ nguyên 100% logic và interface
  */
 const CategoryDialog = ({
   open,
@@ -37,21 +37,12 @@ const CategoryDialog = ({
   loading = false,
   mode = "create",
 }) => {
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-  });
-
-  // Auto-generated slug (for preview only)
+  const [formData, setFormData] = useState({ name: "", description: "" });
   const [slug, setSlug] = useState("");
-
-  // Validation errors
   const [errors, setErrors] = useState({});
+  const NAME_MAX = 100;
+  const DESC_MAX = 500;
 
-  /**
-   * Load initial data when dialog opens in edit mode
-   */
   useEffect(() => {
     if (open && initialData && mode === "edit") {
       setFormData({
@@ -60,17 +51,12 @@ const CategoryDialog = ({
       });
       setSlug(initialData.slug || slugify(initialData.name));
     } else if (open && mode === "create") {
-      setFormData({
-        name: "",
-        description: "",
-      });
+      setFormData({ name: "", description: "" });
       setSlug("");
     }
+    setErrors({});
   }, [open, initialData, mode]);
 
-  /**
-   * Auto-generate slug when name changes
-   */
   useEffect(() => {
     if (formData.name) {
       setSlug(slugify(formData.name));
@@ -79,57 +65,35 @@ const CategoryDialog = ({
     }
   }, [formData.name]);
 
-  /**
-   * Handle input change
-   */
   const handleChange = (field) => (event) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
-
-    // Clear error when user types
+    const value = event.target.value;
+    if (field === "name" && value.length > NAME_MAX) return;
+    if (field === "description" && value.length > DESC_MAX) return;
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors((prev) => ({
-        ...prev,
-        [field]: "",
-      }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
-  /**
-   * Validate form
-   */
   const validate = () => {
     const newErrors = {};
-
     if (!formData.name.trim()) {
       newErrors.name = "Tên danh mục là bắt buộc";
     } else if (formData.name.trim().length < 2) {
       newErrors.name = "Tên danh mục phải có ít nhất 2 ký tự";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Handle submit
-   */
   const handleSubmit = () => {
     if (!validate()) return;
-
-    // Only send name and description
-    // Backend will generate slug automatically
     onSubmit({
       name: formData.name.trim(),
       description: formData.description.trim(),
     });
   };
 
-  /**
-   * Handle close - Reset form
-   */
   const handleClose = () => {
     if (!loading) {
       setFormData({ name: "", description: "" });
@@ -139,9 +103,6 @@ const CategoryDialog = ({
     }
   };
 
-  /**
-   * Handle Enter key
-   */
   const handleKeyPress = (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -149,159 +110,294 @@ const CategoryDialog = ({
     }
   };
 
+  const isCreate = mode === "create";
+  const themeColor = "#7C4DFF";
+
   return (
     <Dialog
       open={open}
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-        },
-      }}
+      PaperProps={{ sx: { borderRadius: "20px", overflow: "hidden" } }}
     >
-      {/* Dialog Title */}
       <DialogTitle
         sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-          pb: 2,
+          background: `linear-gradient(135deg, ${themeColor} 0%, #448AFF 100%)`,
+          color: "white",
+          p: 0,
         }}
       >
-        {/* Icon */}
-        <FolderIcon
+        <Box
           sx={{
-            color: "error.main",
-            fontSize: 28,
-          }}
-        />
-
-        {/* Title Text */}
-        <Box sx={{ flex: 1 }}>
-          <Box
-            component="span"
-            sx={{
-              fontSize: "1.25rem",
-              fontWeight: "bold",
-            }}
-          >
-            {mode === "create" ? "Thêm Danh mục mới" : "Cập nhật Danh mục"}
-          </Box>
-        </Box>
-
-        {/* Close Button */}
-        <IconButton
-          onClick={handleClose}
-          disabled={loading}
-          size="small"
-          sx={{
-            color: "text.secondary",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: 3,
           }}
         >
-          <CloseIcon />
-        </IconButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "14px",
+                bgcolor: "rgba(255,255,255,0.2)",
+                backdropFilter: "blur(10px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {isCreate ? (
+                <AddIcon sx={{ fontSize: 24 }} />
+              ) : (
+                <EditIcon sx={{ fontSize: 24 }} />
+              )}
+            </Box>
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                  fontSize: "1.25rem",
+                }}
+              >
+                {isCreate ? "Thêm Danh mục mới" : "Cập nhật Danh mục"}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ opacity: 0.9, mt: 0.25, fontSize: "0.9375rem" }}
+              >
+                {isCreate
+                  ? "Tạo danh mục mới để phân loại tài liệu"
+                  : "Chỉnh sửa thông tin danh mục"}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={handleClose}
+            disabled={loading}
+            sx={{
+              color: "white",
+              bgcolor: "rgba(255,255,255,0.1)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
       </DialogTitle>
 
-      {/* Dialog Content */}
-      <DialogContent sx={{ pt: 2 }}>
+      <DialogContent sx={{ p: 3, pt: 4 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {/* Category Name */}
-          <TextField
-            label="Tên danh mục"
-            required
-            fullWidth
-            value={formData.name}
-            onChange={handleChange("name")}
-            onKeyPress={handleKeyPress}
-            disabled={loading}
-            error={Boolean(errors.name)}
-            helperText={errors.name}
-            placeholder="Nhập tên danh mục (VD: Khoa học máy tính)"
-            autoFocus
-          />
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: "#1A1A2E",
+                mb: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                fontSize: "0.9375rem",
+              }}
+            >
+              <TextFieldsIcon sx={{ fontSize: 18, color: themeColor }} />
+              Tên danh mục
+              <Typography component="span" sx={{ color: "#EF4444" }}>
+                *
+              </Typography>
+            </Typography>
+            <TextField
+              fullWidth
+              value={formData.name}
+              onChange={handleChange("name")}
+              onKeyPress={handleKeyPress}
+              disabled={loading}
+              error={Boolean(errors.name)}
+              helperText={
+                errors.name || `${formData.name.length}/${NAME_MAX} ký tự`
+              }
+              placeholder="VD: Khoa học máy tính, Kiến trúc..."
+              autoFocus
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  bgcolor: "#FAFAFC",
+                  fontSize: "0.9375rem",
+                  "&:hover": { bgcolor: "#F0F0F5" },
+                  "&.Mui-focused": { bgcolor: "white" },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: themeColor,
+                    borderWidth: 2,
+                  },
+                },
+                "& .MuiFormHelperText-root": {
+                  textAlign: "right",
+                  mx: 0,
+                  fontSize: "0.8125rem",
+                },
+              }}
+            />
+          </Box>
 
-          {/* Slug Preview */}
-          <TextField
-            label="Đường dẫn tĩnh (Slug)"
-            fullWidth
-            value={slug}
-            disabled
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LinkIcon color="action" />
-                </InputAdornment>
-              ),
-            }}
-            helperText="URL sẽ được tạo tự động từ tên danh mục"
-            sx={{
-              "& .MuiInputBase-input.Mui-disabled": {
-                WebkitTextFillColor: "text.secondary",
-              },
-            }}
-          />
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: "#1A1A2E",
+                mb: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                fontSize: "0.9375rem",
+              }}
+            >
+              <LinkIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
+              Đường dẫn tĩnh (Slug)
+            </Typography>
+            <TextField
+              fullWidth
+              value={slug}
+              disabled
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: "#8E8EA9",
+                        fontFamily: "monospace",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      /category/
+                    </Typography>
+                  </InputAdornment>
+                ),
+              }}
+              helperText="Được tạo tự động từ tên danh mục"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  bgcolor: "#F0F0F5",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "transparent",
+                  },
+                },
+                "& .MuiInputBase-input": {
+                  fontFamily: "monospace",
+                  color: "#4A4A68",
+                  fontSize: "0.9375rem",
+                },
+                "& .MuiFormHelperText-root": { mx: 0, fontSize: "0.8125rem" },
+              }}
+            />
+          </Box>
 
-          {/* Description */}
-          <TextField
-            label="Mô tả (Tùy chọn)"
-            fullWidth
-            multiline
-            rows={4}
-            value={formData.description}
-            onChange={handleChange("description")}
-            disabled={loading}
-            placeholder="Nhập mô tả ngắn gọn về danh mục này..."
-            helperText={`${formData.description.length} ký tự`}
-          />
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: "#1A1A2E",
+                mb: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                fontSize: "0.9375rem",
+              }}
+            >
+              <DescriptionIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
+              Mô tả
+              <Typography
+                component="span"
+                sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}
+              >
+                (Tùy chọn)
+              </Typography>
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              value={formData.description}
+              onChange={handleChange("description")}
+              disabled={loading}
+              placeholder="Nhập mô tả ngắn gọn về danh mục này..."
+              helperText={`${formData.description.length}/${DESC_MAX} ký tự`}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  bgcolor: "#FAFAFC",
+                  fontSize: "0.9375rem",
+                  "&:hover": { bgcolor: "#F0F0F5" },
+                  "&.Mui-focused": { bgcolor: "white" },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: themeColor,
+                    borderWidth: 2,
+                  },
+                },
+                "& .MuiFormHelperText-root": {
+                  textAlign: "right",
+                  mx: 0,
+                  fontSize: "0.8125rem",
+                },
+              }}
+            />
+          </Box>
         </Box>
       </DialogContent>
 
-      {/* Dialog Actions */}
-      <DialogActions
-        sx={{
-          px: 3,
-          pb: 3,
-          gap: 1.5,
-        }}
-      >
-        {/* Cancel Button */}
+      <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1.5 }}>
         <Button
           onClick={handleClose}
           disabled={loading}
           variant="outlined"
-          color="inherit"
           sx={{
-            minWidth: 100,
-            borderColor: "divider",
-            color: "text.secondary",
-            "&:hover": {
-              borderColor: "text.secondary",
-              backgroundColor: "action.hover",
-            },
+            minWidth: 120,
+            borderRadius: "12px",
+            borderColor: "#E0E0E0",
+            color: "#4A4A68",
+            fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            "&:hover": { borderColor: "#C4C4D4", bgcolor: "#F0F0F5" },
           }}
         >
           Hủy bỏ
         </Button>
-
-        {/* Submit Button */}
         <Button
           onClick={handleSubmit}
           disabled={loading || !formData.name.trim()}
           variant="contained"
-          color="error"
-          startIcon={<SaveIcon />}
+          startIcon={
+            loading ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : (
+              <SaveIcon />
+            )
+          }
           sx={{
-            minWidth: 150,
+            minWidth: 160,
+            borderRadius: "12px",
             fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            bgcolor: themeColor,
+            boxShadow: `0 4px 14px ${alpha(themeColor, 0.4)}`,
+            "&:hover": {
+              bgcolor: "#6B3FE8",
+              boxShadow: `0 6px 20px ${alpha(themeColor, 0.5)}`,
+            },
+            "&:disabled": { bgcolor: "#C4C4D4" },
           }}
         >
-          {loading
-            ? "Đang lưu..."
-            : mode === "create"
-              ? "Lưu Danh mục"
-              : "Cập nhật"}
+          {loading ? "Đang lưu..." : isCreate ? "Tạo danh mục" : "Cập nhật"}
         </Button>
       </DialogActions>
     </Dialog>

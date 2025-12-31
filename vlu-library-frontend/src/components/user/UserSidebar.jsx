@@ -8,6 +8,8 @@ import {
   Typography,
   Box,
   Divider,
+  Avatar,
+  alpha,
 } from "@mui/material";
 import {
   Person as PersonIcon,
@@ -17,13 +19,15 @@ import {
   Folder as FolderIcon,
   BarChart as BarChartIcon,
   RateReview as RateReviewIcon,
+  ChevronRight as ChevronRightIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 /**
- * UserSidebar Component
- * Sidebar navigation cho User, Author và Moderator (Admin sử dụng AdminSidebar riêng)
+ * UserSidebar Component - VLU Design System v2.0
+ * Modern & Bold sidebar navigation
  *
  * @param {string} active - Menu item đang active
  */
@@ -35,49 +39,66 @@ const UserSidebar = ({ active = "profile" }) => {
   const isAuthor = user && user.role === "Author";
   const isModerator = user && user.role === "Moderator";
 
-  // Menu items configuration
+  // Role colors theo Design System v2.0
+  const getRoleColor = (role) => {
+    const colors = {
+      Admin: "#D32F2F",
+      Moderator: "#7C4DFF",
+      Author: "#4CAF50",
+      User: "#2196F3",
+    };
+    return colors[role] || "#8E8EA9";
+  };
+
+  // Menu items configuration với icons và colors
   const menuItems = [
     {
       id: "profile",
       label: "Thông tin cá nhân",
-      icon: <PersonIcon />,
+      icon: PersonIcon,
       path: "/profile",
-      show: true, // Always show
+      show: true,
+      color: "#2196F3",
     },
     {
       id: "moderation",
       label: "Duyệt tài liệu",
-      icon: <RateReviewIcon />,
+      icon: RateReviewIcon,
       path: "/moderation",
-      show: isModerator, // Only for Moderator (Admin uses AdminSidebar)
+      show: isModerator,
+      color: "#7C4DFF",
     },
     {
       id: "my-documents",
       label: "Tài liệu của tôi",
-      icon: <FolderIcon />,
+      icon: FolderIcon,
       path: "/my-documents",
-      show: isAuthor, // Only for Author
+      show: isAuthor,
+      color: "#4CAF50",
     },
     {
       id: "stats",
       label: "Thống kê",
-      icon: <BarChartIcon />,
+      icon: BarChartIcon,
       path: "/author/stats",
-      show: isAuthor, // Only for Author
+      show: isAuthor,
+      color: "#FF7043",
     },
     {
       id: "password",
       label: "Đổi mật khẩu",
-      icon: <LockIcon />,
+      icon: LockIcon,
       path: "/profile/change-password",
-      show: true, // Always show
+      show: true,
+      color: "#8E8EA9",
     },
     {
       id: "notifications",
       label: "Thông báo",
-      icon: <NotificationsIcon />,
+      icon: NotificationsIcon,
       path: "/profile/notifications",
-      show: true, // Always show
+      show: true,
+      color: "#FFC107",
     },
   ];
 
@@ -106,131 +127,221 @@ const UserSidebar = ({ active = "profile" }) => {
     <Paper
       elevation={0}
       sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: "20px",
         overflow: "hidden",
+        bgcolor: "white",
+        boxShadow: "0 2px 12px rgba(26, 26, 46, 0.06)",
+        border: "1px solid #F0F0F5",
+        position: "sticky",
+        top: 90,
       }}
     >
-      {/* Header */}
+      {/* ========== USER INFO HEADER ========== */}
       <Box
         sx={{
           p: 2.5,
-          backgroundColor: "grey.50",
-          borderBottom: "1px solid",
-          borderColor: "divider",
+          background: "linear-gradient(135deg, #FAFAFC 0%, #F0F0F5 100%)",
+          borderBottom: "1px solid #F0F0F5",
         }}
       >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Avatar
+            src={user?.avatarUrl}
+            sx={{
+              width: 48,
+              height: 48,
+              bgcolor: getRoleColor(user?.role),
+              fontSize: "1.25rem",
+              fontWeight: 600,
+            }}
+          >
+            {user?.name?.charAt(0).toUpperCase()}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 700,
+                color: "#1A1A2E",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {user?.name || "Người dùng"}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: getRoleColor(user?.role),
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  bgcolor: getRoleColor(user?.role),
+                }}
+              />
+              {user?.role === "Admin" && "Quản trị viên"}
+              {user?.role === "Moderator" && "Kiểm duyệt viên"}
+              {user?.role === "Author" && "Tác giả"}
+              {user?.role === "User" && "Thành viên"}
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* ========== SECTION HEADER ========== */}
+      <Box sx={{ px: 2.5, py: 2 }}>
         <Typography
-          variant="subtitle2"
+          variant="caption"
           sx={{
-            fontWeight: 600,
+            fontWeight: 700,
             textTransform: "uppercase",
-            letterSpacing: 0.5,
-            color: "text.secondary",
-            fontSize: "0.75rem",
+            letterSpacing: "0.08em",
+            color: "#8E8EA9",
+            fontSize: "0.7rem",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
           }}
         >
+          <SettingsIcon sx={{ fontSize: 14 }} />
           {isModerator ? "Quản lý & Cài đặt" : "Cài đặt tài khoản"}
         </Typography>
       </Box>
 
-      {/* Menu List */}
-      <List sx={{ p: 0 }}>
-        {visibleMenuItems.map((item, index) => (
-          <Box key={item.id}>
-            <ListItem disablePadding>
+      {/* ========== MENU LIST ========== */}
+      <List sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
+        {visibleMenuItems.map((item, index) => {
+          const isActive = active === item.id;
+          const Icon = item.icon;
+
+          return (
+            <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 onClick={() => handleMenuClick(item.path)}
-                selected={active === item.id}
                 sx={{
                   py: 1.5,
-                  px: 2.5,
+                  px: 2,
+                  borderRadius: "12px",
                   position: "relative",
-                  "&.Mui-selected": {
-                    backgroundColor: (theme) => `${theme.palette.error.main}08`, // Red with 8% opacity
-                    color: "error.main",
-                    "&:hover": {
-                      backgroundColor: (theme) =>
-                        `${theme.palette.error.main}12`,
-                    },
-                    "&::before": {
-                      content: '""',
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 4,
-                      backgroundColor: "error.main",
-                    },
-                    "& .MuiListItemIcon-root": {
-                      color: "error.main",
-                    },
-                    "& .MuiListItemText-primary": {
-                      fontWeight: 600,
-                    },
-                  },
+                  bgcolor: isActive ? alpha("#D32F2F", 0.08) : "transparent",
                   "&:hover": {
-                    backgroundColor: "action.hover",
+                    bgcolor: isActive ? alpha("#D32F2F", 0.12) : "#FAFAFC",
                   },
+                  transition: "all 0.2s ease",
                 }}
               >
+                {/* Active Indicator */}
+                {isActive && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: 0,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: 4,
+                      height: 24,
+                      bgcolor: "#D32F2F",
+                      borderRadius: "0 4px 4px 0",
+                    }}
+                  />
+                )}
+
                 <ListItemIcon
                   sx={{
                     minWidth: 40,
-                    color: "text.secondary",
                   }}
                 >
-                  {item.icon}
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "8px",
+                      bgcolor: isActive
+                        ? alpha("#D32F2F", 0.1)
+                        : alpha(item.color, 0.1),
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon
+                      sx={{
+                        fontSize: 18,
+                        color: isActive ? "#D32F2F" : item.color,
+                      }}
+                    />
+                  </Box>
                 </ListItemIcon>
+
                 <ListItemText
                   primary={item.label}
                   primaryTypographyProps={{
-                    fontSize: "0.9375rem",
+                    fontSize: "0.875rem",
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? "#D32F2F" : "#4A4A68",
                   }}
                 />
+
+                {isActive && (
+                  <ChevronRightIcon sx={{ fontSize: 18, color: "#D32F2F" }} />
+                )}
               </ListItemButton>
             </ListItem>
-            {index < visibleMenuItems.length - 1 && (
-              <Divider sx={{ mx: 2.5 }} />
-            )}
-          </Box>
-        ))}
+          );
+        })}
+      </List>
 
-        {/* Divider before Logout */}
-        <Divider sx={{ my: 1 }} />
+      {/* ========== DIVIDER ========== */}
+      <Divider sx={{ mx: 2.5, borderColor: "#F0F0F5" }} />
 
-        {/* Logout Button */}
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={handleLogout}
-            sx={{
-              py: 1.5,
-              px: 2.5,
-              color: "error.main",
-              "&:hover": {
-                backgroundColor: (theme) => `${theme.palette.error.main}08`,
-              },
-            }}
-          >
-            <ListItemIcon
+      {/* ========== LOGOUT BUTTON ========== */}
+      <Box sx={{ p: 1.5 }}>
+        <ListItemButton
+          onClick={handleLogout}
+          sx={{
+            py: 1.5,
+            px: 2,
+            borderRadius: "12px",
+            "&:hover": {
+              bgcolor: alpha("#D32F2F", 0.08),
+            },
+            transition: "all 0.2s ease",
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <Box
               sx={{
-                minWidth: 40,
-                color: "error.main",
+                width: 32,
+                height: 32,
+                borderRadius: "8px",
+                bgcolor: alpha("#D32F2F", 0.1),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Đăng xuất"
-              primaryTypographyProps={{
-                fontSize: "0.9375rem",
-                fontWeight: 500,
-              }}
-            />
-          </ListItemButton>
-        </ListItem>
-      </List>
+              <LogoutIcon sx={{ fontSize: 18, color: "#D32F2F" }} />
+            </Box>
+          </ListItemIcon>
+          <ListItemText
+            primary="Đăng xuất"
+            primaryTypographyProps={{
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              color: "#D32F2F",
+            }}
+          />
+        </ListItemButton>
+      </Box>
     </Paper>
   );
 };

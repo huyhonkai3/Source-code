@@ -7,6 +7,99 @@ const path = require("path");
 const fs = require("fs");
 
 /**
+ * ========================================
+ * HELPER FUNCTIONS CHO TÌM KIẾM THÔNG MINH
+ * ========================================
+ */
+
+/**
+ * Escape các ký tự đặc biệt trong regex
+ * Ví dụ: "Node.js" → "Node\\.js"
+ */
+const escapeRegex = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
+/**
+ * Tạo pattern tìm kiếm linh hoạt
+ * - Cho phép dấu chấm, gạch ngang optional giữa các ký tự
+ * - Ví dụ: "Nodejs" → "N[._-]?o[._-]?d[._-]?e[._-]?j[._-]?s"
+ * - Match được: Node.js, NodeJS, Node-js, Nodejs, node.js
+ */
+const createFlexiblePattern = (word) => {
+  // Escape ký tự đặc biệt trước
+  const escaped = escapeRegex(word);
+  // Cho phép dấu chấm/gạch ngang optional giữa các ký tự
+  return escaped.split("").join("[._-]?");
+};
+
+/**
+ * Loại bỏ dấu tiếng Việt
+ * Ví dụ: "Giáo trình" → "Giao trinh"
+ */
+const removeVietnameseTones = (str) => {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+};
+
+/**
+ * Tạo search query thông minh
+ * @param {string} searchKeyword - Từ khóa tìm kiếm từ user
+ * @returns {Object} MongoDB query object
+ */
+const buildSmartSearchQuery = (searchKeyword) => {
+  if (!searchKeyword || !searchKeyword.trim()) {
+    return null;
+  }
+
+  const trimmed = searchKeyword.trim();
+
+  // Tách thành các từ (split by space)
+  const words = trimmed.split(/\s+/).filter((w) => w.length > 0);
+
+  if (words.length === 0) {
+    return null;
+  }
+
+  // Nếu chỉ có 1 từ
+  if (words.length === 1) {
+    const word = words[0];
+    const flexPattern = createFlexiblePattern(word);
+    const noTonesPattern = removeVietnameseTones(word);
+
+    return {
+      $or: [
+        // Tìm chính xác (có thể có dấu chấm/gạch ngang)
+        { title: { $regex: flexPattern, $options: "i" } },
+        { author: { $regex: flexPattern, $options: "i" } },
+        { description: { $regex: flexPattern, $options: "i" } },
+        { fileName: { $regex: flexPattern, $options: "i" } },
+        // Tìm không dấu (cho tiếng Việt)
+        { title: { $regex: noTonesPattern, $options: "i" } },
+      ],
+    };
+  }
+
+  // Nếu có nhiều từ: TẤT CẢ các từ phải xuất hiện (AND logic)
+  const andConditions = words.map((word) => {
+    const flexPattern = createFlexiblePattern(word);
+    return {
+      $or: [
+        { title: { $regex: flexPattern, $options: "i" } },
+        { author: { $regex: flexPattern, $options: "i" } },
+        { description: { $regex: flexPattern, $options: "i" } },
+        { fileName: { $regex: flexPattern, $options: "i" } },
+      ],
+    };
+  });
+
+  return { $and: andConditions };
+};
+
+/**
  * API 2.5: Tải lên tài liệu (F6)
  * POST /api/documents/upload
  * Access: Author, Admin
@@ -295,58 +388,133 @@ const reviewDocument = async (req, res) => {
 
 /**
  * API 2.7 & 2.8: Lấy danh sách tài liệu
- * GET /api/documents (Public - API 2.7)
- * GET /api/admin/documents (Admin - API 2.8)
+ * GET /api/documents (Public - chỉ approved)
+ * GET /api/admin/documents (Admin - tất cả status)
+ * Access: Public / Admin, Moderator
+ *
+ * ĐÃ SỬA: Hỗ trợ đầy đủ các filter từ frontend mới
+ * - q: search keyword (thay vì search)
+ * - category: hỗ trợ cả string và array
+ * - yearFrom, yearTo: filter theo năm xuất bản
+ * - type: filter theo loại file (pdf, epub)
+ * - sort: newest, oldest, mostViewed, mostDownloaded, highestRated
  */
 const getDocuments = async (req, res) => {
   try {
+    // Lấy tất cả query params - HỖ TRỢ CẢ 'q' và 'search'
     const {
-      page = 1,
-      limit = 10,
+      q,
       search,
       category,
+      page = 1,
+      limit = 10,
+      sort = "newest",
+      yearFrom,
+      yearTo,
+      type,
       status,
-      sort = "-createdAt",
     } = req.query;
 
+    // Xác định đây là API public hay admin dựa trên URL
+    const isAdminRoute = req.originalUrl.includes("/admin/");
+
+    // Build query
+    const query = {};
+
+    // Status filter
+    if (isAdminRoute) {
+      if (status && status !== "all") {
+        query.status = status;
+      }
+    } else {
+      query.status = "approved";
+    }
+
+    // Search by keyword - SỬ DỤNG TÌM KIẾM THÔNG MINH
+    const searchKeyword = q || search;
+    if (searchKeyword) {
+      const smartQuery = buildSmartSearchQuery(searchKeyword);
+      if (smartQuery) {
+        // Merge smart search query vào main query
+        if (smartQuery.$or) {
+          query.$or = smartQuery.$or;
+        } else if (smartQuery.$and) {
+          query.$and = smartQuery.$and;
+        }
+      }
+    }
+
+    // Filter by category - HỖ TRỢ ARRAY
+    let categoryIds = req.query.category || req.query["category[]"];
+    if (categoryIds) {
+      if (!Array.isArray(categoryIds)) {
+        categoryIds = [categoryIds];
+      }
+      categoryIds = categoryIds.filter((id) => id && id !== "all");
+      if (categoryIds.length > 0) {
+        if (categoryIds.length === 1) {
+          query.categoryId = categoryIds[0];
+        } else {
+          query.categoryId = { $in: categoryIds };
+        }
+      }
+    }
+
+    // Filter by year range - ĐÃ THÊM
+    if (yearFrom) {
+      query.publishYear = { ...query.publishYear, $gte: parseInt(yearFrom) };
+    }
+    if (yearTo) {
+      query.publishYear = { ...query.publishYear, $lte: parseInt(yearTo) };
+    }
+
+    // Filter by file type - ĐÃ THÊM
+    if (type && type !== "all") {
+      query.fileFormat = type;
+    }
+
+    // Sort options - ĐÃ SỬA để map các giá trị từ frontend
+    let sortOption = {};
+    switch (sort) {
+      case "newest":
+      case "-createdAt":
+        sortOption = { createdAt: -1 };
+        break;
+      case "oldest":
+      case "createdAt":
+        sortOption = { createdAt: 1 };
+        break;
+      case "mostViewed":
+      case "-views":
+        sortOption = { views: -1 };
+        break;
+      case "mostDownloaded":
+      case "-downloads":
+        sortOption = { downloads: -1 };
+        break;
+      case "highestRated":
+      case "-rating":
+        sortOption = { rating: -1 };
+        break;
+      case "title":
+        sortOption = { title: 1 };
+        break;
+      default:
+        sortOption = { createdAt: -1 };
+    }
+
+    // Pagination
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    const query = {};
-
-    if (!req.originalUrl.includes("/admin")) {
-      query.status = "approved";
-    } else if (status) {
-      query.status = status;
-    }
-
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { author: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    let categoryId = category;
-    if (req.query["category[]"]) {
-      categoryId = req.query["category[]"];
-    }
-
-    if (categoryId) {
-      if (Array.isArray(categoryId)) {
-        query.categoryId = { $in: categoryId };
-      } else {
-        query.categoryId = categoryId;
-      }
-    }
-
+    // Execute query
     const [documents, totalDocs] = await Promise.all([
       Document.find(query)
         .populate("categoryId", "name slug")
         .populate("uploadedBy", "name email")
-        .sort(sort)
+        .populate("reviewedBy", "name email")
+        .sort(sortOption)
         .skip(skip)
         .limit(limitNum),
       Document.countDocuments(query),
@@ -380,6 +548,13 @@ const getDocuments = async (req, res) => {
                 email: doc.uploadedBy.email,
               }
             : null,
+          reviewedBy: doc.reviewedBy
+            ? {
+                id: doc.reviewedBy._id,
+                name: doc.reviewedBy.name,
+                email: doc.reviewedBy.email,
+              }
+            : null,
           fileUrl: doc.fileUrl,
           fileName: doc.fileName,
           fileSize: doc.fileSize,
@@ -396,6 +571,7 @@ const getDocuments = async (req, res) => {
           currentPage: pageNum,
           totalPages,
           totalDocs,
+          totalDocuments: totalDocs, // Thêm để frontend có thể đọc
           limit: limitNum,
           hasNextPage: pageNum < totalPages,
           hasPrevPage: pageNum > 1,
@@ -413,56 +589,66 @@ const getDocuments = async (req, res) => {
 };
 
 /**
- * API: Lấy tài liệu của tác giả hiện tại
+ * API: Get my documents (Author Dashboard)
  * GET /api/documents/my-documents
  * Access: Author, Admin
  */
 const getMyDocuments = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 10, status, sort = "-createdAt" } = req.query;
+    const { q, status, page = 1, limit = 10, sort = "-createdAt" } = req.query;
 
+    // Build query
+    const query = { uploadedBy: userId };
+
+    // Search
+    if (q) {
+      query.$or = [
+        { title: { $regex: q, $options: "i" } },
+        { author: { $regex: q, $options: "i" } },
+      ];
+    }
+
+    // Status filter
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    // Sort
+    let sortOption = {};
+    if (sort === "-createdAt" || sort === "newest") {
+      sortOption = { createdAt: -1 };
+    } else if (sort === "createdAt" || sort === "oldest") {
+      sortOption = { createdAt: 1 };
+    } else {
+      sortOption = { createdAt: -1 };
+    }
+
+    // Pagination
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    const query = { uploadedBy: userId };
-
-    if (status) {
-      query.status = status;
-    }
-
-    const [documents, totalDocs] = await Promise.all([
+    // Get documents
+    const [documents, totalDocuments] = await Promise.all([
       Document.find(query)
         .populate("categoryId", "name slug")
-        .sort(sort)
+        .sort(sortOption)
         .skip(skip)
         .limit(limitNum),
       Document.countDocuments(query),
     ]);
 
-    const totalPages = Math.ceil(totalDocs / limitNum);
+    // Get stats
+    const [totalCount, approvedCount, pendingCount, rejectedCount] =
+      await Promise.all([
+        Document.countDocuments({ uploadedBy: userId }),
+        Document.countDocuments({ uploadedBy: userId, status: "approved" }),
+        Document.countDocuments({ uploadedBy: userId, status: "pending" }),
+        Document.countDocuments({ uploadedBy: userId, status: "rejected" }),
+      ]);
 
-    const stats = await Document.aggregate([
-      { $match: { uploadedBy: new mongoose.Types.ObjectId(userId) } },
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const statsObj = {
-      total: totalDocs,
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-    };
-
-    stats.forEach((s) => {
-      statsObj[s._id] = s.count;
-    });
+    const totalPages = Math.ceil(totalDocuments / limitNum);
 
     return res.status(200).json({
       status: "success",
@@ -478,7 +664,6 @@ const getMyDocuments = async (req, res) => {
             ? {
                 id: doc.categoryId._id,
                 name: doc.categoryId.name,
-                slug: doc.categoryId.slug,
               }
             : null,
           fileName: doc.fileName,
@@ -493,14 +678,20 @@ const getMyDocuments = async (req, res) => {
         pagination: {
           currentPage: pageNum,
           totalPages,
-          totalDocs,
+          totalDocuments,
           limit: limitNum,
         },
-        stats: statsObj,
+        stats: {
+          total: totalCount,
+          approved: approvedCount,
+          pending: pendingCount,
+          rejected: rejectedCount,
+        },
       },
     });
   } catch (error) {
     console.error("Get my documents error:", error);
+
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -510,15 +701,13 @@ const getMyDocuments = async (req, res) => {
 };
 
 /**
- * API 2.9: Lấy chi tiết tài liệu
+ * API: Get document by ID
  * GET /api/documents/:id
- * Access: Public (có phân quyền)
+ * Access: Public (approved) / Admin (all)
  */
 const getDocumentById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role;
-    const userId = req.user?.id;
 
     const document = await Document.findById(id)
       .populate("categoryId", "name slug")
@@ -533,11 +722,13 @@ const getDocumentById = async (req, res) => {
       });
     }
 
+    // Check access permission
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
     const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
     const isOwner = document.uploadedBy?._id?.toString() === userId;
-    const isApproved = document.status === "approved";
 
-    if (!isAdminOrModerator && !isOwner && !isApproved) {
+    if (document.status !== "approved" && !isAdminOrModerator && !isOwner) {
       return res.status(403).json({
         status: "error",
         code: 403,
@@ -548,7 +739,7 @@ const getDocumentById = async (req, res) => {
     return res.status(200).json({
       status: "success",
       code: 200,
-      message: "Lấy chi tiết tài liệu thành công",
+      message: "Lấy thông tin tài liệu thành công",
       data: {
         document: {
           id: document._id,
@@ -557,7 +748,6 @@ const getDocumentById = async (req, res) => {
           author: document.author,
           publisher: document.publisher,
           publishYear: document.publishYear,
-          pageCount: document.pageCount,
           category: document.categoryId
             ? {
                 id: document.categoryId._id,
@@ -577,7 +767,6 @@ const getDocumentById = async (req, res) => {
           fileName: document.fileName,
           fileSize: document.fileSize,
           fileFormat: document.fileFormat,
-          coverImage: document.coverImage,
           status: document.status,
           rejectionReason: document.rejectionReason,
           reviewedBy: document.reviewedBy
@@ -589,32 +778,32 @@ const getDocumentById = async (req, res) => {
           reviewedAt: document.reviewedAt,
           views: document.views,
           downloads: document.downloads,
-          rating: document.rating,
-          commentCount: document.commentCount,
-          wikidataInfo: document.wikidataInfo,
           createdAt: document.createdAt,
           updatedAt: document.updatedAt,
         },
       },
     });
   } catch (error) {
-    console.error("Get document by id error:", error);
+    console.error("Get document by ID error:", error);
+
     return res.status(500).json({
       status: "error",
       code: 500,
-      message: "Lỗi server khi lấy chi tiết tài liệu",
+      message: "Lỗi server khi lấy thông tin tài liệu",
     });
   }
 };
 
 /**
- * API 2.10: Cập nhật tài liệu
+ * API: Update document
  * PUT /api/documents/:id
- * Access: Author (owner), Admin
+ * Access: Owner (pending only), Admin
  */
 const updateDocument = async (req, res) => {
   try {
     const { id } = req.params;
+    const { title, description, author, publisher, publishYear, category } =
+      req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -628,6 +817,7 @@ const updateDocument = async (req, res) => {
       });
     }
 
+    // Check permission
     const isOwner = document.uploadedBy.toString() === userId;
     const isAdmin = userRole === "Admin";
 
@@ -635,44 +825,33 @@ const updateDocument = async (req, res) => {
       return res.status(403).json({
         status: "error",
         code: 403,
-        message: "Bạn không có quyền cập nhật tài liệu này",
+        message: "Bạn không có quyền chỉnh sửa tài liệu này",
       });
     }
 
-    const allowedUpdates = [
-      "title",
-      "description",
-      "author",
-      "publisher",
-      "publishYear",
-    ];
-    const updates = {};
-
-    allowedUpdates.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-      }
-    });
-
-    if (req.body.category) {
-      const categoryExists = await Category.findById(req.body.category);
-      if (!categoryExists) {
-        return res.status(404).json({
-          status: "error",
-          code: 404,
-          message: "Không tìm thấy danh mục",
-        });
-      }
-      updates.categoryId = req.body.category;
+    // Owner can only edit pending documents
+    if (isOwner && !isAdmin && document.status !== "pending") {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Chỉ có thể chỉnh sửa tài liệu đang chờ duyệt",
+      });
     }
 
-    const updatedDocument = await Document.findByIdAndUpdate(
-      id,
-      { $set: updates },
-      { new: true, runValidators: true },
-    )
-      .populate("categoryId", "name slug")
-      .populate("uploadedBy", "name email role");
+    // Update fields
+    if (title) document.title = title.trim();
+    if (description !== undefined) document.description = description.trim();
+    if (author !== undefined) document.author = author ? author.trim() : null;
+    if (publisher !== undefined)
+      document.publisher = publisher ? publisher.trim() : null;
+    if (publishYear !== undefined)
+      document.publishYear = publishYear ? parseInt(publishYear) : null;
+    if (category) document.categoryId = category;
+
+    await document.save();
+
+    await document.populate("categoryId", "name slug");
+    await document.populate("uploadedBy", "name email role");
 
     return res.status(200).json({
       status: "success",
@@ -680,27 +859,26 @@ const updateDocument = async (req, res) => {
       message: "Cập nhật tài liệu thành công",
       data: {
         document: {
-          id: updatedDocument._id,
-          title: updatedDocument.title,
-          description: updatedDocument.description,
-          author: updatedDocument.author,
-          publisher: updatedDocument.publisher,
-          publishYear: updatedDocument.publishYear,
-          category: updatedDocument.categoryId
+          id: document._id,
+          title: document.title,
+          description: document.description,
+          author: document.author,
+          publisher: document.publisher,
+          publishYear: document.publishYear,
+          category: document.categoryId
             ? {
-                id: updatedDocument.categoryId._id,
-                name: updatedDocument.categoryId.name,
-                slug: updatedDocument.categoryId.slug,
+                id: document.categoryId._id,
+                name: document.categoryId.name,
               }
             : null,
-          fileFormat: updatedDocument.fileFormat,
-          status: updatedDocument.status,
-          updatedAt: updatedDocument.updatedAt,
+          status: document.status,
+          updatedAt: document.updatedAt,
         },
       },
     });
   } catch (error) {
     console.error("Update document error:", error);
+
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -710,9 +888,9 @@ const updateDocument = async (req, res) => {
 };
 
 /**
- * API 2.11: Xóa tài liệu
+ * API: Delete document
  * DELETE /api/documents/:id
- * Access: Author (owner), Admin
+ * Access: Owner, Admin
  */
 const deleteDocument = async (req, res) => {
   try {
@@ -730,6 +908,7 @@ const deleteDocument = async (req, res) => {
       });
     }
 
+    // Check permission
     const isOwner = document.uploadedBy.toString() === userId;
     const isAdmin = userRole === "Admin";
 
@@ -741,15 +920,18 @@ const deleteDocument = async (req, res) => {
       });
     }
 
+    // Delete file from storage
     const filePath = path.join(process.cwd(), document.fileUrl);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
+    // Update category document count
     await Category.findByIdAndUpdate(document.categoryId, {
       $inc: { documentCount: -1 },
     });
 
+    // Delete document
     await Document.findByIdAndDelete(id);
 
     return res.status(200).json({
@@ -759,6 +941,7 @@ const deleteDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Delete document error:", error);
+
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -768,7 +951,7 @@ const deleteDocument = async (req, res) => {
 };
 
 /**
- * API: Tải xuống tài liệu
+ * API: Download document
  * GET /api/documents/:id/download
  * Access: Authenticated users
  */
@@ -788,6 +971,7 @@ const downloadDocument = async (req, res) => {
       });
     }
 
+    // Check access permission
     const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
     const isOwner = document.uploadedBy?.toString() === userId;
     const isApproved = document.status === "approved";
@@ -810,22 +994,27 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    let contentType = "application/pdf";
-    if (document.fileFormat === "epub") {
-      contentType = "application/epub+zip";
-    }
-
-    res.setHeader("Content-Type", contentType);
+    // Set headers for download
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(document.fileName)}"`,
     );
 
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    let contentType = "application/pdf";
+    if (
+      document.fileFormat === "epub" ||
+      document.fileName.toLowerCase().endsWith(".epub")
+    ) {
+      contentType = "application/epub+zip";
+    }
+    res.setHeader("Content-Type", contentType);
 
-    stream.on("error", (error) => {
-      console.error("Stream error:", error);
+    // Stream file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    fileStream.on("error", (err) => {
+      console.error("File stream error:", err);
       if (!res.headersSent) {
         return res.status(500).json({
           status: "error",
@@ -905,21 +1094,35 @@ const trackDocument = async (req, res) => {
 
 /**
  * API: Dashboard Stats
- * GET /api/admin/stats
+ * GET /api/admin/documents/stats
  * Access: Admin
+ *
+ * Trả về đầy đủ thông tin cho StatCards:
+ * - totalDocuments
+ * - approvedDocuments
+ * - pendingDocuments
+ * - rejectedDocuments
+ * - activeUsers
+ * - totalViews
+ * - totalDownloads
  */
 const getDashboardStats = async (req, res) => {
   try {
+    // Đếm tất cả các loại documents trong 1 lần query
     const [
       totalDocuments,
+      approvedDocuments,
       pendingDocuments,
+      rejectedDocuments,
       activeUsers,
       totalViewsAgg,
       totalDownloadsAgg,
       categories,
     ] = await Promise.all([
       Document.countDocuments(),
+      Document.countDocuments({ status: "approved" }),
       Document.countDocuments({ status: "pending" }),
+      Document.countDocuments({ status: "rejected" }),
       User.countDocuments({ status: "active" }),
       Document.aggregate([
         { $group: { _id: null, total: { $sum: "$views" } } },
@@ -930,26 +1133,32 @@ const getDashboardStats = async (req, res) => {
       Category.find({}).sort({ documentCount: -1 }),
     ]);
 
+    // Build overview object với đầy đủ thông tin
     const overview = {
       totalDocuments,
+      approvedDocuments,
       pendingDocuments,
+      rejectedDocuments,
       activeUsers,
       totalViews: totalViewsAgg[0]?.total || 0,
       totalDownloads: totalDownloadsAgg[0]?.total || 0,
     };
 
+    // Top viewed documents
     const topViewed = await Document.find({ status: "approved" })
       .sort({ views: -1 })
       .limit(10)
       .populate("categoryId", "name")
       .select("title categoryId views author");
 
+    // Top downloaded documents
     const topDownloaded = await Document.find({ status: "approved" })
       .sort({ downloads: -1 })
       .limit(10)
       .populate("categoryId", "name")
       .select("title categoryId downloads author");
 
+    // Category distribution
     const totalDocsInCategory = categories.reduce(
       (sum, cat) => sum + cat.documentCount,
       0,
@@ -1005,10 +1214,6 @@ const getDashboardStats = async (req, res) => {
  * API 2.15: Đọc trực tuyến (PDF & EPUB)
  * GET /api/documents/:id/read
  * Access: Authenticated users
- *
- * QUAN TRỌNG cho EPUB:
- * - Phải dùng stream với đúng Content-Type
- * - react-reader yêu cầu binary data hoàn chỉnh
  */
 const readDocument = async (req, res) => {
   try {
@@ -1038,7 +1243,6 @@ const readDocument = async (req, res) => {
       });
     }
 
-    // Xây dựng đường dẫn file tuyệt đối
     const filePath = path.join(process.cwd(), document.fileUrl);
 
     console.log("[READ] Document ID:", id);
@@ -1053,8 +1257,6 @@ const readDocument = async (req, res) => {
       });
     }
 
-    // Set Content-Type
-    // Dù res.sendFile tự detect, nhưng ta set explicit để đảm bảo đúng logic business
     let contentType = "application/pdf";
     if (
       document.fileFormat === "epub" ||
@@ -1063,18 +1265,11 @@ const readDocument = async (req, res) => {
       contentType = "application/epub+zip";
     }
 
-    // CORS headers - giữ nguyên để frontend đọc được thông tin
     res.setHeader(
       "Access-Control-Expose-Headers",
       "Content-Length, Content-Type, Content-Disposition",
     );
 
-    // Sử dụng res.sendFile để gửi file
-    // Express sẽ tự động xử lý:
-    // 1. Content-Type (dựa trên extension file hoặc headers đã set)
-    // 2. Content-Length
-    // 3. Range requests (206 Partial Content) - rất quan trọng cho EPUB
-    // 4. ETag & Caching
     res.sendFile(
       filePath,
       {
@@ -1086,7 +1281,6 @@ const readDocument = async (req, res) => {
       (err) => {
         if (err) {
           console.error("[READ] Send file error:", err);
-          // Chỉ gửi lỗi JSON nếu header chưa được gửi
           if (!res.headersSent) {
             res.status(500).json({
               status: "error",

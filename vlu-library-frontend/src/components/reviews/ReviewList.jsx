@@ -7,25 +7,28 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  alpha,
+  Skeleton,
 } from "@mui/material";
 import {
   Star as StarIcon,
   MoreVert as MoreVertIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  FormatQuote as QuoteIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 
 /**
- * ReviewList Component
- * Hiển thị danh sách đánh giá
+ * ReviewList Component - VLU Design System v2.0
+ * Modern & Bold review list với cards
  *
  * @param {Array} reviews - Danh sách reviews
  * @param {boolean} loading - Loading state
- * @param {string} currentUserId - ID của user hiện tại (để check ownership)
- * @param {string} currentUserRole - Role của user hiện tại (để check admin)
+ * @param {string} currentUserId - ID của user hiện tại
+ * @param {string} currentUserRole - Role của user hiện tại
  * @param {Function} onEdit - Callback khi click edit
  * @param {Function} onDelete - Callback khi click delete
  */
@@ -71,6 +74,15 @@ const ReviewList = ({
   };
 
   /**
+   * Get rating color
+   */
+  const getRatingColor = (rating) => {
+    if (rating >= 4) return "#4CAF50";
+    if (rating >= 3) return "#FFC107";
+    return "#FF9800";
+  };
+
+  /**
    * Handle menu open
    */
   const handleMenuOpen = (event, review, permissions) => {
@@ -111,10 +123,40 @@ const ReviewList = ({
   // Loading state
   if (loading) {
     return (
-      <Box sx={{ textAlign: "center", py: 4 }}>
-        <Typography variant="body2" color="text.secondary">
-          Đang tải đánh giá...
+      <Box>
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 700, color: "#1A1A2E", mb: 3 }}
+        >
+          Đánh giá gần đây
         </Typography>
+        {[1, 2, 3].map((n) => (
+          <Paper
+            key={n}
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 2,
+              borderRadius: "16px",
+              bgcolor: "white",
+              border: "1px solid #F0F0F5",
+            }}
+          >
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <Skeleton variant="circular" width={48} height={48} />
+              <Box sx={{ flex: 1 }}>
+                <Skeleton variant="text" width={150} height={24} />
+                <Skeleton variant="text" width={100} height={20} />
+                <Skeleton
+                  variant="text"
+                  width="100%"
+                  height={60}
+                  sx={{ mt: 1 }}
+                />
+              </Box>
+            </Box>
+          </Paper>
+        ))}
       </Box>
     );
   }
@@ -125,18 +167,37 @@ const ReviewList = ({
       <Paper
         elevation={0}
         sx={{
-          p: 4,
+          p: 5,
           textAlign: "center",
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 2,
+          borderRadius: "20px",
+          bgcolor: "white",
+          boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+          border: "1px solid #F0F0F5",
         }}
       >
-        <Typography variant="body1" color="text.secondary">
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            mx: "auto",
+            mb: 2,
+            borderRadius: "50%",
+            bgcolor: "#FFF8E1",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <StarIcon sx={{ fontSize: 40, color: "#FFC107" }} />
+        </Box>
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
+        >
           Chưa có đánh giá nào
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-          Hãy là người đầu tiên đánh giá tài liệu này
+        <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+          Hãy là người đầu tiên đánh giá tài liệu này!
         </Typography>
       </Paper>
     );
@@ -144,26 +205,43 @@ const ReviewList = ({
 
   return (
     <Box>
+      {/* Section Title */}
       <Typography
         variant="h6"
         sx={{
-          fontWeight: 600,
-          mb: 2,
+          fontWeight: 700,
+          color: "#1A1A2E",
+          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
         }}
       >
+        <QuoteIcon sx={{ fontSize: 24, color: "#D32F2F" }} />
         Đánh giá gần đây
+        <Box
+          component="span"
+          sx={{
+            ml: 1,
+            px: 1.5,
+            py: 0.25,
+            borderRadius: "8px",
+            bgcolor: alpha("#D32F2F", 0.1),
+            color: "#D32F2F",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+          }}
+        >
+          {reviews.length}
+        </Box>
       </Typography>
 
-      {reviews.map((review) => {
-        // Ownership check
+      {/* Reviews List */}
+      {reviews.map((review, index) => {
         const isOwner = currentUserId && review.userId?.id === currentUserId;
-
-        // Permission checks
         const isAdmin = currentUserRole === "Admin";
-        const canEdit = isOwner; // Only owner can edit
-        const canDelete = isOwner || isAdmin; // Owner or Admin can delete
-
-        // Show menu if user has any permission
+        const canEdit = isOwner;
+        const canDelete = isOwner || isAdmin;
         const showMenu = canEdit || canDelete;
 
         return (
@@ -171,18 +249,32 @@ const ReviewList = ({
             key={review._id}
             elevation={0}
             sx={{
-              p: 2.5,
+              p: 3,
               mb: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 2,
-              "&:hover": {
-                boxShadow: 1,
+              borderRadius: "16px",
+              bgcolor: "white",
+              boxShadow: "0 2px 8px rgba(26,26,46,0.04)",
+              border: "1px solid #F0F0F5",
+              transition: "all 0.2s ease",
+              animation: "fadeInUp 0.4s ease forwards",
+              animationDelay: `${index * 0.05}s`,
+              opacity: 0,
+              "@keyframes fadeInUp": {
+                from: {
+                  opacity: 0,
+                  transform: "translateY(10px)",
+                },
+                to: {
+                  opacity: 1,
+                  transform: "translateY(0)",
+                },
               },
-              transition: "box-shadow 0.2s",
+              "&:hover": {
+                boxShadow: "0 4px 16px rgba(26,26,46,0.08)",
+                borderColor: "#E0E0E0",
+              },
             }}
           >
-            {/* User Info */}
             <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
               {/* Avatar */}
               <Avatar
@@ -191,60 +283,75 @@ const ReviewList = ({
                 sx={{
                   width: 48,
                   height: 48,
-                  backgroundColor: "primary.main",
+                  bgcolor: "#D32F2F",
                   fontWeight: 600,
+                  fontSize: "1rem",
                 }}
               >
                 {getInitials(review.userId?.name)}
               </Avatar>
 
               {/* Content */}
-              <Box sx={{ flex: 1 }}>
-                {/* Name and Rating */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                {/* Header Row */}
                 <Box
                   sx={{
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "space-between",
                     mb: 1,
                   }}
                 >
                   <Box>
+                    {/* Name */}
                     <Typography
-                      variant="body1"
+                      variant="subtitle1"
                       sx={{
                         fontWeight: 600,
-                        color: "text.primary",
+                        color: "#1A1A2E",
+                        lineHeight: 1.3,
                       }}
                     >
                       {review.userId?.name || "Người dùng"}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+
+                    {/* Date */}
+                    <Typography variant="caption" sx={{ color: "#8E8EA9" }}>
                       {formatDate(review.createdAt)}
                     </Typography>
                   </Box>
 
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {/* Star Rating */}
-                    <Rating
-                      value={review.rating}
-                      readOnly
-                      size="small"
-                      icon={<StarIcon fontSize="inherit" />}
-                      emptyIcon={
-                        <StarIcon
-                          fontSize="inherit"
-                          sx={{ color: "grey.300" }}
-                        />
-                      }
+                    {/* Rating Badge */}
+                    <Box
                       sx={{
-                        "& .MuiRating-iconFilled": {
-                          color: "#FFA500",
-                        },
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: "8px",
+                        bgcolor: alpha(getRatingColor(review.rating), 0.1),
                       }}
-                    />
+                    >
+                      <StarIcon
+                        sx={{
+                          fontSize: 16,
+                          color: getRatingColor(review.rating),
+                        }}
+                      />
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: getRatingColor(review.rating),
+                        }}
+                      >
+                        {review.rating}
+                      </Typography>
+                    </Box>
 
-                    {/* Menu Button (Only if has permissions) */}
+                    {/* Menu Button */}
                     {showMenu && (
                       <IconButton
                         size="small"
@@ -252,8 +359,10 @@ const ReviewList = ({
                           handleMenuOpen(e, review, { canEdit, canDelete })
                         }
                         sx={{
+                          color: "#8E8EA9",
                           "&:hover": {
-                            backgroundColor: "action.hover",
+                            bgcolor: "#F0F0F5",
+                            color: "#4A4A68",
                           },
                         }}
                       >
@@ -268,8 +377,8 @@ const ReviewList = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: "text.secondary",
-                      lineHeight: 1.6,
+                      color: "#4A4A68",
+                      lineHeight: 1.7,
                       whiteSpace: "pre-wrap",
                     }}
                   >
@@ -295,20 +404,47 @@ const ReviewList = ({
           vertical: "top",
           horizontal: "right",
         }}
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(26,26,46,0.12)",
+            minWidth: 150,
+          },
+        }}
       >
-        {/* Edit - Only for owner */}
         {menuPermissions.canEdit && (
-          <MenuItem onClick={handleEdit}>
-            <EditIcon fontSize="small" sx={{ mr: 1 }} />
-            Chỉnh sửa
+          <MenuItem
+            onClick={handleEdit}
+            sx={{
+              py: 1.5,
+              px: 2,
+              "&:hover": {
+                bgcolor: "#F0F0F5",
+              },
+            }}
+          >
+            <EditIcon sx={{ fontSize: 18, mr: 1.5, color: "#4A4A68" }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Chỉnh sửa
+            </Typography>
           </MenuItem>
         )}
-
-        {/* Delete - For owner or Admin */}
         {menuPermissions.canDelete && (
-          <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
-            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-            Xóa
+          <MenuItem
+            onClick={handleDelete}
+            sx={{
+              py: 1.5,
+              px: 2,
+              color: "#D32F2F",
+              "&:hover": {
+                bgcolor: alpha("#D32F2F", 0.08),
+              },
+            }}
+          >
+            <DeleteIcon sx={{ fontSize: 18, mr: 1.5 }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Xóa
+            </Typography>
           </MenuItem>
         )}
       </Menu>

@@ -50,6 +50,39 @@ export const getAllAdmin = async (params) => {
 };
 
 /**
+ * Get document statistics for Admin Dashboard
+ * API: GET /api/admin/documents/stats
+ * @returns {Promise} Response data with overview, topViewed, topDownloaded, categoryDistribution
+ *
+ * Response structure:
+ * {
+ *   status: "success",
+ *   data: {
+ *     overview: {
+ *       totalDocuments: number,
+ *       pendingDocuments: number,
+ *       activeUsers: number,
+ *       totalViews: number,
+ *       totalDownloads: number
+ *     },
+ *     topViewed: Array,
+ *     topDownloaded: Array,
+ *     categoryDistribution: Array,
+ *     period: string,
+ *     generatedAt: string
+ *   }
+ * }
+ */
+export const getDocumentStats = async () => {
+  try {
+    const response = await axiosInstance.get("/admin/documents/stats");
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
  * Get document by ID
  * @param {string} id - Document ID
  * @returns {Promise} Response data
@@ -75,7 +108,6 @@ export const upload = async (formData, onProgress) => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      // Cấu hình theo dõi tiến trình upload của Axios
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total) {
           const percentCompleted = Math.round(
@@ -140,12 +172,11 @@ export const getRelated = async (categoryId, currentDocId, limit = 4) => {
     const response = await axiosInstance.get("/documents", {
       params: {
         category: categoryId,
-        limit: limit + 1, // Fetch extra to filter out current doc
+        limit: limit + 1,
         sort: "newest",
       },
     });
 
-    // Filter out current document on frontend
     if (response.data?.data?.documents) {
       response.data.data.documents = response.data.data.documents
         .filter((doc) => (doc._id || doc.id) !== currentDocId)
@@ -248,6 +279,7 @@ export const reviewDocument = async (id, data) => {
 const documentsAPI = {
   getAll,
   getAllAdmin,
+  getDocumentStats,
   getById,
   upload,
   track,

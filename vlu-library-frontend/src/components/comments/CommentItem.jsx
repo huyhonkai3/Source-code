@@ -7,20 +7,23 @@ import {
   Paper,
   Menu,
   MenuItem,
+  alpha,
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
   ThumbUp as ThumbUpIcon,
+  ThumbUpOutlined as ThumbUpOutlinedIcon,
   MoreVert as MoreVertIcon,
   Edit as EditIcon,
+  Reply as ReplyIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 
 /**
- * CommentItem Component
- * Hiển thị một bình luận
+ * CommentItem Component - VLU Design System v2.0
+ * Modern & Bold comment card
  *
  * @param {Object} comment - Comment object
  * @param {string} currentUserId - ID của user hiện tại
@@ -36,6 +39,7 @@ const CommentItem = ({
   onDelete,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [isLiked, setIsLiked] = useState(false);
 
   /**
    * Get user initials for avatar
@@ -64,27 +68,27 @@ const CommentItem = ({
   };
 
   /**
-   * Get role badge config
+   * Get role badge config - Design System v2.0 colors
    */
   const getRoleBadge = (role) => {
     switch (role) {
       case "Admin":
         return {
           label: "Quản trị viên",
-          color: "error",
-          variant: "filled",
+          color: "#D32F2F",
+          bgColor: alpha("#D32F2F", 0.1),
         };
       case "Moderator":
         return {
           label: "Kiểm duyệt viên",
-          color: "warning",
-          variant: "filled",
+          color: "#7C4DFF",
+          bgColor: alpha("#7C4DFF", 0.1),
         };
       case "Author":
         return {
           label: "Tác giả",
-          color: "primary",
-          variant: "outlined",
+          color: "#4CAF50",
+          bgColor: alpha("#4CAF50", 0.1),
         };
       default:
         return null;
@@ -121,11 +125,18 @@ const CommentItem = ({
     handleMenuClose();
   };
 
+  /**
+   * Handle like toggle
+   */
+  const handleLikeToggle = () => {
+    setIsLiked(!isLiked);
+  };
+
   // Check permissions
   const isOwner = currentUserId && comment.user?.id === currentUserId;
   const isAdmin = currentUserRole === "Admin";
-  const canEdit = isOwner; // Only owner can edit
-  const canDelete = isOwner || isAdmin; // Owner or Admin can delete
+  const canEdit = isOwner;
+  const canDelete = isOwner || isAdmin;
   const showMenu = canEdit || canDelete;
 
   const roleBadge = getRoleBadge(comment.user?.role);
@@ -134,15 +145,17 @@ const CommentItem = ({
     <Paper
       elevation={0}
       sx={{
-        p: 2.5,
+        p: 3,
         mb: 2,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
+        borderRadius: "16px",
+        bgcolor: "white",
+        boxShadow: "0 2px 8px rgba(26,26,46,0.04)",
+        border: "1px solid #F0F0F5",
+        transition: "all 0.2s ease",
         "&:hover": {
-          boxShadow: 1,
+          boxShadow: "0 4px 16px rgba(26,26,46,0.08)",
+          borderColor: "#E0E0E0",
         },
-        transition: "box-shadow 0.2s",
       }}
     >
       <Box sx={{ display: "flex", gap: 2 }}>
@@ -151,10 +164,11 @@ const CommentItem = ({
           src={comment.user?.avatarUrl}
           alt={comment.user?.name}
           sx={{
-            width: 40,
-            height: 40,
-            backgroundColor: "primary.main",
+            width: 44,
+            height: 44,
+            bgcolor: "#D32F2F",
             fontWeight: 600,
+            fontSize: "1rem",
             flexShrink: 0,
           }}
         >
@@ -162,22 +176,30 @@ const CommentItem = ({
         </Avatar>
 
         {/* Content */}
-        <Box sx={{ flex: 1 }}>
-          {/* Header: Name, Role, Time, Menu */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* Header Row */}
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
               mb: 1,
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              {/* Name */}
               <Typography
-                variant="body1"
+                variant="subtitle2"
                 sx={{
                   fontWeight: 600,
-                  color: "text.primary",
+                  color: "#1A1A2E",
                 }}
               >
                 {comment.user?.name || "Người dùng"}
@@ -187,36 +209,44 @@ const CommentItem = ({
               {roleBadge && (
                 <Chip
                   label={roleBadge.label}
-                  color={roleBadge.color}
-                  variant={roleBadge.variant}
                   size="small"
                   sx={{
-                    height: 20,
-                    fontSize: "0.65rem",
+                    height: 22,
+                    fontSize: "0.7rem",
                     fontWeight: 600,
+                    bgcolor: roleBadge.bgColor,
+                    color: roleBadge.color,
+                    border: "none",
                   }}
                 />
               )}
 
-              <Typography variant="caption" color="text.secondary">
-                •
-              </Typography>
+              {/* Separator */}
+              <Box
+                sx={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  bgcolor: "#C4C4D4",
+                }}
+              />
 
-              <Typography variant="caption" color="text.secondary">
+              {/* Time */}
+              <Typography variant="caption" sx={{ color: "#8E8EA9" }}>
                 {formatDate(comment.createdAt)}
               </Typography>
             </Box>
 
-            {/* Menu Button (Only if has permissions) */}
+            {/* Menu Button */}
             {showMenu && (
               <IconButton
                 size="small"
                 onClick={handleMenuOpen}
                 sx={{
-                  color: "text.secondary",
+                  color: "#8E8EA9",
                   "&:hover": {
-                    color: "primary.main",
-                    backgroundColor: "action.hover",
+                    bgcolor: "#F0F0F5",
+                    color: "#4A4A68",
                   },
                 }}
               >
@@ -229,8 +259,8 @@ const CommentItem = ({
           <Typography
             variant="body2"
             sx={{
-              color: "text.secondary",
-              lineHeight: 1.6,
+              color: "#4A4A68",
+              lineHeight: 1.7,
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
             }}
@@ -238,37 +268,69 @@ const CommentItem = ({
             {comment.content}
           </Typography>
 
-          {/* Actions (Like - Optional for future) */}
-          <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Action Buttons */}
+          <Box
+            sx={{
+              mt: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            {/* Like Button */}
             <Box
+              onClick={handleLikeToggle}
               sx={{
                 display: "flex",
                 alignItems: "center",
                 gap: 0.5,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: "8px",
                 cursor: "pointer",
-                color: "text.secondary",
+                bgcolor: isLiked ? alpha("#D32F2F", 0.08) : "transparent",
+                color: isLiked ? "#D32F2F" : "#8E8EA9",
+                transition: "all 0.2s ease",
                 "&:hover": {
-                  color: "primary.main",
+                  bgcolor: isLiked ? alpha("#D32F2F", 0.12) : "#F0F0F5",
                 },
               }}
             >
-              <ThumbUpIcon fontSize="small" sx={{ fontSize: 16 }} />
-              <Typography variant="caption">Thích</Typography>
+              {isLiked ? (
+                <ThumbUpIcon sx={{ fontSize: 16 }} />
+              ) : (
+                <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
+              )}
+              <Typography
+                variant="caption"
+                sx={{ fontWeight: isLiked ? 600 : 500 }}
+              >
+                Thích
+              </Typography>
             </Box>
 
+            {/* Reply Button */}
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
                 gap: 0.5,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: "8px",
                 cursor: "pointer",
-                color: "text.secondary",
+                color: "#8E8EA9",
+                transition: "all 0.2s ease",
                 "&:hover": {
-                  color: "primary.main",
+                  bgcolor: "#F0F0F5",
+                  color: "#4A4A68",
                 },
               }}
             >
-              <Typography variant="caption">Trả lời</Typography>
+              <ReplyIcon sx={{ fontSize: 16 }} />
+              <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                Trả lời
+              </Typography>
             </Box>
           </Box>
         </Box>
@@ -287,20 +349,47 @@ const CommentItem = ({
           vertical: "top",
           horizontal: "right",
         }}
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(26,26,46,0.12)",
+            minWidth: 150,
+          },
+        }}
       >
-        {/* Edit - Only for owner */}
         {canEdit && (
-          <MenuItem onClick={handleEdit}>
-            <EditIcon fontSize="small" sx={{ mr: 1 }} />
-            Chỉnh sửa
+          <MenuItem
+            onClick={handleEdit}
+            sx={{
+              py: 1.5,
+              px: 2,
+              "&:hover": {
+                bgcolor: "#F0F0F5",
+              },
+            }}
+          >
+            <EditIcon sx={{ fontSize: 18, mr: 1.5, color: "#4A4A68" }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Chỉnh sửa
+            </Typography>
           </MenuItem>
         )}
-
-        {/* Delete - For owner or Admin */}
         {canDelete && (
-          <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
-            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-            Xóa
+          <MenuItem
+            onClick={handleDelete}
+            sx={{
+              py: 1.5,
+              px: 2,
+              color: "#D32F2F",
+              "&:hover": {
+                bgcolor: alpha("#D32F2F", 0.08),
+              },
+            }}
+          >
+            <DeleteIcon sx={{ fontSize: 18, mr: 1.5 }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Xóa
+            </Typography>
           </MenuItem>
         )}
       </Menu>

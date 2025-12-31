@@ -13,9 +13,9 @@ import {
   FormControlLabel,
   Alert,
   IconButton,
-  Divider,
   Paper,
   CircularProgress,
+  alpha,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -24,17 +24,13 @@ import {
   Shield as ShieldIcon,
   AdminPanelSettings as AdminIcon,
   Save as SaveIcon,
+  Security as SecurityIcon,
+  Info as InfoIcon,
 } from "@mui/icons-material";
 
 /**
- * ChangeRoleDialog Component
- * Modal cho phép Admin thay đổi vai trò (Role) của người dùng
- *
- * @param {boolean} open - Trạng thái mở/đóng dialog
- * @param {Function} onClose - Callback khi đóng dialog
- * @param {Object} user - User object cần thay đổi role
- * @param {Function} onConfirm - Callback khi xác nhận thay đổi (userId, newRole)
- * @param {boolean} loading - Trạng thái loading khi gọi API
+ * ChangeRoleDialog Component - VLU Design System v2.0.1
+ * UPDATED: Tăng font sizes - giữ nguyên 100% logic và interface
  */
 const ChangeRoleDialog = ({
   open,
@@ -45,163 +41,153 @@ const ChangeRoleDialog = ({
 }) => {
   const [selectedRole, setSelectedRole] = useState("");
 
-  // Role configuration với icon và mô tả
   const ROLES = [
     {
       value: "User",
-      label: "User (Người dùng)",
+      label: "User",
+      sublabel: "Người dùng",
       description:
-        "Quyền hạn: Xem, tìm kiếm và tải xuống tài liệu. Bình luận và đánh giá.",
-      icon: <PersonIcon />,
+        "Xem, tìm kiếm và tải xuống tài liệu. Bình luận và đánh giá.",
+      icon: PersonIcon,
       color: "#757575",
+      bgColor: "#F5F5F5",
     },
     {
       value: "Author",
-      label: "Author (Tác giả)",
+      label: "Author",
+      sublabel: "Tác giả",
       description:
         "Bao gồm quyền User. Được phép tải lên và quản lý tài liệu của chính mình.",
-      icon: <CreateIcon />,
+      icon: CreateIcon,
       color: "#388E3C",
+      bgColor: "#E8F5E9",
     },
     {
       value: "Moderator",
-      label: "Moderator (Kiểm duyệt viên)",
+      label: "Moderator",
+      sublabel: "Kiểm duyệt viên",
       description:
         "Được phép xem xét, phê duyệt hoặc từ chối các tài liệu do Author gửi lên.",
-      icon: <ShieldIcon />,
+      icon: ShieldIcon,
       color: "#1976D2",
+      bgColor: "#E3F2FD",
     },
     {
       value: "Admin",
-      label: "Admin (Quản trị viên)",
+      label: "Admin",
+      sublabel: "Quản trị viên",
       description:
         "Quyền truy cập toàn bộ hệ thống. Quản lý người dùng, danh mục và cấu hình.",
-      icon: <AdminIcon />,
+      icon: AdminIcon,
       color: "#D32F2F",
+      bgColor: "#FFEBEE",
     },
   ];
 
-  // Set initial role when user changes
   useEffect(() => {
-    if (user?.role) {
-      setSelectedRole(user.role);
-    }
+    if (user?.role) setSelectedRole(user.role);
   }, [user]);
 
-  /**
-   * Handle role selection change
-   */
-  const handleRoleChange = (event) => {
-    setSelectedRole(event.target.value);
-  };
-
-  /**
-   * Handle confirm button click
-   */
+  const handleRoleChange = (event) => setSelectedRole(event.target.value);
   const handleConfirm = () => {
-    if (user && selectedRole && selectedRole !== user.role) {
+    if (user && selectedRole && selectedRole !== user.role)
       onConfirm(user._id || user.id, selectedRole);
-    }
   };
-
-  /**
-   * Check if role is unchanged
-   */
   const isRoleUnchanged = selectedRole === user?.role;
-
-  /**
-   * Get role config by value
-   */
-  const getRoleConfig = (roleValue) => {
-    return ROLES.find((r) => r.value === roleValue) || ROLES[0];
-  };
-
-  /**
-   * Get user initials for avatar
-   */
+  const getRoleConfig = (roleValue) =>
+    ROLES.find((r) => r.value === roleValue) || ROLES[0];
   const getInitials = (name) => {
     if (!name) return "?";
     const words = name.trim().split(" ");
-    if (words.length >= 2) {
+    if (words.length >= 2)
       return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
-    }
     return name[0].toUpperCase();
   };
 
   if (!user) return null;
-
   const currentRoleConfig = getRoleConfig(user.role);
 
   return (
     <Dialog
       open={open}
       onClose={loading ? undefined : onClose}
-      maxWidth="xs"
+      maxWidth="sm"
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          boxShadow: 24,
-        },
-      }}
+      PaperProps={{ sx: { borderRadius: "24px", overflow: "hidden" } }}
     >
-      {/* Dialog Header */}
       <DialogTitle
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          pb: 2,
-          borderBottom: "1px solid",
-          borderColor: "divider",
+          background: "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
+          color: "white",
+          p: 0,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 1.5,
-              backgroundColor: "primary.main",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-            }}
-          >
-            <ShieldIcon />
-          </Box>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Phân quyền người dùng
-          </Typography>
-        </Box>
-        <IconButton
-          onClick={onClose}
-          disabled={loading}
-          size="small"
+        <Box
           sx={{
-            color: "text.secondary",
-            "&:hover": {
-              backgroundColor: "action.hover",
-            },
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: 3,
           }}
         >
-          <CloseIcon />
-        </IconButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "14px",
+                bgcolor: "rgba(255,255,255,0.2)",
+                backdropFilter: "blur(10px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <SecurityIcon sx={{ fontSize: 24 }} />
+            </Box>
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                  fontSize: "1.25rem",
+                }}
+              >
+                Phân quyền người dùng
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ opacity: 0.9, mt: 0.25, fontSize: "0.9375rem" }}
+              >
+                Thay đổi vai trò và quyền hạn
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            disabled={loading}
+            sx={{
+              color: "white",
+              bgcolor: "rgba(255,255,255,0.1)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
       </DialogTitle>
 
-      {/* Dialog Content */}
-      <DialogContent sx={{ pt: 3, pb: 2 }}>
-        {/* User Info Card */}
+      <DialogContent sx={{ p: 3, pt: 4 }}>
         <Paper
           elevation={0}
           sx={{
-            p: 2,
+            p: 2.5,
             mb: 3,
-            backgroundColor: "grey.50",
+            borderRadius: "16px",
+            bgcolor: "#FAFAFC",
             border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
+            borderColor: "#E0E0E0",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -211,9 +197,10 @@ const ChangeRoleDialog = ({
               sx={{
                 width: 56,
                 height: 56,
-                backgroundColor: currentRoleConfig.color,
+                background: `linear-gradient(135deg, ${currentRoleConfig.color} 0%, ${alpha(currentRoleConfig.color, 0.7)} 100%)`,
                 fontWeight: 600,
                 fontSize: "1.25rem",
+                boxShadow: `0 4px 14px ${alpha(currentRoleConfig.color, 0.3)}`,
               }}
             >
               {getInitials(user.name)}
@@ -223,15 +210,16 @@ const ChangeRoleDialog = ({
                 variant="body1"
                 sx={{
                   fontWeight: 600,
-                  color: "text.primary",
+                  color: "#1A1A2E",
                   mb: 0.5,
+                  fontSize: "1rem",
                 }}
               >
                 {user.name}
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "text.secondary", mb: 0.5 }}
+                sx={{ color: "#8E8EA9", mb: 1, fontSize: "0.9375rem" }}
               >
                 {user.email}
               </Typography>
@@ -239,29 +227,26 @@ const ChangeRoleDialog = ({
                 sx={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 0.5,
-                  px: 1,
-                  py: 0.25,
-                  backgroundColor: "white",
-                  borderRadius: 1,
-                  border: "1px solid",
-                  borderColor: "divider",
+                  gap: 0.75,
+                  px: 1.5,
+                  py: 0.5,
+                  bgcolor: currentRoleConfig.bgColor,
+                  borderRadius: "8px",
                 }}
               >
-                <Box
-                  sx={{
-                    color: currentRoleConfig.color,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  {currentRoleConfig.icon}
-                </Box>
+                {(() => {
+                  const IconComp = currentRoleConfig.icon;
+                  return (
+                    <IconComp
+                      sx={{ fontSize: 16, color: currentRoleConfig.color }}
+                    />
+                  );
+                })()}
                 <Typography
-                  variant="caption"
                   sx={{
                     fontWeight: 600,
                     color: currentRoleConfig.color,
+                    fontSize: "0.8125rem",
                   }}
                 >
                   {currentRoleConfig.label}
@@ -271,138 +256,171 @@ const ChangeRoleDialog = ({
           </Box>
         </Paper>
 
-        {/* Section Title */}
         <Typography
-          variant="subtitle2"
           sx={{
-            fontWeight: 600,
-            color: "text.secondary",
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
+            color: "#8E8EA9",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            display: "block",
             mb: 2,
             fontSize: "0.75rem",
+            textTransform: "uppercase",
           }}
         >
           Chọn vai trò mới
         </Typography>
 
-        {/* Role Selection */}
         <RadioGroup value={selectedRole} onChange={handleRoleChange}>
-          {ROLES.map((role, index) => (
-            <Box key={role.value}>
-              <FormControlLabel
-                value={role.value}
-                disabled={loading}
-                control={
-                  <Radio
-                    sx={{
-                      color: "primary.main",
-                      "&.Mui-checked": {
-                        color: role.color,
-                      },
-                    }}
-                  />
-                }
-                label={
-                  <Box sx={{ py: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {ROLES.map((role) => {
+              const RoleIcon = role.icon;
+              const isSelected = selectedRole === role.value;
+              const isCurrent = user.role === role.value;
+
+              return (
+                <Paper
+                  key={role.value}
+                  elevation={0}
+                  onClick={() => !loading && setSelectedRole(role.value)}
+                  sx={{
+                    p: 2,
+                    borderRadius: "14px",
+                    border: "2px solid",
+                    borderColor: isSelected ? role.color : "#E0E0E0",
+                    bgcolor: isSelected ? alpha(role.color, 0.04) : "white",
+                    cursor: loading ? "default" : "pointer",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      borderColor: loading ? "#E0E0E0" : role.color,
+                      bgcolor: loading ? "white" : alpha(role.color, 0.04),
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}
+                  >
+                    <Radio
+                      checked={isSelected}
+                      value={role.value}
+                      disabled={loading}
+                      sx={{
+                        p: 0,
+                        color: "#C4C4D4",
+                        "&.Mui-checked": { color: role.color },
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "10px",
+                        bgcolor: role.bgColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <RoleIcon sx={{ color: role.color, fontSize: 22 }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
                       <Box
-                        sx={{
-                          color: role.color,
-                          display: "flex",
-                          alignItems: "center",
-                        }}
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
                       >
-                        {role.icon}
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontWeight: 600,
+                            color: "#1A1A2E",
+                            fontSize: "0.9375rem",
+                          }}
+                        >
+                          {role.label}
+                        </Typography>
+                        <Typography
+                          sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}
+                        >
+                          ({role.sublabel})
+                        </Typography>
+                        {isCurrent && (
+                          <Box
+                            sx={{
+                              px: 1,
+                              py: 0.25,
+                              bgcolor: "#F0F0F5",
+                              borderRadius: "6px",
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                color: "#8E8EA9",
+                                fontWeight: 600,
+                                fontSize: "0.6875rem",
+                              }}
+                            >
+                              HIỆN TẠI
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: 600,
-                          color: "text.primary",
+                          color: "#8E8EA9",
+                          mt: 0.5,
+                          lineHeight: 1.5,
+                          fontSize: "0.875rem",
                         }}
                       >
-                        {role.label}
+                        {role.description}
                       </Typography>
                     </Box>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "text.secondary",
-                        display: "block",
-                        mt: 0.5,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {role.description}
-                    </Typography>
                   </Box>
-                }
-                sx={{
-                  mx: 0,
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 1.5,
-                  border: "1px solid",
-                  borderColor:
-                    selectedRole === role.value ? role.color : "transparent",
-                  backgroundColor:
-                    selectedRole === role.value
-                      ? `${role.color}08`
-                      : "transparent",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    backgroundColor:
-                      selectedRole === role.value
-                        ? `${role.color}12`
-                        : "action.hover",
-                  },
-                }}
-              />
-              {index < ROLES.length - 1 && <Divider sx={{ my: 1 }} />}
-            </Box>
-          ))}
+                </Paper>
+              );
+            })}
+          </Box>
         </RadioGroup>
 
-        {/* Warning Alert */}
-        <Alert
-          severity="warning"
-          icon={false}
+        <Box
           sx={{
+            display: "flex",
+            gap: 2,
+            p: 2,
             mt: 3,
-            backgroundColor: "warning.lighter",
+            borderRadius: "12px",
+            bgcolor: "#FEF3C7",
             border: "1px solid",
-            borderColor: "warning.light",
-            "& .MuiAlert-message": {
-              fontSize: "0.8125rem",
-            },
+            borderColor: "#FDE68A",
           }}
         >
-          <Typography variant="caption" sx={{ fontWeight: 500 }}>
-            Lưu ý: Thay đổi vai trò sẽ cập nhật quyền hạn ngay lập tức và có thể
-            ảnh hưởng đến truy cập của người dùng.
+          <InfoIcon
+            sx={{ color: "#B45309", fontSize: 22, flexShrink: 0, mt: 0.25 }}
+          />
+          <Typography
+            variant="body2"
+            sx={{ color: "#92400E", lineHeight: 1.6, fontSize: "0.9375rem" }}
+          >
+            Thay đổi vai trò sẽ cập nhật quyền hạn ngay lập tức và có thể ảnh
+            hưởng đến truy cập của người dùng.
           </Typography>
-        </Alert>
+        </Box>
       </DialogContent>
 
-      {/* Dialog Actions */}
-      <DialogActions
-        sx={{
-          px: 3,
-          py: 2,
-          borderTop: "1px solid",
-          borderColor: "divider",
-          gap: 1,
-        }}
-      >
+      <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1.5 }}>
         <Button
           onClick={onClose}
           disabled={loading}
           variant="outlined"
           sx={{
-            minWidth: 100,
-            textTransform: "none",
+            minWidth: 120,
+            borderRadius: "12px",
             fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            borderColor: "#E0E0E0",
+            color: "#4A4A68",
+            "&:hover": { borderColor: "#C4C4D4", bgcolor: "#F0F0F5" },
           }}
         >
           Hủy bỏ
@@ -413,15 +431,24 @@ const ChangeRoleDialog = ({
           variant="contained"
           startIcon={
             loading ? (
-              <CircularProgress size={16} color="inherit" />
+              <CircularProgress size={18} color="inherit" />
             ) : (
               <SaveIcon />
             )
           }
           sx={{
-            minWidth: 140,
-            textTransform: "none",
+            minWidth: 160,
+            borderRadius: "12px",
             fontWeight: 600,
+            py: 1.25,
+            fontSize: "0.9375rem",
+            bgcolor: "#2196F3",
+            boxShadow: "0 4px 14px rgba(33, 150, 243, 0.4)",
+            "&:hover": {
+              bgcolor: "#1976D2",
+              boxShadow: "0 6px 20px rgba(33, 150, 243, 0.5)",
+            },
+            "&:disabled": { bgcolor: "#C4C4D4" },
           }}
         >
           {loading ? "Đang lưu..." : "Lưu thay đổi"}

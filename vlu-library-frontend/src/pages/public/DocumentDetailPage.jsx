@@ -1,8 +1,6 @@
 /**
- * DocumentDetailPage
- * Trang chi tiết tài liệu cho Public/User/Author
- *
- * Đường dẫn: src/pages/public/DocumentDetailPage.jsx
+ * DocumentDetailPage - VLU Design System v2.0
+ * Modern & Bold document detail page với visual-first approach
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -15,10 +13,6 @@ import {
   Tabs,
   Tab,
   Paper,
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
   CircularProgress,
   Snackbar,
   Alert,
@@ -28,12 +22,28 @@ import {
   DialogActions,
   Button,
   Chip,
+  alpha,
+  Skeleton,
+  IconButton,
 } from "@mui/material";
 import {
   Home as HomeIcon,
   ChevronRight as ChevronRightIcon,
   PictureAsPdf as PdfIcon,
   MenuBook as EpubIcon,
+  Info as InfoIcon,
+  AutoStories as ReadIcon,
+  Star as StarIcon,
+  ChatBubble as CommentIcon,
+  Login as LoginIcon,
+  Close as CloseIcon,
+  Lock as LockIcon,
+  Person as PersonIcon,
+  Business as PublisherIcon,
+  CalendarToday as CalendarIcon,
+  Layers as PagesIcon,
+  Storage as SizeIcon,
+  Category as FormatIcon,
 } from "@mui/icons-material";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -44,8 +54,6 @@ import RelatedDocuments from "../../components/documents/RelatedDocuments";
 import ReviewSection from "../../components/reviews/ReviewSection";
 import CommentSection from "../../components/comments/CommentSection";
 import documentsAPI from "../../api/documents.api";
-
-// Import FileViewer từ common (thay thế PDFViewer cũ)
 import { FileViewer } from "../../components/common/file-viewer";
 
 const DocumentDetailPage = () => {
@@ -95,14 +103,10 @@ const DocumentDetailPage = () => {
 
   /**
    * Tạo URL đầy đủ cho file viewer
-   * REACT_APP_API_URL có thể là:
-   * - http://localhost:5000 (không có /api)
-   * - http://localhost:5000/api (đã có /api)
    */
   const getFileUrl = () => {
     if (!document) return "";
     const baseURL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    // Kiểm tra xem baseURL đã có /api chưa
     const apiPath = baseURL.endsWith("/api") ? "" : "/api";
     return `${baseURL}${apiPath}/documents/${document.id || document._id}/read`;
   };
@@ -133,8 +137,14 @@ const DocumentDetailPage = () => {
         icon={isEpub ? <EpubIcon /> : <PdfIcon />}
         label={isEpub ? "EPUB" : "PDF"}
         size="small"
-        color={isEpub ? "warning" : "error"}
-        sx={{ fontWeight: 600 }}
+        sx={{
+          fontWeight: 700,
+          bgcolor: isEpub ? alpha("#FF7043", 0.1) : alpha("#D32F2F", 0.1),
+          color: isEpub ? "#FF7043" : "#D32F2F",
+          "& .MuiChip-icon": {
+            color: isEpub ? "#FF7043" : "#D32F2F",
+          },
+        }}
       />
     );
   };
@@ -156,60 +166,255 @@ const DocumentDetailPage = () => {
     navigate("/login");
   };
 
+  // Tab configuration với icons
+  const tabs = [
+    { label: "Thông tin chi tiết", icon: <InfoIcon /> },
+    { label: "Đọc tài liệu", icon: <ReadIcon /> },
+    { label: "Đánh giá", icon: <StarIcon /> },
+    { label: "Bình luận", icon: <CommentIcon /> },
+  ];
+
+  // Detail info items cho Tab 0
+  const getDetailItems = () => {
+    if (!document) return [];
+
+    const items = [];
+
+    if (document.author) {
+      items.push({
+        icon: PersonIcon,
+        label: "Tác giả",
+        value: document.author,
+        color: "#2196F3",
+      });
+    }
+
+    if (document.publisher) {
+      items.push({
+        icon: PublisherIcon,
+        label: "Nhà xuất bản",
+        value: document.publisher,
+        color: "#7C4DFF",
+      });
+    }
+
+    if (document.publishYear) {
+      items.push({
+        icon: CalendarIcon,
+        label: "Năm xuất bản",
+        value: document.publishYear,
+        color: "#4CAF50",
+      });
+    }
+
+    if (document.pageCount) {
+      items.push({
+        icon: PagesIcon,
+        label: "Số trang",
+        value: `${document.pageCount} trang`,
+        color: "#FF7043",
+      });
+    }
+
+    items.push({
+      icon: SizeIcon,
+      label: "Kích thước",
+      value: `${(document.fileSize / (1024 * 1024)).toFixed(2)} MB`,
+      color: "#00BCD4",
+    });
+
+    items.push({
+      icon: FormatIcon,
+      label: "Định dạng",
+      value: renderFormatBadge(),
+      color: "#EC407A",
+      isChip: true,
+    });
+
+    return items;
+  };
+
+  // Loading state
   if (loading) {
     return (
-      <>
+      <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
         <Header />
-        <Container maxWidth="lg" sx={{ mt: 4 }}>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              minHeight: "60vh",
-              alignItems: "center",
-            }}
-          >
-            <CircularProgress />
+        <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+          {/* Breadcrumb Skeleton */}
+          <Skeleton
+            variant="text"
+            width={300}
+            height={24}
+            sx={{ mb: 3, borderRadius: "8px" }}
+          />
+
+          {/* DocumentInfo Skeleton */}
+          <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
+            <Skeleton
+              variant="rounded"
+              width={280}
+              height={373}
+              sx={{ borderRadius: "16px", flexShrink: 0 }}
+            />
+            <Box sx={{ flex: 1 }}>
+              <Skeleton
+                variant="rounded"
+                width={120}
+                height={32}
+                sx={{ mb: 2, borderRadius: "8px" }}
+              />
+              <Skeleton variant="text" width="80%" height={48} sx={{ mb: 2 }} />
+              <Skeleton variant="text" width="60%" height={24} sx={{ mb: 3 }} />
+              <Skeleton
+                variant="rounded"
+                height={80}
+                sx={{ mb: 3, borderRadius: "12px" }}
+              />
+              <Skeleton
+                variant="text"
+                width="100%"
+                height={60}
+                sx={{ mb: 3 }}
+              />
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Skeleton
+                  variant="rounded"
+                  width={180}
+                  height={48}
+                  sx={{ borderRadius: "12px" }}
+                />
+                <Skeleton
+                  variant="rounded"
+                  width={150}
+                  height={48}
+                  sx={{ borderRadius: "12px" }}
+                />
+              </Box>
+            </Box>
           </Box>
+
+          {/* Tabs Skeleton */}
+          <Skeleton
+            variant="rounded"
+            height={400}
+            sx={{ borderRadius: "20px" }}
+          />
         </Container>
-      </>
+      </Box>
     );
   }
 
+  // Not found state
   if (!document) {
     return (
-      <>
+      <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
         <Header />
-        <Container maxWidth="lg" sx={{ mt: 4 }}>
-          <Typography variant="h5">Không tìm thấy tài liệu</Typography>
+        <Container maxWidth="lg" sx={{ pt: 4 }}>
+          <Box
+            sx={{
+              textAlign: "center",
+              py: 10,
+              px: 3,
+              bgcolor: "white",
+              borderRadius: "24px",
+              boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+            }}
+          >
+            <Box
+              sx={{
+                width: 100,
+                height: 100,
+                mx: "auto",
+                mb: 3,
+                borderRadius: "50%",
+                bgcolor: "#FFF5F5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <InfoIcon sx={{ fontSize: 48, color: "#D32F2F" }} />
+            </Box>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
+            >
+              Không tìm thấy tài liệu
+            </Typography>
+            <Typography variant="body1" sx={{ color: "#8E8EA9", mb: 3 }}>
+              Tài liệu bạn đang tìm kiếm có thể đã bị xóa hoặc không tồn tại.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => navigate("/documents")}
+              sx={{
+                bgcolor: "#D32F2F",
+                borderRadius: "12px",
+                px: 4,
+                py: 1.5,
+                fontWeight: 600,
+                textTransform: "none",
+                boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+                "&:hover": {
+                  bgcolor: "#B71C1C",
+                },
+              }}
+            >
+              Quay lại thư viện
+            </Button>
+          </Box>
         </Container>
-      </>
+      </Box>
     );
   }
 
   return (
-    <>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
       <Header />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+        {/* ========== BREADCRUMBS ========== */}
         <Breadcrumbs
-          separator={<ChevronRightIcon fontSize="small" />}
-          sx={{ mb: 3 }}
+          separator={
+            <ChevronRightIcon sx={{ fontSize: 18, color: "#C4C4D4" }} />
+          }
+          sx={{
+            mb: 3,
+            "& .MuiBreadcrumbs-ol": {
+              flexWrap: "nowrap",
+            },
+          }}
         >
           <Link
             component={RouterLink}
             to="/"
             underline="hover"
-            color="inherit"
-            sx={{ display: "flex", alignItems: "center" }}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              color: "#8E8EA9",
+              fontWeight: 500,
+              fontSize: "0.875rem",
+              "&:hover": {
+                color: "#D32F2F",
+              },
+            }}
           >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+            <HomeIcon sx={{ mr: 0.5, fontSize: 18 }} />
             Trang chủ
           </Link>
           <Link
             component={RouterLink}
             to="/documents"
             underline="hover"
-            color="inherit"
+            sx={{
+              color: "#8E8EA9",
+              fontWeight: 500,
+              fontSize: "0.875rem",
+              "&:hover": {
+                color: "#D32F2F",
+              },
+            }}
           >
             Tài liệu
           </Link>
@@ -218,14 +423,34 @@ const DocumentDetailPage = () => {
               component={RouterLink}
               to={`/documents?category=${document.category.id}`}
               underline="hover"
-              color="inherit"
+              sx={{
+                color: "#8E8EA9",
+                fontWeight: 500,
+                fontSize: "0.875rem",
+                "&:hover": {
+                  color: "#D32F2F",
+                },
+              }}
             >
               {document.category.name}
             </Link>
           )}
-          <Typography color="text.primary">{document.title}</Typography>
+          <Typography
+            sx={{
+              color: "#1A1A2E",
+              fontWeight: 600,
+              fontSize: "0.875rem",
+              maxWidth: 200,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {document.title}
+          </Typography>
         </Breadcrumbs>
 
+        {/* ========== DOCUMENT INFO HERO ========== */}
         <DocumentInfo
           document={document}
           onRead={handleRead}
@@ -234,76 +459,205 @@ const DocumentDetailPage = () => {
           isAuthenticated={isAuthenticated}
         />
 
+        {/* ========== TABS SECTION ========== */}
         <Paper
           elevation={0}
-          sx={{ border: "1px solid", borderColor: "divider", mt: 4 }}
+          sx={{
+            mt: 4,
+            borderRadius: "20px",
+            overflow: "hidden",
+            bgcolor: "white",
+            boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+            border: "1px solid #F0F0F5",
+          }}
         >
-          <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
-            <Tab label="Thông tin chi tiết" />
-            <Tab label="Đọc tài liệu" />
-            <Tab label="Đánh giá" />
-            <Tab label="Bình luận" />
-          </Tabs>
+          {/* Tab Headers */}
+          <Box
+            sx={{
+              borderBottom: "1px solid #F0F0F5",
+              px: { xs: 2, md: 3 },
+            }}
+          >
+            <Tabs
+              value={tabValue}
+              onChange={(e, v) => setTabValue(v)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                "& .MuiTabs-indicator": {
+                  height: 3,
+                  borderRadius: "3px 3px 0 0",
+                  bgcolor: "#D32F2F",
+                },
+                "& .MuiTab-root": {
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: "0.9375rem",
+                  color: "#8E8EA9",
+                  minHeight: 56,
+                  px: 3,
+                  "&.Mui-selected": {
+                    color: "#D32F2F",
+                  },
+                  "&:hover": {
+                    color: "#4A4A68",
+                    bgcolor: alpha("#D32F2F", 0.04),
+                  },
+                },
+              }}
+            >
+              {tabs.map((tab, index) => (
+                <Tab
+                  key={index}
+                  label={tab.label}
+                  icon={tab.icon}
+                  iconPosition="start"
+                  sx={{
+                    "& .MuiSvgIcon-root": {
+                      fontSize: 20,
+                      mr: 1,
+                    },
+                  }}
+                />
+              ))}
+            </Tabs>
+          </Box>
 
-          <Box sx={{ p: 3 }}>
-            {/* Tab 0: Thông tin chi tiết */}
+          {/* Tab Content */}
+          <Box sx={{ p: { xs: 2, md: 4 } }}>
+            {/* ========== TAB 0: THÔNG TIN CHI TIẾT ========== */}
             {tabValue === 0 && (
-              <Table>
-                <TableBody>
-                  {document.author && (
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600, width: "30%" }}>
-                        Tác giả
-                      </TableCell>
-                      <TableCell>{document.author}</TableCell>
-                    </TableRow>
-                  )}
-                  {document.publisher && (
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        Nhà xuất bản
-                      </TableCell>
-                      <TableCell>{document.publisher}</TableCell>
-                    </TableRow>
-                  )}
-                  {document.publishYear && (
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        Năm xuất bản
-                      </TableCell>
-                      <TableCell>{document.publishYear}</TableCell>
-                    </TableRow>
-                  )}
-                  {document.pageCount && (
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Số trang</TableCell>
-                      <TableCell>{document.pageCount}</TableCell>
-                    </TableRow>
-                  )}
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Kích thước</TableCell>
-                    <TableCell>
-                      {(document.fileSize / (1024 * 1024)).toFixed(2)} MB
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Định dạng</TableCell>
-                    <TableCell>{renderFormatBadge()}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <Box>
+                {/* Detail Grid */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(2, 1fr)",
+                      md: "repeat(3, 1fr)",
+                    },
+                    gap: 2,
+                  }}
+                >
+                  {getDetailItems().map((item, index) => {
+                    const Icon = item.icon;
+                    return (
+                      <Box
+                        key={index}
+                        sx={{
+                          p: 2.5,
+                          borderRadius: "14px",
+                          bgcolor: "#FAFAFC",
+                          border: "1px solid #F0F0F5",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            bgcolor: alpha(item.color, 0.04),
+                            borderColor: alpha(item.color, 0.2),
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: "12px",
+                            bgcolor: alpha(item.color, 0.1),
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon sx={{ fontSize: 22, color: item.color }} />
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "#8E8EA9",
+                              fontWeight: 500,
+                              display: "block",
+                              mb: 0.25,
+                            }}
+                          >
+                            {item.label}
+                          </Typography>
+                          {item.isChip ? (
+                            item.value
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: "#1A1A2E",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.value}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+
+                {/* Description Section */}
+                {document.description && (
+                  <Box sx={{ mt: 4 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 700,
+                        color: "#1A1A2E",
+                        mb: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <InfoIcon sx={{ fontSize: 20, color: "#D32F2F" }} />
+                      Mô tả tài liệu
+                    </Typography>
+                    <Box
+                      sx={{
+                        p: 3,
+                        borderRadius: "14px",
+                        bgcolor: "#FAFAFC",
+                        border: "1px solid #F0F0F5",
+                      }}
+                    >
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          color: "#4A4A68",
+                          lineHeight: 1.8,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {document.description}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             )}
 
-            {/* Tab 1: Đọc tài liệu - Sử dụng FileViewer */}
-            {/* FIX: Thêm overflow: hidden và position: relative để ngăn content tràn ra ngoài */}
+            {/* ========== TAB 1: ĐỌC TÀI LIỆU ========== */}
             {tabValue === 1 && (
               <Box
                 sx={{
-                  height: "70vh",
+                  height: "75vh",
                   position: "relative",
-                  overflow: "hidden", // FIX: Ngăn content tràn ra ngoài
-                  borderRadius: 1,
-                  // Đảm bảo FileViewer không vượt quá container
+                  overflow: "hidden",
+                  borderRadius: "14px",
+                  bgcolor: "#1A1A2E",
                   "& > *": {
                     maxWidth: "100%",
                     maxHeight: "100%",
@@ -322,14 +676,14 @@ const DocumentDetailPage = () => {
               </Box>
             )}
 
-            {/* Tab 2: Đánh giá */}
+            {/* ========== TAB 2: ĐÁNH GIÁ ========== */}
             {tabValue === 2 && (
               <Box>
                 <ReviewSection docId={id} />
               </Box>
             )}
 
-            {/* Tab 3: Bình luận */}
+            {/* ========== TAB 3: BÌNH LUẬN ========== */}
             {tabValue === 3 && (
               <Box>
                 <CommentSection docId={id} />
@@ -338,26 +692,98 @@ const DocumentDetailPage = () => {
           </Box>
         </Paper>
 
+        {/* ========== RELATED DOCUMENTS ========== */}
         <RelatedDocuments
           categoryId={document.category?.id}
           currentDocId={id}
         />
       </Container>
 
-      {/* Login Dialog */}
-      <Dialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)}>
-        <DialogTitle>Yêu cầu đăng nhập</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Bạn cần đăng nhập để đọc và tải xuống tài liệu.
+      {/* ========== LOGIN DIALOG ========== */}
+      <Dialog
+        open={loginDialogOpen}
+        onClose={() => setLoginDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            maxWidth: 400,
+            boxShadow: "0 24px 48px rgba(26,26,46,0.2)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 0 }}>
+          <Box
+            sx={{
+              background:
+                "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 50%, #FFC107 100%)",
+              p: 3,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: "12px",
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <LockIcon sx={{ fontSize: 24, color: "white" }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "white" }}>
+                Yêu cầu đăng nhập
+              </Typography>
+            </Box>
+            <IconButton
+              onClick={() => setLoginDialogOpen(false)}
+              sx={{ color: "white" }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, pt: 3 }}>
+          <Typography sx={{ color: "#4A4A68", lineHeight: 1.7 }}>
+            Bạn cần đăng nhập để đọc và tải xuống tài liệu. Hãy đăng nhập bằng
+            tài khoản sinh viên/giảng viên VLU để tiếp tục.
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLoginDialogOpen(false)}>Hủy</Button>
+
+        <DialogActions sx={{ p: 3, pt: 0, gap: 1.5 }}>
+          <Button
+            onClick={() => setLoginDialogOpen(false)}
+            sx={{
+              color: "#4A4A68",
+              borderRadius: "12px",
+              px: 3,
+              fontWeight: 600,
+              textTransform: "none",
+            }}
+          >
+            Hủy
+          </Button>
           <Button
             variant="contained"
             onClick={handleLoginRedirect}
-            sx={{ bgcolor: "error.main" }}
+            startIcon={<LoginIcon />}
+            sx={{
+              bgcolor: "#D32F2F",
+              borderRadius: "12px",
+              px: 3,
+              fontWeight: 600,
+              textTransform: "none",
+              boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
+              "&:hover": {
+                bgcolor: "#B71C1C",
+              },
+            }}
           >
             Đăng nhập
           </Button>
@@ -377,12 +803,15 @@ const DocumentDetailPage = () => {
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          variant="filled"
+          sx={{
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </>
+    </Box>
   );
 };
 

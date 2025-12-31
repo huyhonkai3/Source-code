@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Box, Grid, Snackbar, Alert, Typography } from "@mui/material";
+import { Box, Grid, Snackbar, Alert, Typography, alpha } from "@mui/material";
+import {
+  Star as StarIcon,
+  CheckCircle as CheckIcon,
+} from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import reviewsAPI from "../../api/reviews.api";
@@ -10,7 +14,7 @@ import EditReviewDialog from "./EditReviewDialog";
 import DeleteReviewDialog from "./DeleteReviewDialog";
 
 /**
- * ReviewSection Component
+ * ReviewSection Component - VLU Design System v2.0
  * Container component quản lý toàn bộ review system
  *
  * @param {string} docId - ID của tài liệu
@@ -50,8 +54,6 @@ const ReviewSection = ({ docId }) => {
         page: 1,
         limit: 10,
       });
-
-      console.log(response);
 
       if (response.status === "success") {
         setReviews(response.data.reviews);
@@ -107,17 +109,13 @@ const ReviewSection = ({ docId }) => {
       });
 
       if (response.status === "success") {
-        // Success
         setSnackbar({
           open: true,
           message: "Cảm ơn! Đánh giá của bạn đã được lưu.",
           severity: "success",
         });
 
-        // Set hasReviewed to true
         setHasReviewed(true);
-
-        // Refresh reviews
         await fetchReviews();
       }
     } catch (error) {
@@ -230,22 +228,46 @@ const ReviewSection = ({ docId }) => {
   };
 
   return (
-    <Box sx={{ py: 4 }}>
-      {/* Section Title */}
-      <Typography
-        variant="h5"
+    <Box>
+      {/* ========== SECTION HEADER ========== */}
+      <Box
         sx={{
-          fontWeight: 700,
-          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          mb: 4,
         }}
       >
-        Đánh giá tài liệu
-      </Typography>
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: "12px",
+            bgcolor: alpha("#FFC107", 0.15),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <StarIcon sx={{ fontSize: 24, color: "#F9A825" }} />
+        </Box>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: "#1A1A2E" }}>
+            Đánh giá tài liệu
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+            Xem và chia sẻ đánh giá về tài liệu này
+          </Typography>
+        </Box>
+      </Box>
 
+      {/* ========== MAIN CONTENT ========== */}
       <Grid container spacing={3}>
         {/* Left Column: Rating Summary */}
         <Grid item xs={12} md={4}>
-          <RatingSummary statistics={statistics} />
+          <Box sx={{ position: "sticky", top: 100 }}>
+            <RatingSummary statistics={statistics} />
+          </Box>
         </Grid>
 
         {/* Right Column: Review Form + Review List */}
@@ -264,9 +286,44 @@ const ReviewSection = ({ docId }) => {
 
           {/* User already reviewed message */}
           {hasReviewed && (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Bạn đã đánh giá tài liệu này rồi. Cảm ơn đã đóng góp ý kiến!
-            </Alert>
+            <Box
+              sx={{
+                mb: 3,
+                p: 2.5,
+                borderRadius: "14px",
+                bgcolor: alpha("#4CAF50", 0.08),
+                border: "1px solid",
+                borderColor: alpha("#4CAF50", 0.2),
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "10px",
+                  bgcolor: alpha("#4CAF50", 0.15),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <CheckIcon sx={{ fontSize: 22, color: "#4CAF50" }} />
+              </Box>
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, color: "#2E7D32" }}
+                >
+                  Bạn đã đánh giá tài liệu này
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#4A4A68" }}>
+                  Cảm ơn bạn đã đóng góp ý kiến!
+                </Typography>
+              </Box>
+            </Box>
           )}
 
           {/* Review List */}
@@ -281,7 +338,7 @@ const ReviewSection = ({ docId }) => {
         </Grid>
       </Grid>
 
-      {/* Edit Review Dialog */}
+      {/* ========== DIALOGS ========== */}
       <EditReviewDialog
         open={editDialog.open}
         review={editDialog.review}
@@ -290,7 +347,6 @@ const ReviewSection = ({ docId }) => {
         loading={editLoading}
       />
 
-      {/* Delete Review Dialog */}
       <DeleteReviewDialog
         open={deleteDialog.open}
         review={deleteDialog.review}
@@ -299,17 +355,20 @@ const ReviewSection = ({ docId }) => {
         loading={deleteLoading}
       />
 
-      {/* Snackbar */}
+      {/* ========== SNACKBAR ========== */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          variant="filled"
+          sx={{
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          }}
         >
           {snackbar.message}
         </Alert>

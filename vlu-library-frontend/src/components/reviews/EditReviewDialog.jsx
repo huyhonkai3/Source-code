@@ -10,12 +10,19 @@ import {
   Box,
   Typography,
   IconButton,
+  alpha,
+  CircularProgress,
 } from "@mui/material";
-import { Close as CloseIcon, Star as StarIcon } from "@mui/icons-material";
+import {
+  Close as CloseIcon,
+  Star as StarIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+} from "@mui/icons-material";
 
 /**
- * EditReviewDialog Component
- * Dialog để chỉnh sửa đánh giá
+ * EditReviewDialog Component - VLU Design System v2.0
+ * Modern & Bold dialog để chỉnh sửa đánh giá
  *
  * @param {boolean} open - Dialog open state
  * @param {Object} review - Review object to edit
@@ -31,6 +38,7 @@ const EditReviewDialog = ({
   loading = false,
 }) => {
   const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(-1);
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
 
@@ -44,6 +52,34 @@ const EditReviewDialog = ({
       setError("");
     }
   }, [review]);
+
+  /**
+   * Get rating label
+   */
+  const getRatingLabel = (value) => {
+    const labels = {
+      1: "Rất kém",
+      2: "Kém",
+      3: "Trung bình",
+      4: "Tốt",
+      5: "Tuyệt vời",
+    };
+    return labels[value] || "";
+  };
+
+  /**
+   * Get rating color
+   */
+  const getRatingColor = (value) => {
+    const colors = {
+      1: "#F44336",
+      2: "#FF9800",
+      3: "#FFC107",
+      4: "#8BC34A",
+      5: "#4CAF50",
+    };
+    return colors[value] || "#FFC107";
+  };
 
   /**
    * Handle rating change
@@ -65,7 +101,6 @@ const EditReviewDialog = ({
    * Handle save
    */
   const handleSave = () => {
-    // Validation
     if (rating === 0) {
       setError("Vui lòng chọn số sao đánh giá");
       return;
@@ -76,7 +111,6 @@ const EditReviewDialog = ({
       return;
     }
 
-    // Call save callback
     onSave(review._id, { rating, content: content.trim() });
   };
 
@@ -90,6 +124,8 @@ const EditReviewDialog = ({
     }
   };
 
+  const displayValue = hoverRating !== -1 ? hoverRating : rating;
+
   if (!review) return null;
 
   return (
@@ -100,97 +136,148 @@ const EditReviewDialog = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
+          borderRadius: "20px",
+          boxShadow: "0 24px 48px rgba(26,26,46,0.2)",
         },
       }}
     >
-      {/* Header */}
-      <DialogTitle
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          pb: 1,
-        }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Chỉnh sửa đánh giá
-        </Typography>
-        <IconButton
-          onClick={handleClose}
-          disabled={loading}
-          size="small"
+      {/* ========== HEADER ========== */}
+      <DialogTitle sx={{ p: 0 }}>
+        <Box
           sx={{
-            color: "text.secondary",
+            p: 3,
+            borderBottom: "1px solid #F0F0F5",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
-      {/* Content */}
-      <DialogContent>
-        {/* Rating */}
-        <Box sx={{ mb: 3 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              mb: 1,
-              color: "text.secondary",
-            }}
-          >
-            Đánh giá của bạn {rating > 0 && `(${rating} sao)`}
-          </Typography>
-
-          <Rating
-            name="edit-rating"
-            value={rating}
-            onChange={handleRatingChange}
-            precision={1}
-            size="large"
-            disabled={loading}
-            icon={<StarIcon fontSize="inherit" />}
-            emptyIcon={
-              <StarIcon fontSize="inherit" sx={{ color: "grey.300" }} />
-            }
-            sx={{
-              "& .MuiRating-iconFilled": {
-                color: "#FFA500",
-              },
-              "& .MuiRating-iconHover": {
-                color: "#FFB733",
-              },
-            }}
-          />
-
-          {/* Rating text */}
-          {rating > 0 && (
-            <Typography
-              variant="caption"
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box
               sx={{
-                display: "block",
-                mt: 0.5,
-                color: "text.secondary",
+                width: 48,
+                height: 48,
+                borderRadius: "12px",
+                bgcolor: alpha("#2196F3", 0.1),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {rating === 5 && "5/5 - Tuyệt vời"}
-              {rating === 4 && "4/5 - Tốt"}
-              {rating === 3 && "3/5 - Trung bình"}
-              {rating === 2 && "2/5 - Kém"}
-              {rating === 1 && "1/5 - Rất kém"}
-            </Typography>
-          )}
+              <EditIcon sx={{ fontSize: 24, color: "#2196F3" }} />
+            </Box>
+            <Box>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, color: "#1A1A2E" }}
+              >
+                Chỉnh sửa đánh giá
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+                Cập nhật đánh giá của bạn
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={handleClose}
+            disabled={loading}
+            sx={{
+              color: "#8E8EA9",
+              "&:hover": {
+                bgcolor: "#F0F0F5",
+              },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
         </Box>
+      </DialogTitle>
 
-        {/* Content */}
-        <Box sx={{ mb: 2 }}>
+      {/* ========== CONTENT ========== */}
+      <DialogContent sx={{ p: 3 }}>
+        {/* Rating Section */}
+        <Box sx={{ mb: 3 }}>
           <Typography
-            variant="body2"
+            variant="subtitle2"
             sx={{
               fontWeight: 600,
-              mb: 1,
-              color: "text.secondary",
+              mb: 1.5,
+              color: "#1A1A2E",
+            }}
+          >
+            Đánh giá của bạn
+          </Typography>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              p: 2,
+              borderRadius: "14px",
+              bgcolor:
+                displayValue > 0
+                  ? alpha(getRatingColor(displayValue), 0.08)
+                  : "#FAFAFC",
+              border: "1px solid",
+              borderColor:
+                displayValue > 0
+                  ? alpha(getRatingColor(displayValue), 0.2)
+                  : "#F0F0F5",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <Rating
+              name="edit-rating"
+              value={rating}
+              onChange={handleRatingChange}
+              onChangeActive={(event, newHover) => {
+                setHoverRating(newHover);
+              }}
+              precision={1}
+              size="large"
+              disabled={loading}
+              icon={<StarIcon sx={{ fontSize: 32 }} />}
+              emptyIcon={<StarIcon sx={{ fontSize: 32, color: "#E0E0E0" }} />}
+              sx={{
+                "& .MuiRating-iconFilled": {
+                  color: "#FFC107",
+                },
+                "& .MuiRating-iconHover": {
+                  color: "#FFD54F",
+                },
+              }}
+            />
+
+            {displayValue > 0 && (
+              <Box
+                sx={{
+                  px: 2,
+                  py: 0.75,
+                  borderRadius: "8px",
+                  bgcolor: getRatingColor(displayValue),
+                  color: "white",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 700, whiteSpace: "nowrap" }}
+                >
+                  {displayValue}/5 - {getRatingLabel(displayValue)}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {/* Content Section */}
+        <Box>
+          <Typography
+            variant="subtitle2"
+            sx={{
+              fontWeight: 600,
+              mb: 1.5,
+              color: "#1A1A2E",
             }}
           >
             Nhận xét của bạn
@@ -205,18 +292,40 @@ const EditReviewDialog = ({
             disabled={loading}
             error={!!error}
             helperText={error || `${content.length}/1000 ký tự`}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "14px",
+                bgcolor: "#FAFAFC",
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#C4C4D4",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#2196F3",
+                  borderWidth: "2px",
+                },
+              },
+            }}
           />
         </Box>
       </DialogContent>
 
-      {/* Actions */}
-      <DialogActions sx={{ px: 3, pb: 3 }}>
+      {/* ========== ACTIONS ========== */}
+      <DialogActions
+        sx={{
+          p: 3,
+          pt: 0,
+          gap: 1.5,
+        }}
+      >
         <Button
           onClick={handleClose}
           disabled={loading}
           sx={{
-            textTransform: "none",
+            color: "#4A4A68",
+            borderRadius: "12px",
+            px: 3,
             fontWeight: 600,
+            textTransform: "none",
           }}
         >
           Hủy
@@ -225,9 +334,28 @@ const EditReviewDialog = ({
           onClick={handleSave}
           variant="contained"
           disabled={loading || rating === 0}
+          startIcon={
+            loading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              <SaveIcon />
+            )
+          }
           sx={{
-            textTransform: "none",
+            bgcolor: "#2196F3",
+            color: "white",
+            borderRadius: "12px",
+            px: 3,
             fontWeight: 600,
+            textTransform: "none",
+            boxShadow: "0 4px 14px rgba(33,150,243,0.3)",
+            "&:hover": {
+              bgcolor: "#1976D2",
+            },
+            "&.Mui-disabled": {
+              bgcolor: "#E0E0E0",
+              color: "#8E8EA9",
+            },
           }}
         >
           {loading ? "Đang lưu..." : "Lưu thay đổi"}
