@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ import DeleteCommentDialog from "./DeleteCommentDialog";
 /**
  * CommentSection Component - VLU Design System v2.0
  * Container chính quản lý toàn bộ comment system
+ * UPDATED: Hỗ trợ Nested Comments (2 cấp)
  *
  * @param {string} docId - ID của tài liệu
  */
@@ -33,8 +34,9 @@ const CommentSection = ({ docId }) => {
   const { isAuthenticated, user } = useAuth();
 
   // State
-  const [comments, setComments] = useState([]);
+  const [comments, setComments] = useState([]); // Flat array từ API
   const [totalCount, setTotalCount] = useState(0);
+  const [totalRootCount, setTotalRootCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [editDialog, setEditDialog] = useState({ open: false, comment: null });
@@ -51,6 +53,43 @@ const CommentSection = ({ docId }) => {
   });
 
   /**
+   * GROUP COMMENTS: Tách root comments và mapping replies
+   * Sử dụng useMemo để tối ưu performance
+   */
+  const { rootComments, repliesMap } = useMemo(() => {
+    const roots = [];
+    const replies = {};
+
+    comments.forEach((comment) => {
+      const parentId = comment.parentId;
+
+      if (!parentId) {
+        // Root comment
+        roots.push(comment);
+      } else {
+        // Reply - group theo parentId
+        const parentIdStr = parentId.toString();
+        if (!replies[parentIdStr]) {
+          replies[parentIdStr] = [];
+        }
+        replies[parentIdStr].push(comment);
+      }
+    });
+
+    // Sort root comments: newest first
+    roots.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Sort replies: oldest first (để đọc theo thứ tự thời gian)
+    Object.keys(replies).forEach((parentId) => {
+      replies[parentId].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+      );
+    });
+
+    return { rootComments: roots, repliesMap: replies };
+  }, [comments]);
+
+  /**
    * Fetch comments
    */
   const fetchComments = useCallback(async () => {
@@ -58,12 +97,16 @@ const CommentSection = ({ docId }) => {
     try {
       const response = await commentsAPI.getByDocId(docId, {
         page: 1,
-        limit: 20,
+        limit: 100, // Lấy nhiều hơn để bao gồm cả replies
       });
 
       if (response.status === "success") {
         setComments(response.data.comments);
         setTotalCount(response.data.pagination.totalComments);
+        setTotalRootCount(
+          response.data.pagination.totalRootComments ||
+            response.data.pagination.totalComments,
+        );
       }
     } catch (error) {
       console.error("Fetch comments error:", error);
@@ -85,7 +128,7 @@ const CommentSection = ({ docId }) => {
   }, [fetchComments]);
 
   /**
-   * Handle submit comment
+   * Handle submit comment (Root comment)
    */
   const handleSubmitComment = async (content) => {
     setSubmitLoading(true);
@@ -94,11 +137,14 @@ const CommentSection = ({ docId }) => {
       const response = await commentsAPI.add({
         docId,
         content,
+        // parentId không truyền = root comment
       });
 
       if (response.status === "success") {
+        // Thêm comment mới vào đầu list
         setComments([response.data.comment, ...comments]);
-        setTotalCount(totalCount + 1);
+        setTotalCount((prev) => prev + 1);
+        setTotalRootCount((prev) => prev + 1);
 
         setSnackbar({
           open: true,
@@ -124,6 +170,49 @@ const CommentSection = ({ docId }) => {
   };
 
   /**
+   * Handle submit reply
+   * @param {string} content - Nội dung reply
+   * @param {string} parentId - ID của comment cha
+   */
+  const handleSubmitReply = async (content, parentId) => {
+    try {
+      const response = await commentsAPI.add({
+        docId,
+        content,
+        parentId, // Truyền parentId để tạo reply
+      });
+
+      if (response.status === "success") {
+        // Thêm reply vào list (cuối list để sort đúng)
+        setComments([...comments, response.data.comment]);
+        setTotalCount((prev) => prev + 1);
+
+        setSnackbar({
+          open: true,
+          message: "Đã gửi phản hồi",
+          severity: "success",
+        });
+
+        return response.data.comment;
+      }
+    } catch (error) {
+      console.error("Submit reply error:", error);
+
+      const errorMessage =
+        error.response?.data?.message ||
+        "Không thể gửi phản hồi. Vui lòng thử lại.";
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: "error",
+      });
+
+      throw error;
+    }
+  };
+
+  /**
    * Handle edit comment
    */
   const handleEditComment = (comment) => {
@@ -140,8 +229,11 @@ const CommentSection = ({ docId }) => {
       const response = await commentsAPI.update(commentId, { content });
 
       if (response.status === "success") {
+        // Update comment trong list
         setComments(
-          comments.map((c) => (c._id === commentId ? { ...c, content } : c)),
+          comments.map((c) =>
+            (c._id || c.id) === commentId ? { ...c, content } : c,
+          ),
         );
 
         setEditDialog({ open: false, comment: null });
@@ -178,6 +270,7 @@ const CommentSection = ({ docId }) => {
 
   /**
    * Handle confirm delete
+   * NOTE: Khi xóa root comment, backend sẽ xóa luôn replies
    */
   const handleConfirmDelete = async (commentId) => {
     setDeleteLoading(true);
@@ -186,14 +279,35 @@ const CommentSection = ({ docId }) => {
       const response = await commentsAPI.delete(commentId);
 
       if (response.status === "success") {
-        setComments(comments.filter((c) => c._id !== commentId));
-        setTotalCount(totalCount - 1);
+        const deletedCount = response.data?.deletedCount || 1;
+        const deletedComment = deleteDialog.comment;
+        const isRootComment = !deletedComment?.parentId;
 
+        // Remove comment và replies (nếu là root)
+        if (isRootComment) {
+          // Xóa root comment và tất cả replies của nó
+          setComments(
+            comments.filter(
+              (c) =>
+                (c._id || c.id) !== commentId &&
+                c.parentId?.toString() !== commentId,
+            ),
+          );
+          setTotalRootCount((prev) => prev - 1);
+        } else {
+          // Chỉ xóa reply
+          setComments(comments.filter((c) => (c._id || c.id) !== commentId));
+        }
+
+        setTotalCount((prev) => prev - deletedCount);
         setDeleteDialog({ open: false, comment: null });
 
         setSnackbar({
           open: true,
-          message: "Đã xóa bình luận",
+          message:
+            deletedCount > 1
+              ? `Đã xóa bình luận và ${deletedCount - 1} phản hồi`
+              : "Đã xóa bình luận",
           severity: "success",
         });
       }
@@ -220,6 +334,17 @@ const CommentSection = ({ docId }) => {
   const handleLoginClick = () => {
     localStorage.setItem("redirectPath", window.location.pathname);
     navigate("/login");
+  };
+
+  /**
+   * Handle login required (for like/reply without auth)
+   */
+  const handleLoginRequired = () => {
+    setSnackbar({
+      open: true,
+      message: "Vui lòng đăng nhập để thực hiện thao tác này",
+      severity: "warning",
+    });
   };
 
   /**
@@ -387,7 +512,7 @@ const CommentSection = ({ docId }) => {
               </Paper>
             ))}
           </Box>
-        ) : comments.length === 0 ? (
+        ) : rootComments.length === 0 ? (
           // Empty State
           <Paper
             elevation={0}
@@ -426,39 +551,49 @@ const CommentSection = ({ docId }) => {
             </Typography>
           </Paper>
         ) : (
-          // Comments List
+          // Comments List với Nested Replies
           <>
-            {comments.map((comment, index) => (
-              <Box
-                key={comment._id}
-                sx={{
-                  animation: "fadeInUp 0.4s ease forwards",
-                  animationDelay: `${index * 0.05}s`,
-                  opacity: 0,
-                  "@keyframes fadeInUp": {
-                    from: {
-                      opacity: 0,
-                      transform: "translateY(10px)",
+            {rootComments.map((comment, index) => {
+              const commentId = comment._id || comment.id;
+              const replies = repliesMap[commentId] || [];
+
+              return (
+                <Box
+                  key={commentId}
+                  sx={{
+                    animation: "fadeInUp 0.4s ease forwards",
+                    animationDelay: `${index * 0.05}s`,
+                    opacity: 0,
+                    "@keyframes fadeInUp": {
+                      from: {
+                        opacity: 0,
+                        transform: "translateY(10px)",
+                      },
+                      to: {
+                        opacity: 1,
+                        transform: "translateY(0)",
+                      },
                     },
-                    to: {
-                      opacity: 1,
-                      transform: "translateY(0)",
-                    },
-                  },
-                }}
-              >
-                <CommentItem
-                  comment={comment}
-                  currentUserId={user?.id}
-                  currentUserRole={user?.role}
-                  onEdit={handleEditComment}
-                  onDelete={handleDeleteComment}
-                />
-              </Box>
-            ))}
+                  }}
+                >
+                  <CommentItem
+                    comment={comment}
+                    replies={replies}
+                    currentUserId={user?.id}
+                    currentUserRole={user?.role}
+                    currentUser={user}
+                    onEdit={handleEditComment}
+                    onDelete={handleDeleteComment}
+                    onReply={handleSubmitReply}
+                    onLoginRequired={handleLoginRequired}
+                    isChild={false}
+                  />
+                </Box>
+              );
+            })}
 
             {/* Load More Button */}
-            {totalCount > comments.length && (
+            {totalRootCount > rootComments.length && (
               <Box sx={{ textAlign: "center", mt: 3 }}>
                 <Button
                   variant="outlined"

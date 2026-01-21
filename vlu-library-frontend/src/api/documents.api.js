@@ -275,6 +275,38 @@ export const reviewDocument = async (id, data) => {
   }
 };
 
+/**
+ * Lấy tài liệu nổi bật cho Landing Page
+ * @param {Object} params - { type: 'newest'|'popular'|'most-downloaded', limit: 8 }
+ * @returns {Promise} Response chứa danh sách tài liệu
+ */
+export const getFeatured = async (params = {}) => {
+  try {
+    const response = await axiosInstance.get("/documents/featured", {
+      params: {
+        type: params.type || "newest",
+        limit: params.limit || 8,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Lấy thống kê công khai cho Landing Page
+ * @returns {Promise} Response chứa { documents, users, views, downloads }
+ */
+export const getPublicStats = async () => {
+  try {
+    const response = await axiosInstance.get("/documents/public-stats");
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Export as default object
 const documentsAPI = {
   getAll,
@@ -291,6 +323,8 @@ const documentsAPI = {
   deleteDocument,
   updateDocument,
   reviewDocument,
+  getFeatured,
+  getPublicStats,
 };
 
 export default documentsAPI;

@@ -5,6 +5,15 @@ const User = require("../models/user.model");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
+const https = require("https");
+const http = require("http");
+// Import helper functions từ upload middleware
+const {
+  getFileUrl,
+  deleteFile,
+  isS3Url,
+  STORAGE_MODE,
+} = require("../middleware/upload.middleware");
 
 /**
  * ========================================
@@ -178,7 +187,9 @@ const uploadDocument = async (req, res) => {
       publishYear: publishYear ? parseInt(publishYear) : null,
       categoryId: category,
       uploadedBy: req.user.id,
-      fileUrl: `/uploads/${req.file.filename}`,
+      // S3: req.file.location (full URL)
+      // Local: /uploads/filename
+      fileUrl: getFileUrl(req.file),
       fileName: req.file.originalname,
       fileSize: req.file.size,
       fileFormat: fileFormat,
@@ -920,11 +931,8 @@ const deleteDocument = async (req, res) => {
       });
     }
 
-    // Delete file from storage
-    const filePath = path.join(process.cwd(), document.fileUrl);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // Delete file from storage (S3 hoặc Local)
+    await deleteFile(document.fileUrl);
 
     // Update category document count
     await Category.findByIdAndUpdate(document.categoryId, {
@@ -984,6 +992,67 @@ const downloadDocument = async (req, res) => {
       });
     }
 
+    let contentType = "application/pdf";
+    if (
+      document.fileFormat === "epub" ||
+      document.fileName.toLowerCase().endsWith(".epub")
+    ) {
+      contentType = "application/epub+zip";
+    }
+
+    console.log("[DOWNLOAD] Document ID:", id);
+    console.log("[DOWNLOAD] Storage Mode:", STORAGE_MODE);
+    console.log("[DOWNLOAD] File URL:", document.fileUrl);
+    console.log("[DOWNLOAD] Content-Type:", contentType);
+
+    // ========== S3 MODE: Redirect đến S3 URL với download param ==========
+    if (document.fileUrl.includes(".amazonaws.com/")) {
+      console.log("[DOWNLOAD] Proxying from S3...");
+
+      // Set headers cho DOWNLOAD (attachment)
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(document.fileName)}"`,
+      );
+
+      const httpModule = document.fileUrl.startsWith("https") ? https : http;
+
+      httpModule
+        .get(document.fileUrl, (s3Response) => {
+          if (s3Response.headers["content-length"]) {
+            res.setHeader(
+              "Content-Length",
+              s3Response.headers["content-length"],
+            );
+          }
+
+          if (s3Response.statusCode !== 200) {
+            if (!res.headersSent) {
+              return res.status(404).json({
+                status: "error",
+                message: "File không tồn tại trên storage",
+              });
+            }
+            return;
+          }
+
+          s3Response.pipe(res);
+        })
+        .on("error", (err) => {
+          console.error("[DOWNLOAD] S3 error:", err);
+          if (!res.headersSent) {
+            res.status(500).json({
+              status: "error",
+              message: "Không thể kết nối đến storage",
+            });
+          }
+        });
+
+      return;
+    }
+
+    // ========== LOCAL MODE: Stream file từ local ==========
     const filePath = path.join(process.cwd(), document.fileUrl);
 
     if (!fs.existsSync(filePath)) {
@@ -1000,13 +1069,6 @@ const downloadDocument = async (req, res) => {
       `attachment; filename="${encodeURIComponent(document.fileName)}"`,
     );
 
-    let contentType = "application/pdf";
-    if (
-      document.fileFormat === "epub" ||
-      document.fileName.toLowerCase().endsWith(".epub")
-    ) {
-      contentType = "application/epub+zip";
-    }
     res.setHeader("Content-Type", contentType);
 
     // Stream file
@@ -1243,10 +1305,84 @@ const readDocument = async (req, res) => {
       });
     }
 
-    const filePath = path.join(process.cwd(), document.fileUrl);
+    // ĐỊNH NGHĨA contentType TRƯỚC KHI SỬ DỤNG
+    let contentType = "application/pdf";
+    if (
+      document.fileFormat === "epub" ||
+      document.fileName.toLowerCase().endsWith(".epub")
+    ) {
+      contentType = "application/epub+zip";
+    }
 
     console.log("[READ] Document ID:", id);
-    console.log("[READ] File path:", filePath);
+    console.log("[READ] Storage Mode:", STORAGE_MODE);
+    console.log("[READ] File URL:", document.fileUrl);
+    console.log("[READ] Content-Type:", contentType);
+
+    // ========== S3 MODE: Proxy stream từ S3 ==========
+    if (document.fileUrl.includes(".amazonaws.com/")) {
+      console.log("[READ] Proxying from S3...");
+
+      res.setHeader("Content-Type", contentType); // ✅ Giờ contentType đã có giá trị
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${encodeURIComponent(document.fileName)}"`,
+      );
+      res.setHeader(
+        "Access-Control-Expose-Headers",
+        "Content-Length, Content-Type, Content-Disposition",
+      );
+
+      const httpModule = document.fileUrl.startsWith("https") ? https : http;
+
+      httpModule
+        .get(document.fileUrl, (s3Response) => {
+          if (s3Response.headers["content-length"]) {
+            res.setHeader(
+              "Content-Length",
+              s3Response.headers["content-length"],
+            );
+          }
+
+          if (s3Response.statusCode !== 200) {
+            console.error("[READ] S3 returned status:", s3Response.statusCode);
+            if (!res.headersSent) {
+              return res.status(404).json({
+                status: "error",
+                code: 404,
+                message: "File không tồn tại trên storage",
+              });
+            }
+            return;
+          }
+
+          s3Response.pipe(res);
+
+          s3Response.on("error", (err) => {
+            console.error("[READ] S3 stream error:", err);
+            if (!res.headersSent) {
+              res.status(500).json({
+                status: "error",
+                message: "Lỗi khi đọc file từ storage",
+              });
+            }
+          });
+        })
+        .on("error", (err) => {
+          console.error("[READ] Request to S3 error:", err);
+          if (!res.headersSent) {
+            res.status(500).json({
+              status: "error",
+              message: "Lỗi kết nối storage",
+            });
+          }
+        });
+
+      return;
+    }
+
+    // ========== LOCAL MODE: Stream file từ local ==========
+    const filePath = path.join(process.cwd(), document.fileUrl);
 
     if (!fs.existsSync(filePath)) {
       console.error("[READ] File not found:", filePath);
@@ -1255,14 +1391,6 @@ const readDocument = async (req, res) => {
         code: 404,
         message: "File không tồn tại trên server",
       });
-    }
-
-    let contentType = "application/pdf";
-    if (
-      document.fileFormat === "epub" ||
-      document.fileName.toLowerCase().endsWith(".epub")
-    ) {
-      contentType = "application/epub+zip";
     }
 
     res.setHeader(
@@ -1306,6 +1434,156 @@ const readDocument = async (req, res) => {
   }
 };
 
+/**
+ * API: Lấy tài liệu nổi bật cho Landing Page
+ * GET /api/documents/featured
+ * Access: Public (không cần đăng nhập)
+ *
+ * @query {string} type - Loại featured: 'newest' | 'popular' | 'most-downloaded'
+ * @query {number} limit - Số lượng tài liệu (default: 8, max: 12)
+ */
+const getFeaturedDocuments = async (req, res) => {
+  try {
+    const { type = "newest", limit = 8 } = req.query;
+
+    // Validate limit
+    const limitNum = Math.min(Math.max(parseInt(limit) || 8, 1), 12);
+
+    // Build sort options based on type
+    let sortOption = { createdAt: -1 }; // Default: newest
+
+    switch (type) {
+      case "popular":
+        sortOption = { views: -1, createdAt: -1 };
+        break;
+      case "most-downloaded":
+        sortOption = { downloads: -1, createdAt: -1 };
+        break;
+      case "top-rated":
+        sortOption = { rating: -1, createdAt: -1 };
+        break;
+      case "newest":
+      default:
+        sortOption = { createdAt: -1 };
+    }
+
+    // Query only approved documents
+    const documents = await Document.find({ status: "approved" })
+      .sort(sortOption)
+      .limit(limitNum)
+      .populate("uploadedBy", "name email")
+      .populate("categoryId", "name slug")
+      .select(
+        "title description author publisher publishYear fileFormat fileName fileSize coverImage views downloads rating commentCount createdAt",
+      )
+      .lean();
+
+    // Transform response
+    const transformedDocs = documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      description: doc.description,
+      author: doc.author,
+      publisher: doc.publisher,
+      publishYear: doc.publishYear,
+      fileFormat: doc.fileFormat,
+      fileName: doc.fileName,
+      fileSize: doc.fileSize,
+      coverImage: doc.coverImage,
+      views: doc.views || 0,
+      downloads: doc.downloads || 0,
+      rating: doc.rating || 0,
+      commentCount: doc.commentCount || 0,
+      createdAt: doc.createdAt,
+      uploadedBy: doc.uploadedBy
+        ? {
+            id: doc.uploadedBy._id,
+            name: doc.uploadedBy.name,
+          }
+        : null,
+      category: doc.categoryId
+        ? {
+            id: doc.categoryId._id,
+            name: doc.categoryId.name,
+            slug: doc.categoryId.slug,
+          }
+        : null,
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách tài liệu nổi bật thành công",
+      data: {
+        documents: transformedDocs,
+        type,
+        count: transformedDocs.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get featured documents error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy tài liệu nổi bật",
+    });
+  }
+};
+
+/**
+ * API: Lấy thống kê công khai cho Landing Page
+ * GET /api/documents/public-stats
+ * Access: Public (không cần đăng nhập)
+ */
+const getPublicStats = async (req, res) => {
+  try {
+    // Parallel queries for better performance
+    const [totalDocuments, totalUsers, totalViewsResult, totalDownloadsResult] =
+      await Promise.all([
+        // Đếm tài liệu đã duyệt
+        Document.countDocuments({ status: "approved" }),
+        // Đếm users active
+        User.countDocuments({ status: "active" }),
+        // Tổng lượt xem
+        Document.aggregate([
+          { $match: { status: "approved" } },
+          { $group: { _id: null, total: { $sum: "$views" } } },
+        ]),
+        // Tổng lượt tải
+        Document.aggregate([
+          { $match: { status: "approved" } },
+          { $group: { _id: null, total: { $sum: "$downloads" } } },
+        ]),
+      ]);
+
+    const totalViews = totalViewsResult[0]?.total || 0;
+    const totalDownloads = totalDownloadsResult[0]?.total || 0;
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy thống kê thành công",
+      data: {
+        stats: {
+          documents: totalDocuments,
+          users: totalUsers,
+          views: totalViews,
+          downloads: totalDownloads,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get public stats error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy thống kê",
+    });
+  }
+};
+
 module.exports = {
   uploadDocument,
   reviewDocument,
@@ -1318,4 +1596,6 @@ module.exports = {
   downloadDocument,
   trackDocument,
   getDashboardStats,
+  getFeaturedDocuments,
+  getPublicStats,
 };

@@ -187,25 +187,25 @@ const userAPI = {
     }
   },
 
-  /**
-   * [ADMIN] Khóa/Mở khóa tài khoản
-   * @param {string} id - ID của người dùng
-   * @param {Object} data - Dữ liệu thay đổi
-   * @param {string} data.status - Trạng thái (active/locked)
-   * @param {string} data.reason - Lý do khóa (nếu lock)
-   * @returns {Promise} Response data
-   */
-  changeUserStatus: async (id, data) => {
-    try {
-      const response = await axiosInstance.put(
-        `/admin/users/${id}/status`,
-        data,
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
+  // /**
+  //  * [ADMIN] Khóa/Mở khóa tài khoản
+  //  * @param {string} id - ID của người dùng
+  //  * @param {Object} data - Dữ liệu thay đổi
+  //  * @param {string} data.status - Trạng thái (active/locked)
+  //  * @param {string} data.reason - Lý do khóa (nếu lock)
+  //  * @returns {Promise} Response data
+  //  */
+  // changeUserStatus: async (id, data) => {
+  //   try {
+  //     const response = await axiosInstance.put(
+  //       `/admin/users/${id}/status`,
+  //       data,
+  //     );
+  //     return response.data;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // },
 
   /**
    * [ADMIN] Khóa/Mở khóa tài khoản

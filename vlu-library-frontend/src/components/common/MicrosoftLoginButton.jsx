@@ -6,13 +6,11 @@ import {
   CircularProgress,
   Box,
   Typography,
-  useTheme,
   alpha,
 } from "@mui/material";
 
 /**
  * Microsoft Logo SVG Component
- * Logo chính thức của Microsoft với 4 ô màu
  */
 const MicrosoftLogo = ({ size = 20 }) => (
   <svg
@@ -29,27 +27,20 @@ const MicrosoftLogo = ({ size = 20 }) => (
 );
 
 /**
- * MicrosoftLoginButton Component
- * Button đăng nhập bằng Microsoft với giao diện chuyên nghiệp
- *
- * @param {Function} onLoginSuccess - Callback khi đăng nhập thành công
- * @param {Function} onError - Callback khi có lỗi
+ * MicrosoftLoginButton - VLU Design System v2.0.1
+ * Modern & Bold với enhanced styling + font sizes tăng
  */
 const MicrosoftLoginButton = ({ onLoginSuccess, onError }) => {
   const { instance } = useMsal();
-  const theme = useTheme();
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
     try {
-      // Login Popup
       const loginResponse = await instance.loginPopup(loginRequest);
-
       const accessToken = loginResponse.accessToken;
       const userEmail = loginResponse.account.username;
 
-      // Logic kiểm tra domain
       if (
         !userEmail.endsWith("@vanlanguni.vn") &&
         !userEmail.endsWith("@vlu.edu.vn")
@@ -66,7 +57,6 @@ const MicrosoftLoginButton = ({ onLoginSuccess, onError }) => {
     } catch (e) {
       console.error("Login Failed:", e);
 
-      // Xử lý lỗi cụ thể của Azure AD
       if (e.message && e.message.includes("AADSTS90094")) {
         alert(
           "LỖI QUYỀN TRUY CẬP: Ứng dụng này chưa được Admin trường Văn Lang cấp phép.\n\nGiải pháp: Vui lòng liên hệ Admin IT trường hoặc sử dụng Email cá nhân để đăng nhập (nếu hệ thống cho phép).",
@@ -76,7 +66,6 @@ const MicrosoftLoginButton = ({ onLoginSuccess, onError }) => {
           "Tài khoản của bạn không có quyền cấp phép cho ứng dụng bên thứ 3. Vui lòng liên hệ Admin trường.",
         );
       } else if (e.errorCode !== "user_cancelled") {
-        // Không hiển thị lỗi nếu user tự cancel
         alert("Đăng nhập thất bại. Chi tiết: " + e.message);
       }
 
@@ -96,31 +85,33 @@ const MicrosoftLoginButton = ({ onLoginSuccess, onError }) => {
         mt: 2,
         py: 1.5,
         px: 3,
-        borderColor: theme.palette.grey[300],
+        borderColor: "#E0E0E0",
         backgroundColor: "white",
-        color: theme.palette.text.primary,
+        color: "#1A1A2E",
         textTransform: "none",
-        fontSize: "0.95rem",
-        fontWeight: 500,
-        borderRadius: 1,
+        fontSize: "0.9375rem",
+        fontWeight: 600,
+        borderRadius: "12px",
         position: "relative",
         transition: "all 0.2s ease-in-out",
         "&:hover": {
-          backgroundColor: alpha(theme.palette.grey[100], 0.8),
-          borderColor: theme.palette.grey[400],
-          boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.1)}`,
+          backgroundColor: "#FAFAFC",
+          borderColor: "#C4C4D4",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          transform: "translateY(-1px)",
         },
         "&:active": {
-          backgroundColor: theme.palette.grey[200],
+          backgroundColor: "#F0F0F5",
+          transform: "translateY(0)",
         },
         "&:disabled": {
-          backgroundColor: theme.palette.grey[100],
-          borderColor: theme.palette.grey[300],
+          backgroundColor: "#F5F5F5",
+          borderColor: "#E0E0E0",
         },
       }}
     >
       {loading ? (
-        <CircularProgress size={22} sx={{ color: theme.palette.grey[600] }} />
+        <CircularProgress size={22} sx={{ color: "#8E8EA9" }} />
       ) : (
         <Box
           sx={{
@@ -133,10 +124,7 @@ const MicrosoftLoginButton = ({ onLoginSuccess, onError }) => {
           <MicrosoftLogo size={20} />
           <Typography
             component="span"
-            sx={{
-              fontWeight: 500,
-              color: theme.palette.text.primary,
-            }}
+            sx={{ fontWeight: 600, color: "#1A1A2E", fontSize: "0.9375rem" }}
           >
             Đăng nhập bằng Microsoft
           </Typography>

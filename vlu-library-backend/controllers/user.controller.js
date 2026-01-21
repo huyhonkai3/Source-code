@@ -3,6 +3,12 @@ const UpgradeRequest = require("../models/upgradeRequest.model");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
+// Import helper functions từ upload middleware
+const {
+  getAvatarUrl,
+  deleteFile,
+  STORAGE_MODE,
+} = require("../middleware/upload.middleware");
 
 /**  API 1.9 – Lấy thông tin cá nhân
  * @route GET /api/users/profile
@@ -83,30 +89,16 @@ exports.uploadAvatar = async (req, res) => {
 
     const userId = req.user.id;
 
-    // Lấy thông tin user hiện tại để xóa avatar cũ (nếu có)
+    // Lấy thông tin user hiện tại
     const currentUser = await User.findById(userId);
 
-    // Xóa avatar cũ nếu tồn tại và là file local
+    // Xóa avatar cũ nếu tồn tại (S3 hoặc Local)
     if (currentUser?.avatarUrl) {
-      const oldAvatarPath = currentUser.avatarUrl;
-      // Chỉ xóa nếu là file local (bắt đầu bằng /uploads/)
-      if (oldAvatarPath.startsWith("/uploads/")) {
-        const fullOldPath = path.join(".", oldAvatarPath);
-        if (fs.existsSync(fullOldPath)) {
-          try {
-            fs.unlinkSync(fullOldPath);
-            console.log(`Deleted old avatar: ${fullOldPath}`);
-          } catch (deleteError) {
-            console.error("Error deleting old avatar:", deleteError);
-            // Không throw error, tiếp tục upload avatar mới
-          }
-        }
-      }
+      await deleteFile(currentUser.avatarUrl);
     }
 
-    // Tạo URL cho avatar mới
-    // Format: /uploads/avatars/filename.jpg
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Tạo URL cho avatar mới (S3 hoặc Local)
+    const avatarUrl = getAvatarUrl(req.file);
 
     // Cập nhật avatarUrl trong database
     const updatedUser = await User.findByIdAndUpdate(
@@ -116,12 +108,7 @@ exports.uploadAvatar = async (req, res) => {
     ).select("-password -passwordHash");
 
     if (!updatedUser) {
-      // Xóa file vừa upload nếu không tìm thấy user
-      const uploadedFilePath = req.file.path;
-      if (fs.existsSync(uploadedFilePath)) {
-        fs.unlinkSync(uploadedFilePath);
-      }
-
+      await deleteFile(getAvatarUrl(req.file));
       return res.status(404).json({
         status: "error",
         message: "Không tìm thấy người dùng",
@@ -140,13 +127,9 @@ exports.uploadAvatar = async (req, res) => {
   } catch (error) {
     console.error("Upload avatar error:", error);
 
-    // Xóa file đã upload nếu có lỗi
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (deleteError) {
-        console.error("Error cleaning up uploaded file:", deleteError);
-      }
+    // Xóa file đã upload nếu có lỗi (S3 hoặc Local)
+    if (req.file) {
+      await deleteFile(getAvatarUrl(req.file));
     }
 
     res.status(500).json({

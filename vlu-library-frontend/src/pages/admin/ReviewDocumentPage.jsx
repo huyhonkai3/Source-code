@@ -1,9 +1,8 @@
 /**
- * ReviewDocumentPage
+ * ReviewDocumentPage - VLU Design System v2.0.1
+ * Modern & Bold với Enhanced header, Better visual hierarchy + Tăng font sizes
+ *
  * Trang xem xét chi tiết tài liệu cho Admin/Moderator
- *
- * Đường dẫn: src/pages/admin/ReviewDocumentPage.jsx
- *
  * - Admin: Truy cập từ /admin/moderation/:id, navigate về /admin/moderation
  * - Moderator: Truy cập từ /moderation/:id, navigate về /moderation
  */
@@ -20,20 +19,21 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Tooltip,
+  alpha,
+  Fade,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
   PictureAsPdf as PdfIcon,
   MenuBook as EpubIcon,
+  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import documentsAPI from "../../api/documents.api";
 
-// Import FileViewer từ common (thay thế PDFViewer cũ)
 import { FileViewer } from "../../components/common/file-viewer";
-
-// Import các component admin
 import ReviewPanel from "../../components/admin/ReviewPanel";
 import ApproveDialog from "../../components/admin/ApproveDialog";
 import RejectDialog from "../../components/admin/RejectDialog";
@@ -44,14 +44,9 @@ const ReviewDocumentPage = () => {
   const location = useLocation();
   const { user } = useAuth();
 
-  // Determine back route based on current path or user role
   const getBackRoute = () => {
-    if (location.pathname.startsWith("/admin")) {
-      return "/admin/moderation";
-    }
-    if (user?.role === "Moderator") {
-      return "/moderation";
-    }
+    if (location.pathname.startsWith("/admin")) return "/admin/moderation";
+    if (user?.role === "Moderator") return "/moderation";
     return "/admin/moderation";
   };
 
@@ -61,6 +56,7 @@ const ReviewDocumentPage = () => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Dialog states
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -73,12 +69,8 @@ const ReviewDocumentPage = () => {
     severity: "success",
   });
 
-  /**
-   * Fetch document details
-   */
   useEffect(() => {
     fetchDocument();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchDocument = async () => {
@@ -86,7 +78,6 @@ const ReviewDocumentPage = () => {
     try {
       const response = await documentsAPI.getById(id);
       console.log("fetchDocument response - ReviewDocumentPage:", response);
-
       if (response.status === "success") {
         const documentData = response.data.document || response.data;
         setDocument(documentData);
@@ -99,73 +90,53 @@ const ReviewDocumentPage = () => {
     }
   };
 
-  /**
-   * Tạo URL đầy đủ cho file viewer
-   * REACT_APP_API_URL có thể là:
-   * - http://localhost:5000 (không có /api)
-   * - http://localhost:5000/api (đã có /api)
-   */
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDocument();
+    setRefreshing(false);
+    showSnackbar("Đã cập nhật thông tin tài liệu", "success");
+  };
+
   const getFileUrl = () => {
     if (!document) return null;
     const baseURL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    // Kiểm tra xem baseURL đã có /api chưa
     const apiPath = baseURL.endsWith("/api") ? "" : "/api";
     return `${baseURL}${apiPath}/documents/${document.id || document._id}/read`;
   };
 
-  /**
-   * Lấy định dạng file
-   */
   const getFileFormat = () => {
-    if (document?.fileFormat) {
-      return document.fileFormat.toLowerCase();
-    }
+    if (document?.fileFormat) return document.fileFormat.toLowerCase();
     const fileName = document?.fileName || "";
-    if (fileName.toLowerCase().endsWith(".epub")) {
-      return "epub";
-    }
+    if (fileName.toLowerCase().endsWith(".epub")) return "epub";
     return "pdf";
   };
 
-  /**
-   * Get status badge config
-   */
   const getStatusBadge = () => {
     if (!document) return null;
-
     const statusConfig = {
-      pending: { label: "Chờ duyệt", color: "warning" },
-      approved: { label: "Đã duyệt", color: "success" },
-      rejected: { label: "Từ chối", color: "error" },
+      pending: { label: "Chờ duyệt", color: "#F59E0B", bgColor: "#FEF3C7" },
+      approved: { label: "Đã duyệt", color: "#10B981", bgColor: "#D1FAE5" },
+      rejected: { label: "Từ chối", color: "#EF4444", bgColor: "#FEE2E2" },
     };
-
     return statusConfig[document.status] || statusConfig.pending;
   };
 
-  /**
-   * Get format badge
-   */
   const getFormatBadge = () => {
     const format = getFileFormat();
     const isEpub = format === "epub";
-
     return {
       label: isEpub ? "EPUB" : "PDF",
-      color: isEpub ? "warning" : "error",
+      color: isEpub ? "#F59E0B" : "#EF4444",
+      bgColor: isEpub ? "#FEF3C7" : "#FEE2E2",
       icon: isEpub ? (
-        <EpubIcon fontSize="small" />
+        <EpubIcon sx={{ fontSize: 16 }} />
       ) : (
-        <PdfIcon fontSize="small" />
+        <PdfIcon sx={{ fontSize: 16 }} />
       ),
     };
   };
 
-  /**
-   * Handle approve document
-   */
-  const handleApprove = () => {
-    setApproveDialogOpen(true);
-  };
+  const handleApprove = () => setApproveDialogOpen(true);
 
   const handleConfirmApprove = async () => {
     setActionLoading(true);
@@ -173,69 +144,52 @@ const ReviewDocumentPage = () => {
       const response = await documentsAPI.reviewDocument(id, {
         status: "approved",
       });
-
       if (response.status === "success") {
         setApproveDialogOpen(false);
         showSnackbar("Tài liệu đã được duyệt và công khai!", "success");
-
-        setTimeout(() => {
-          navigate(backRoute);
-        }, 1500);
+        setTimeout(() => navigate(backRoute), 1500);
       }
     } catch (error) {
       console.error("Approve document error:", error);
-      const errorMessage =
-        error.response?.data?.message || "Không thể duyệt tài liệu";
-      showSnackbar(errorMessage, "error");
+      showSnackbar(
+        error.response?.data?.message || "Không thể duyệt tài liệu",
+        "error",
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
-  /**
-   * Handle reject document
-   */
-  const handleRejectClick = () => {
-    setRejectDialogOpen(true);
-  };
+  const handleRejectClick = () => setRejectDialogOpen(true);
 
   const handleRejectConfirm = async (reason) => {
     setActionLoading(true);
     try {
       const response = await documentsAPI.reviewDocument(id, {
         status: "rejected",
-        reason: reason,
+        reason,
       });
-
       if (response.status === "success") {
         setRejectDialogOpen(false);
         showSnackbar("Tài liệu đã bị từ chối", "success");
-
-        setTimeout(() => {
-          navigate(backRoute);
-        }, 1500);
+        setTimeout(() => navigate(backRoute), 1500);
       }
     } catch (error) {
       console.error("Reject document error:", error);
-      const errorMessage =
-        error.response?.data?.message || "Không thể từ chối tài liệu";
-      showSnackbar(errorMessage, "error");
+      showSnackbar(
+        error.response?.data?.message || "Không thể từ chối tài liệu",
+        "error",
+      );
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleBack = () => {
-    navigate(backRoute);
-  };
-
-  const showSnackbar = (message, severity = "success") => {
+  const handleBack = () => navigate(backRoute);
+  const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
+  const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
-  };
 
   // Loading state
   if (loading) {
@@ -243,12 +197,33 @@ const ReviewDocumentPage = () => {
       <Box
         sx={{
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
+          bgcolor: "#FAFAFC",
+          gap: 2,
         }}
       >
-        <CircularProgress />
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: "16px",
+            background: "linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 24px rgba(211, 47, 47, 0.3)",
+          }}
+        >
+          <CircularProgress size={32} sx={{ color: "white" }} />
+        </Box>
+        <Typography
+          sx={{ color: "#4A4A68", fontWeight: 500, fontSize: "0.9375rem" }}
+        >
+          Đang tải tài liệu...
+        </Typography>
       </Box>
     );
   }
@@ -263,93 +238,152 @@ const ReviewDocumentPage = () => {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        bgcolor: "#FAFAFC",
       }}
     >
-      {/* Custom Header Bar */}
+      {/* Enhanced Header Bar */}
       <AppBar
         position="static"
-        color="default"
-        elevation={1}
+        elevation={0}
         sx={{
-          backgroundColor: "white",
-          borderBottom: "1px solid",
-          borderColor: "divider",
+          background: "linear-gradient(135deg, #1A1A2E 0%, #2D2D44 100%)",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 64, md: 72 }, px: { xs: 2, md: 3 } }}>
           {/* Back Button */}
-          <IconButton
-            edge="start"
-            onClick={handleBack}
-            sx={{ mr: 2, color: "text.secondary" }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
+          <Tooltip title="Quay lại danh sách" arrow>
+            <IconButton
+              onClick={handleBack}
+              sx={{
+                mr: 2,
+                color: "white",
+                bgcolor: "rgba(255,255,255,0.1)",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          </Tooltip>
 
-          {/* Title */}
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{
-              cursor: "pointer",
-              "&:hover": { textDecoration: "underline" },
-            }}
-            onClick={handleBack}
-          >
-            Quay lại danh sách
-          </Typography>
-
-          {/* Divider */}
+          {/* Title Section */}
           <Box
             sx={{
-              width: "1px",
-              height: 32,
-              backgroundColor: "divider",
-              mx: 3,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              flex: 1,
+              minWidth: 0,
             }}
-          />
-
-          {/* Document Title */}
-          <Typography variant="body1" color="text.secondary">
-            Đang xem xét:{" "}
+          >
             <Typography
-              component="span"
-              variant="body1"
-              fontWeight="bold"
-              color="text.primary"
+              onClick={handleBack}
+              sx={{
+                color: "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                fontSize: "0.9375rem",
+                whiteSpace: "nowrap",
+                "&:hover": { color: "white", textDecoration: "underline" },
+              }}
             >
-              {document?.title || "N/A"}
+              Quay lại
             </Typography>
-          </Typography>
 
-          {/* Spacer */}
-          <Box sx={{ flex: 1 }} />
-
-          {/* Format Badge */}
-          <Chip
-            icon={formatBadge.icon}
-            label={formatBadge.label}
-            color={formatBadge.color}
-            size="small"
-            sx={{ fontWeight: 600, mr: 1 }}
-          />
-
-          {/* Status Badge */}
-          {statusBadge && (
-            <Chip
-              label={statusBadge.label}
-              color={statusBadge.color}
-              size="small"
-              sx={{ fontWeight: 600 }}
+            <Box
+              sx={{
+                width: "1px",
+                height: 24,
+                bgcolor: "rgba(255,255,255,0.2)",
+              }}
             />
-          )}
+
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography
+                sx={{
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: "0.8125rem",
+                  mb: 0.25,
+                }}
+              >
+                Đang xem xét
+              </Typography>
+              <Typography
+                sx={{
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                }}
+              >
+                {document?.title || "N/A"}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Right Actions */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            {/* Refresh Button */}
+            <Tooltip title="Làm mới" arrow>
+              <IconButton
+                onClick={handleRefresh}
+                disabled={refreshing}
+                sx={{
+                  color: "white",
+                  bgcolor: "rgba(255,255,255,0.1)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+                  "& .MuiSvgIcon-root": {
+                    animation: refreshing ? "spin 1s linear infinite" : "none",
+                  },
+                  "@keyframes spin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+
+            {/* Format Badge */}
+            <Chip
+              icon={formatBadge.icon}
+              label={formatBadge.label}
+              size="small"
+              sx={{
+                bgcolor: formatBadge.bgColor,
+                color: formatBadge.color,
+                fontWeight: 600,
+                fontSize: "0.8125rem",
+                borderRadius: "8px",
+                "& .MuiChip-icon": { color: formatBadge.color },
+              }}
+            />
+
+            {/* Status Badge */}
+            {statusBadge && (
+              <Chip
+                label={statusBadge.label}
+                size="small"
+                sx={{
+                  bgcolor: statusBadge.bgColor,
+                  color: statusBadge.color,
+                  fontWeight: 600,
+                  fontSize: "0.8125rem",
+                  borderRadius: "8px",
+                }}
+              />
+            )}
+          </Box>
         </Toolbar>
       </AppBar>
 
       {/* Main Content */}
       <Box sx={{ flex: 1, overflow: "hidden" }}>
         <Grid container sx={{ height: "100%" }}>
-          {/* Left: File Viewer - Sử dụng FileViewer thay vì PDFViewer */}
+          {/* Left: File Viewer */}
           <Grid
             item
             xs={12}
@@ -357,7 +391,8 @@ const ReviewDocumentPage = () => {
             sx={{
               height: "100%",
               borderRight: { md: "1px solid" },
-              borderColor: { md: "divider" },
+              borderColor: { md: "#E0E0E0" },
+              bgcolor: "#F5F5F5",
             }}
           >
             <FileViewer
@@ -371,7 +406,7 @@ const ReviewDocumentPage = () => {
           </Grid>
 
           {/* Right: Review Panel */}
-          <Grid item xs={12} md={4} sx={{ height: "100%" }}>
+          <Grid item xs={12} md={4} sx={{ height: "100%", bgcolor: "white" }}>
             <ReviewPanel
               document={document}
               onApprove={handleApprove}
@@ -405,12 +440,18 @@ const ReviewDocumentPage = () => {
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        TransitionComponent={Fade}
       >
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            borderRadius: "12px",
+            boxShadow: "0 8px 24px rgba(26,26,46,0.15)",
+            fontSize: "0.9375rem",
+          }}
         >
           {snackbar.message}
         </Alert>

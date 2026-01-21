@@ -691,8 +691,8 @@ const Header = () => {
                         </MenuItem>
                       )}
 
-                      {(user?.role === "Admin" ||
-                        user?.role === "Moderator") && (
+                      {/* menu của admin */}
+                      {user?.role === "Admin" && (
                         <MenuItem
                           onClick={() => {
                             handleCloseUserMenu();
@@ -714,6 +714,33 @@ const Header = () => {
                             }}
                           >
                             Quản trị
+                          </Typography>
+                        </MenuItem>
+                      )}
+
+                      {/* menu của kiểm duyệt viên */}
+                      {user?.role === "Moderator" && (
+                        <MenuItem
+                          onClick={() => {
+                            handleCloseUserMenu();
+                            navigate("/moderation");
+                          }}
+                          sx={{
+                            py: 1.25,
+                            px: 2,
+                            gap: 1.5,
+                            "&:hover": { bgcolor: "#FAFAFC" },
+                          }}
+                        >
+                          <AdminIcon sx={{ fontSize: 20, color: "#7C4DFF" }} />
+                          <Typography
+                            sx={{
+                              fontWeight: 500,
+                              color: "#7C4DFF",
+                              fontSize: "0.9375rem",
+                            }}
+                          >
+                            Kiểm duyệt tài liệu
                           </Typography>
                         </MenuItem>
                       )}

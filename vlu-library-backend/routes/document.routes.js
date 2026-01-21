@@ -46,6 +46,23 @@ router.get(
 );
 
 /**
+ * @route   GET /api/documents/featured
+ * @desc    Lấy tài liệu nổi bật cho Landing Page
+ * @access  Public (không cần đăng nhập)
+ * @query   type - 'newest' | 'popular' | 'most-downloaded' | 'top-rated'
+ * @query   limit - Số lượng (1-12, default: 8)
+ */
+router.get("/featured", documentController.getFeaturedDocuments);
+
+/**
+ * @route   GET /api/documents/public-stats
+ * @desc    Lấy thống kê công khai cho Landing Page
+ * @access  Public (không cần đăng nhập)
+ * @returns { documents: number, users: number, views: number, downloads: number }
+ */
+router.get("/public-stats", documentController.getPublicStats);
+
+/**
  * route   GET /api/documents
  * desc    Lấy danh sách tài liệu đã duyệt (API 2.7 - F11)
  * access  Public (không cần đăng nhập)

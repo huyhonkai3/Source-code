@@ -17,9 +17,8 @@ import ChangePasswordPage from "../pages/user/ChangePasswordPage";
 // Moderator Pages - Sử dụng UserSidebar
 import ModeratorModerationPage from "../pages/moderator/ModeratorModerationPage";
 import ModeratorReviewDocumentPage from "../pages/moderator/ModeratorReviewDocumentPage";
-// Import các pages khác khi đã tạo
-// import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
-// import HomePage from '../pages/HomePage';
+import LandingPage from "../pages/public/LandingPage";
+import CategoriesPage from "../pages/public/CategoriesPage";
 
 /**
  * ProtectedRoute Component
@@ -159,22 +158,15 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Categories Page */}
+      <Route path="/categories" element={<CategoriesPage />} />
+
       {/* ============================================
           PROTECTED ROUTES - Yêu cầu đăng nhập
           ============================================ */}
 
-      {/* Temporary home route */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <div style={{ padding: "2rem", textAlign: "center" }}>
-              <h1>Welcome to VLU Digital Library</h1>
-              <p>Home Page - Coming Soon</p>
-            </div>
-          </ProtectedRoute>
-        }
-      />
+      {/* Landing Page - Public (không cần đăng nhập) */}
+      <Route path="/" element={<LandingPage />} />
 
       {/* Public Document Search Page */}
       <Route path="/documents" element={<SearchPage />} />

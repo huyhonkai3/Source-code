@@ -274,8 +274,6 @@ const deleteCategory = async (req, res) => {
  * Điều này đảm bảo:
  * - User/Author/Guest thấy đúng số tài liệu họ có thể xem
  * - Admin thấy tổng số để quản lý
- *
- * KHÔNG CẦN thay đổi frontend hay thêm route mới!
  */
 const getAllCategories = async (req, res) => {
   try {

@@ -1,7 +1,8 @@
 /**
- * EpubViewer Component
- * Component hiển thị file EPUB sử dụng epubjs
+ * EpubViewer Component - VLU Design System v2.0.1
+ * Modern & Bold với Enhanced toolbar, Better visual hierarchy + Tăng font sizes
  *
+ * Component hiển thị file EPUB sử dụng epubjs
  * Đường dẫn: src/components/common/file-viewer/EpubViewer.jsx
  *
  * @requires epubjs - yarn add epubjs
@@ -22,6 +23,7 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  alpha,
 } from "@mui/material";
 import {
   NavigateBefore as NavigateBeforeIcon,
@@ -32,6 +34,9 @@ import {
   Add as ZoomInIcon,
   Remove as ZoomOutIcon,
   Menu as MenuIcon,
+  MenuBook as EpubIcon,
+  Close as CloseIcon,
+  Bookmark as BookmarkIcon,
 } from "@mui/icons-material";
 
 const EpubViewer = ({
@@ -41,7 +46,6 @@ const EpubViewer = ({
   showToolbar = true,
   showDownload = true,
 }) => {
-  // States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [arrayBuffer, setArrayBuffer] = useState(null);
@@ -54,7 +58,6 @@ const EpubViewer = ({
   const [currentSpineIndex, setCurrentSpineIndex] = useState(0);
   const [totalSpineItems, setTotalSpineItems] = useState(0);
 
-  // Refs
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const bookRef = useRef(null);
@@ -63,30 +66,16 @@ const EpubViewer = ({
   const isInitializedRef = useRef(false);
   const spineRef = useRef([]);
 
-  /**
-   * Apply font size bằng CSS injection (tránh lỗi themes.fontSize)
-   */
   const applyFontSize = useCallback((size) => {
     if (!renditionRef.current) return;
-
     try {
-      // Inject CSS trực tiếp vào iframe content
       renditionRef.current.getContents().forEach((content) => {
         if (content && content.document) {
           const style = content.document.createElement("style");
           style.id = "epub-font-size";
-          style.textContent = `
-            body, p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a {
-              font-size: ${size}% !important;
-            }
-          `;
-
-          // Remove old style if exists
+          style.textContent = `body, p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a { font-size: ${size}% !important; }`;
           const oldStyle = content.document.getElementById("epub-font-size");
-          if (oldStyle) {
-            oldStyle.remove();
-          }
-
+          if (oldStyle) oldStyle.remove();
           content.document.head.appendChild(style);
         }
       });
@@ -95,17 +84,12 @@ const EpubViewer = ({
     }
   }, []);
 
-  /**
-   * Effect 1: Fetch EPUB file
-   */
   useEffect(() => {
     if (!url) {
       setError("Không có URL file");
       setLoading(false);
       return;
     }
-
-    console.log("[EpubViewer] Fetching:", url);
 
     let isMounted = true;
 
@@ -118,15 +102,10 @@ const EpubViewer = ({
 
       try {
         const token = localStorage.getItem("accessToken");
-
         const response = await fetch(url, {
           method: "GET",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
+          headers: { Authorization: token ? `Bearer ${token}` : "" },
         });
-
-        console.log("[EpubViewer] Response:", response.status);
 
         if (!response.ok) {
           if (response.status === 401)
@@ -137,11 +116,8 @@ const EpubViewer = ({
         }
 
         const buffer = await response.arrayBuffer();
-        console.log("[EpubViewer] Buffer size:", buffer.byteLength);
-
         if (buffer.byteLength === 0) throw new Error("File rỗng");
 
-        // Blob URL cho download
         const blob = new Blob([buffer], { type: "application/epub+zip" });
         if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = URL.createObjectURL(blob);
@@ -160,24 +136,16 @@ const EpubViewer = ({
     };
 
     fetchEpub();
-
     return () => {
       isMounted = false;
     };
   }, [url]);
 
-  /**
-   * Effect 2: Initialize epub.js
-   */
   useEffect(() => {
-    if (!arrayBuffer || !viewerRef.current || isInitializedRef.current) {
-      return;
-    }
+    if (!arrayBuffer || !viewerRef.current || isInitializedRef.current) return;
 
-    console.log("[EpubViewer] Initializing epub.js...");
     isInitializedRef.current = true;
 
-    // Cleanup
     if (bookRef.current) {
       try {
         bookRef.current.destroy();
@@ -190,26 +158,18 @@ const EpubViewer = ({
 
     const initBook = async () => {
       try {
-        // 1. Tạo book
         const book = ePub(arrayBuffer);
         bookRef.current = book;
 
-        // 2. Đợi book loaded để lấy spine
         await book.ready;
 
-        // 3. Lấy spine items
         const spine = [];
-        book.spine.each((item) => {
-          spine.push({
-            href: item.href,
-            index: item.index,
-          });
-        });
+        book.spine.each((item) =>
+          spine.push({ href: item.href, index: item.index }),
+        );
         spineRef.current = spine;
         setTotalSpineItems(spine.length);
-        console.log("[EpubViewer] Spine items:", spine.length);
 
-        // 4. Tạo rendition - KHÔNG dùng bất kỳ themes nào
         const rendition = book.renderTo(viewerRef.current, {
           width: "100%",
           height: "100%",
@@ -217,41 +177,24 @@ const EpubViewer = ({
         });
         renditionRef.current = rendition;
 
-        // 5. Load TOC
         book.loaded.navigation
-          .then((nav) => {
-            console.log("[EpubViewer] TOC:", nav.toc?.length || 0, "items");
-            setToc(nav.toc || []);
-          })
+          .then((nav) => setToc(nav.toc || []))
           .catch(() => {});
 
-        // 6. Track location changes
         rendition.on("relocated", (location) => {
           if (location?.start?.href) {
-            console.log("[EpubViewer] Relocated:", location.start.href);
-
-            // Tìm index trong spine
             const href = location.start.href;
             const spineIndex = spineRef.current.findIndex((item) =>
               href.includes(item.href),
             );
-            if (spineIndex !== -1) {
-              setCurrentSpineIndex(spineIndex);
-            }
+            if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
           }
         });
 
-        // 7. Apply font size sau khi render xong
-        rendition.on("rendered", () => {
-          applyFontSize(fontSize);
-        });
+        rendition.on("rendered", () => applyFontSize(fontSize));
 
-        // 8. Display
         await rendition.display();
-        console.log("[EpubViewer] Display complete");
-
         setBookReady(true);
-        console.log("[EpubViewer] Book ready!");
       } catch (err) {
         console.error("[EpubViewer] Init error:", err);
         setError("Lỗi đọc EPUB: " + err.message);
@@ -271,33 +214,23 @@ const EpubViewer = ({
     };
   }, [arrayBuffer, applyFontSize, fontSize]);
 
-  /**
-   * Effect 3: Fullscreen
-   */
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  /**
-   * Cleanup blob URL
-   */
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
   }, []);
 
-  /**
-   * Navigation - chuyển chapter trực tiếp
-   */
   const goToPrev = useCallback(() => {
     if (currentSpineIndex > 0) {
       const prevIndex = currentSpineIndex - 1;
       const prevSpine = spineRef.current[prevIndex];
       if (prevSpine && renditionRef.current) {
-        console.log("[EpubViewer] Go to prev:", prevSpine.href);
         renditionRef.current.display(prevSpine.href);
         setCurrentSpineIndex(prevIndex);
       }
@@ -309,14 +242,12 @@ const EpubViewer = ({
       const nextIndex = currentSpineIndex + 1;
       const nextSpine = spineRef.current[nextIndex];
       if (nextSpine && renditionRef.current) {
-        console.log("[EpubViewer] Go to next:", nextSpine.href);
         renditionRef.current.display(nextSpine.href);
         setCurrentSpineIndex(nextIndex);
       }
     }
   }, [currentSpineIndex, totalSpineItems]);
 
-  // Font size - dùng CSS injection
   const changeFontSize = useCallback(
     (delta) => {
       setFontSize((prev) => {
@@ -328,16 +259,11 @@ const EpubViewer = ({
     [applyFontSize],
   );
 
-  // Fullscreen
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
+    else document.exitFullscreen();
   }, []);
 
-  // Download
   const handleDownload = useCallback(() => {
     if (blobUrlRef.current) {
       const link = document.createElement("a");
@@ -347,27 +273,27 @@ const EpubViewer = ({
     }
   }, [fileName]);
 
-  // Go to chapter
   const goToChapter = useCallback((href) => {
     if (!renditionRef.current) return;
-
-    console.log("[EpubViewer] Go to chapter:", href);
     renditionRef.current.display(href);
-
-    // Update spine index
     const hrefBase = href.split("#")[0];
     const spineIndex = spineRef.current.findIndex(
       (item) => item.href.includes(hrefBase) || hrefBase.includes(item.href),
     );
-    if (spineIndex !== -1) {
-      setCurrentSpineIndex(spineIndex);
-    }
-
+    if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
     setTocOpen(false);
   }, []);
 
-  // ============ RENDER ============
+  // Toolbar button style
+  const toolbarButtonSx = {
+    color: "white",
+    bgcolor: "rgba(255,255,255,0.08)",
+    borderRadius: "8px",
+    "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
+    "&:disabled": { color: "rgba(255,255,255,0.3)" },
+  };
 
+  // Loading state
   if (loading) {
     return (
       <Box
@@ -377,17 +303,34 @@ const EpubViewer = ({
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#525252",
-          color: "white",
+          background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
           gap: 2,
         }}
       >
-        <CircularProgress sx={{ color: "white" }} />
-        <Typography>Đang tải EPUB...</Typography>
+        <Box
+          sx={{
+            width: 72,
+            height: 72,
+            borderRadius: "18px",
+            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 32px rgba(245, 158, 11, 0.4)",
+          }}
+        >
+          <CircularProgress size={32} sx={{ color: "white" }} />
+        </Box>
+        <Typography
+          sx={{ color: "white", fontWeight: 500, fontSize: "0.9375rem" }}
+        >
+          Đang tải EPUB...
+        </Typography>
       </Box>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Box
@@ -397,22 +340,53 @@ const EpubViewer = ({
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#525252",
-          color: "white",
+          background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
           gap: 2,
           p: 3,
         }}
       >
-        <Typography variant="h6" color="error.light">
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: "20px",
+            bgcolor: "rgba(239, 68, 68, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <EpubIcon sx={{ fontSize: 40, color: "#EF4444" }} />
+        </Box>
+        <Typography
+          sx={{ color: "#EF4444", fontWeight: 600, fontSize: "1.125rem" }}
+        >
           Lỗi
         </Typography>
-        <Typography variant="body2" sx={{ textAlign: "center" }}>
+        <Typography
+          sx={{
+            color: "rgba(255,255,255,0.7)",
+            fontSize: "0.9375rem",
+            textAlign: "center",
+            maxWidth: 300,
+          }}
+        >
           {error}
         </Typography>
         <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
           <Button
             variant="outlined"
-            sx={{ color: "white", borderColor: "white" }}
+            sx={{
+              color: "white",
+              borderColor: "rgba(255,255,255,0.3)",
+              borderRadius: "10px",
+              fontWeight: 600,
+              fontSize: "0.9375rem",
+              "&:hover": {
+                borderColor: "white",
+                bgcolor: "rgba(255,255,255,0.1)",
+              },
+            }}
             onClick={() => window.location.reload()}
           >
             Thử lại
@@ -422,6 +396,13 @@ const EpubViewer = ({
               variant="contained"
               startIcon={<DownloadIcon />}
               onClick={handleDownload}
+              sx={{
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9375rem",
+                bgcolor: "#F59E0B",
+                "&:hover": { bgcolor: "#D97706" },
+              }}
             >
               Tải về
             </Button>
@@ -438,171 +419,276 @@ const EpubViewer = ({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "#f5f5f5",
+        bgcolor: "#FAFAFC",
         position: "relative",
       }}
     >
-      {/* Toolbar */}
+      {/* Enhanced Toolbar */}
       {showToolbar && (
         <Box
           sx={{
-            height: 48,
-            backgroundColor: "#323232",
+            height: 56,
+            minHeight: 56,
+            background: "linear-gradient(135deg, #1A1A2E 0%, #252538 100%)",
             display: "flex",
             alignItems: "center",
             px: 2,
             gap: 1,
             flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
           }}
         >
-          <Tooltip title="Mục lục">
+          <Tooltip title="Mục lục" arrow>
             <IconButton
               size="small"
-              sx={{ color: "white" }}
+              sx={toolbarButtonSx}
               onClick={() => setTocOpen(true)}
             >
-              <MenuIcon />
+              <MenuIcon sx={{ fontSize: 20 }} />
             </IconButton>
           </Tooltip>
 
           <Box
-            sx={{ width: 1, height: 24, backgroundColor: "#525252", mx: 1 }}
+            sx={{
+              width: "1px",
+              height: 28,
+              bgcolor: "rgba(255,255,255,0.15)",
+              mx: 1.5,
+              borderRadius: 1,
+            }}
           />
 
-          <Tooltip title="Chương trước">
+          <Tooltip title="Chương trước" arrow>
             <span>
               <IconButton
                 size="small"
-                sx={{ color: "white" }}
+                sx={toolbarButtonSx}
                 onClick={goToPrev}
                 disabled={currentSpineIndex === 0}
               >
-                <NavigateBeforeIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: "white",
-              mx: 1,
-              minWidth: 80,
-              textAlign: "center",
-            }}
-          >
-            {currentSpineIndex + 1} / {totalSpineItems}
-          </Typography>
-
-          <Tooltip title="Chương sau">
-            <span>
-              <IconButton
-                size="small"
-                sx={{ color: "white" }}
-                onClick={goToNext}
-                disabled={currentSpineIndex >= totalSpineItems - 1}
-              >
-                <NavigateNextIcon />
+                <NavigateBeforeIcon sx={{ fontSize: 22 }} />
               </IconButton>
             </span>
           </Tooltip>
 
           <Box
-            sx={{ width: 1, height: 24, backgroundColor: "#525252", mx: 1 }}
-          />
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 1.5,
+              py: 0.75,
+              bgcolor: "rgba(255,255,255,0.08)",
+              borderRadius: "8px",
+              minWidth: 100,
+              justifyContent: "center",
+            }}
+          >
+            <Typography
+              sx={{ color: "white", fontWeight: 600, fontSize: "0.9375rem" }}
+            >
+              {currentSpineIndex + 1}
+            </Typography>
+            <Typography
+              sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.9375rem" }}
+            >
+              /
+            </Typography>
+            <Typography
+              sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9375rem" }}
+            >
+              {totalSpineItems}
+            </Typography>
+          </Box>
 
-          <Tooltip title="Giảm cỡ chữ">
+          <Tooltip title="Chương sau" arrow>
             <span>
               <IconButton
                 size="small"
-                sx={{ color: "white" }}
-                onClick={() => changeFontSize(-10)}
-                disabled={fontSize <= 50}
+                sx={toolbarButtonSx}
+                onClick={goToNext}
+                disabled={currentSpineIndex >= totalSpineItems - 1}
               >
-                <ZoomOutIcon fontSize="small" />
+                <NavigateNextIcon sx={{ fontSize: 22 }} />
               </IconButton>
             </span>
           </Tooltip>
 
-          <Typography variant="caption" sx={{ color: "white", minWidth: 40 }}>
-            {fontSize}%
-          </Typography>
+          <Box
+            sx={{
+              width: "1px",
+              height: 28,
+              bgcolor: "rgba(255,255,255,0.15)",
+              mx: 1.5,
+              borderRadius: 1,
+            }}
+          />
 
-          <Tooltip title="Tăng cỡ chữ">
+          <Tooltip title="Giảm cỡ chữ" arrow>
             <span>
               <IconButton
                 size="small"
-                sx={{ color: "white" }}
+                sx={toolbarButtonSx}
+                onClick={() => changeFontSize(-10)}
+                disabled={fontSize <= 50}
+              >
+                <ZoomOutIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              px: 1.5,
+              py: 0.5,
+              bgcolor: "rgba(255,255,255,0.08)",
+              borderRadius: "8px",
+              minWidth: 60,
+              justifyContent: "center",
+            }}
+          >
+            <Typography
+              sx={{ color: "white", fontWeight: 600, fontSize: "0.875rem" }}
+            >
+              {fontSize}%
+            </Typography>
+          </Box>
+
+          <Tooltip title="Tăng cỡ chữ" arrow>
+            <span>
+              <IconButton
+                size="small"
+                sx={toolbarButtonSx}
                 onClick={() => changeFontSize(10)}
                 disabled={fontSize >= 200}
               >
-                <ZoomInIcon fontSize="small" />
+                <ZoomInIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </span>
           </Tooltip>
 
           <Box sx={{ flex: 1 }} />
 
-          <Tooltip title={isFullscreen ? "Thoát" : "Toàn màn hình"}>
+          <Tooltip title={isFullscreen ? "Thoát" : "Toàn màn hình"} arrow>
             <IconButton
               size="small"
-              sx={{ color: "white" }}
+              sx={toolbarButtonSx}
               onClick={toggleFullscreen}
             >
-              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              {isFullscreen ? (
+                <FullscreenExitIcon sx={{ fontSize: 22 }} />
+              ) : (
+                <FullscreenIcon sx={{ fontSize: 22 }} />
+              )}
             </IconButton>
           </Tooltip>
 
           {showDownload && (
-            <Tooltip title="Tải xuống">
+            <Tooltip title="Tải xuống" arrow>
               <IconButton
                 size="small"
-                sx={{ color: "white" }}
+                sx={{
+                  ...toolbarButtonSx,
+                  bgcolor: alpha("#F59E0B", 0.8),
+                  "&:hover": { bgcolor: "#F59E0B" },
+                }}
                 onClick={handleDownload}
               >
-                <DownloadIcon />
+                <DownloadIcon sx={{ fontSize: 20 }} />
               </IconButton>
             </Tooltip>
           )}
         </Box>
       )}
 
-      {/* TOC Drawer */}
-      <Drawer anchor="left" open={tocOpen} onClose={() => setTocOpen(false)}>
-        <Box sx={{ width: 300 }}>
-          <Box sx={{ p: 2, backgroundColor: "#323232" }}>
-            <Typography variant="h6" sx={{ color: "white" }}>
+      {/* TOC Drawer - Enhanced */}
+      <Drawer
+        anchor="left"
+        open={tocOpen}
+        onClose={() => setTocOpen(false)}
+        PaperProps={{ sx: { width: 320, bgcolor: "#1A1A2E" } }}
+      >
+        <Box
+          sx={{
+            p: 2.5,
+            background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <BookmarkIcon sx={{ color: "white", fontSize: 24 }} />
+            <Typography
+              sx={{
+                color: "white",
+                fontWeight: 700,
+                fontSize: "1.125rem",
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
               Mục lục
             </Typography>
           </Box>
-          <Divider />
-          <List sx={{ maxHeight: "calc(100vh - 64px)", overflow: "auto" }}>
-            {toc.map((item, index) => (
-              <ListItem key={index} disablePadding>
-                <ListItemButton
-                  onClick={() => goToChapter(item.href)}
-                  selected={currentChapter === item.label}
-                >
-                  <ListItemText
-                    primary={item.label}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      fontSize: "0.875rem",
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-            {toc.length === 0 && (
-              <ListItem>
-                <ListItemText
-                  primary="Không có mục lục"
-                  sx={{ color: "grey.500" }}
-                />
-              </ListItem>
-            )}
-          </List>
+          <IconButton
+            size="small"
+            onClick={() => setTocOpen(false)}
+            sx={{
+              color: "white",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </IconButton>
         </Box>
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+        <List sx={{ maxHeight: "calc(100vh - 72px)", overflow: "auto", py: 1 }}>
+          {toc.map((item, index) => (
+            <ListItem key={index} disablePadding>
+              <ListItemButton
+                onClick={() => goToChapter(item.href)}
+                selected={currentChapter === item.label}
+                sx={{
+                  px: 2.5,
+                  py: 1.5,
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                  "&.Mui-selected": {
+                    bgcolor: alpha("#F59E0B", 0.2),
+                    borderLeft: "3px solid #F59E0B",
+                  },
+                }}
+              >
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    noWrap: true,
+                    sx: {
+                      color: "rgba(255,255,255,0.9)",
+                      fontSize: "0.9375rem",
+                      fontWeight: currentChapter === item.label ? 600 : 400,
+                    },
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+          {toc.length === 0 && (
+            <ListItem sx={{ py: 4 }}>
+              <ListItemText
+                primary="Không có mục lục"
+                primaryTypographyProps={{
+                  sx: {
+                    color: "rgba(255,255,255,0.5)",
+                    fontSize: "0.9375rem",
+                    textAlign: "center",
+                  },
+                }}
+              />
+            </ListItem>
+          )}
+        </List>
       </Drawer>
 
       {/* EPUB Viewer */}
@@ -611,7 +697,7 @@ const EpubViewer = ({
         sx={{
           flex: 1,
           overflow: "hidden",
-          backgroundColor: "#fff",
+          bgcolor: "#fff",
           "& iframe": { border: "none !important" },
         }}
       />
@@ -621,7 +707,7 @@ const EpubViewer = ({
         <Box
           sx={{
             position: "absolute",
-            top: showToolbar ? 48 : 0,
+            top: showToolbar ? 56 : 0,
             left: 0,
             right: 0,
             bottom: 0,
@@ -629,13 +715,15 @@ const EpubViewer = ({
             flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: "rgba(255,255,255,0.9)",
+            bgcolor: "rgba(255,255,255,0.95)",
             zIndex: 5,
             gap: 2,
           }}
         >
-          <CircularProgress />
-          <Typography variant="body2" color="text.secondary">
+          <CircularProgress size={40} sx={{ color: "#F59E0B" }} />
+          <Typography
+            sx={{ color: "#4A4A68", fontWeight: 500, fontSize: "0.9375rem" }}
+          >
             Đang xử lý...
           </Typography>
         </Box>

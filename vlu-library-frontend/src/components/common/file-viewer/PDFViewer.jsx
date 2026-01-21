@@ -1,7 +1,8 @@
 /**
- * PDFViewer Component
- * Component dùng chung để hiển thị file PDF sử dụng PDF.js
+ * PDFViewer Component - VLU Design System v2.0.1
+ * Modern & Bold với Enhanced toolbar, Better visual hierarchy + Tăng font sizes
  *
+ * Component dùng chung để hiển thị file PDF sử dụng PDF.js
  * Đường dẫn: src/components/common/file-viewer/PDFViewer.jsx
  *
  * @requires pdfjs-dist - yarn add pdfjs-dist
@@ -16,6 +17,7 @@ import {
   MenuItem,
   CircularProgress,
   Tooltip,
+  alpha,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -27,6 +29,7 @@ import {
   GetApp as DownloadIcon,
   Fullscreen as FullscreenIcon,
   FullscreenExit as FullscreenExitIcon,
+  PictureAsPdf as PdfIcon,
 } from "@mui/icons-material";
 import * as pdfjsLib from "pdfjs-dist";
 
@@ -36,11 +39,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLi
 /**
  * PDFViewer Component
  * Hiển thị file PDF sử dụng PDF.js với authentication
- *
- * @param {string} url - URL của file PDF (API endpoint cần auth)
- * @param {string} fileName - Tên file để download
- * @param {boolean} showToolbar - Hiển thị toolbar (default: true)
- * @param {boolean} showDownload - Hiển thị nút download (default: true)
  */
 const PDFViewer = ({
   url,
@@ -48,11 +46,9 @@ const PDFViewer = ({
   showToolbar = true,
   showDownload = true,
 }) => {
-  // Canvas ref
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
-  // PDF state
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -61,91 +57,56 @@ const PDFViewer = ({
   const [error, setError] = useState(null);
   const [rendering, setRendering] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Blob URL để cleanup
   const [blobUrl, setBlobUrl] = useState(null);
 
-  /**
-   * Load PDF document with authentication
-   */
   useEffect(() => {
     if (!url) {
       setError("Không có file để hiển thị");
       setLoading(false);
       return;
     }
-
     loadPDF();
-
-    // Cleanup
     return () => {
-      if (pdfDoc) {
-        pdfDoc.destroy();
-      }
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
+      if (pdfDoc) pdfDoc.destroy();
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  /**
-   * Render page when page or scale changes
-   */
   useEffect(() => {
-    if (pdfDoc) {
-      renderPage(currentPage);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (pdfDoc) renderPage(currentPage);
   }, [currentPage, scale, pdfDoc]);
 
-  /**
-   * Handle fullscreen change
-   */
   useEffect(() => {
-    const handleFullscreenChange = () => {
+    const handleFullscreenChange = () =>
       setIsFullscreen(!!document.fullscreenElement);
-    };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
+    return () =>
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
   }, []);
 
-  /**
-   * Load PDF from URL with Authorization header
-   */
   const loadPDF = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const token = localStorage.getItem("accessToken");
-
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-        },
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
       });
 
       if (!response.ok) {
         let errorMessage = "Không thể tải file PDF";
-
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
         } catch {
-          if (response.status === 401) {
+          if (response.status === 401)
             errorMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
-          } else if (response.status === 403) {
+          else if (response.status === 403)
             errorMessage = "Bạn không có quyền xem tài liệu này.";
-          } else if (response.status === 404) {
+          else if (response.status === 404)
             errorMessage = "Không tìm thấy file PDF.";
-          }
         }
-
         throw new Error(errorMessage);
       }
 
@@ -167,30 +128,19 @@ const PDFViewer = ({
     }
   };
 
-  /**
-   * Render specific page
-   */
   const renderPage = async (pageNum) => {
     if (!pdfDoc || rendering) return;
-
     setRendering(true);
-
     try {
       const page = await pdfDoc.getPage(pageNum);
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d");
-
       const viewport = page.getViewport({ scale });
 
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-
-      await page.render(renderContext).promise;
+      await page.render({ canvasContext: context, viewport }).promise;
       setRendering(false);
     } catch (err) {
       console.error("Error rendering page:", err);
@@ -199,42 +149,22 @@ const PDFViewer = ({
   };
 
   const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
-
   const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
-
-  const handlePageChange = (event) => {
-    const pageNum = parseInt(event.target.value, 10);
-    if (pageNum >= 1 && pageNum <= totalPages) {
-      setCurrentPage(pageNum);
-    }
+  const handlePageChange = (e) => {
+    const pageNum = parseInt(e.target.value, 10);
+    if (pageNum >= 1 && pageNum <= totalPages) setCurrentPage(pageNum);
   };
-
-  const handleZoomIn = () => {
-    setScale((prevScale) => Math.min(prevScale + 0.25, 3.0));
-  };
-
-  const handleZoomOut = () => {
-    setScale((prevScale) => Math.max(prevScale - 0.25, 0.5));
-  };
-
-  const handleZoomChange = (event) => {
-    setScale(parseFloat(event.target.value));
-  };
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3.0));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const handleZoomChange = (e) => setScale(parseFloat(e.target.value));
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
+    else document.exitFullscreen();
   };
 
   const handleDownload = async () => {
@@ -248,31 +178,51 @@ const PDFViewer = ({
         document.body.removeChild(link);
         return;
       }
-
       const token = localStorage.getItem("accessToken");
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-        },
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
       });
-
       if (!response.ok) throw new Error("Không thể tải file");
-
       const blob = await response.blob();
       const downloadUrl = URL.createObjectURL(blob);
-
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
       URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error("Download error:", err);
     }
+  };
+
+  // Toolbar button style
+  const toolbarButtonSx = {
+    color: "white",
+    bgcolor: "rgba(255,255,255,0.08)",
+    borderRadius: "8px",
+    "&:hover": { bgcolor: "rgba(255,255,255,0.15)" },
+    "&:disabled": { color: "rgba(255,255,255,0.3)" },
+  };
+
+  // Select style
+  const selectSx = {
+    color: "white",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.2)",
+      borderRadius: "8px",
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.4)",
+    },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: "#D32F2F",
+    },
+    "& .MuiSvgIcon-root": { color: "white" },
   };
 
   return (
@@ -280,83 +230,86 @@ const PDFViewer = ({
       ref={containerRef}
       sx={{
         height: "100%",
-        width: "100%", // FIX: Đảm bảo width 100%
+        width: "100%",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "#525252",
-        position: "relative", // FIX: Để giới hạn các phần tử con
-        overflow: "hidden", // FIX: Ngăn content tràn ra ngoài container
+        background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* Toolbar */}
+      {/* Enhanced Toolbar */}
       {showToolbar && (
         <Box
           sx={{
-            height: 48,
-            minHeight: 48, // FIX: Đảm bảo toolbar không bị co lại
-            backgroundColor: "#323232",
+            height: 56,
+            minHeight: 56,
+            background: "linear-gradient(135deg, #1A1A2E 0%, #252538 100%)",
             display: "flex",
             alignItems: "center",
             px: 2,
             gap: 1,
-            borderBottom: "1px solid #424242",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
             flexShrink: 0,
           }}
         >
           {/* Left Group */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <IconButton size="small" sx={{ color: "white" }}>
-              <MenuIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" sx={{ color: "white" }}>
-              <SearchIcon fontSize="small" />
-            </IconButton>
+            <Tooltip title="Menu" arrow>
+              <IconButton size="small" sx={toolbarButtonSx}>
+                <MenuIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Tìm kiếm" arrow>
+              <IconButton size="small" sx={toolbarButtonSx}>
+                <SearchIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
           </Box>
 
           {/* Divider */}
           <Box
             sx={{
               width: "1px",
-              height: 24,
-              backgroundColor: "#525252",
-              mx: 1,
+              height: 28,
+              bgcolor: "rgba(255,255,255,0.15)",
+              mx: 1.5,
+              borderRadius: 1,
             }}
           />
 
           {/* Page Navigation */}
           {!loading && !error && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <IconButton
-                size="small"
-                sx={{ color: "white" }}
-                onClick={goToPrevPage}
-                disabled={currentPage <= 1}
-              >
-                <NavigateBeforeIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Trang trước" arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={toolbarButtonSx}
+                    onClick={goToPrevPage}
+                    disabled={currentPage <= 1}
+                  >
+                    <NavigateBeforeIcon sx={{ fontSize: 22 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
 
               <Select
                 value={currentPage}
                 onChange={handlePageChange}
                 size="small"
-                sx={{
-                  color: "white",
-                  minWidth: 100,
-                  height: 32,
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#525252",
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#757575",
-                  },
-                  "& .MuiSvgIcon-root": {
-                    color: "white",
-                  },
-                }}
+                sx={{ ...selectSx, minWidth: 110, height: 36 }}
                 MenuProps={{
                   PaperProps: {
-                    style: {
+                    sx: {
                       maxHeight: 300,
+                      bgcolor: "#2D2D44",
+                      "& .MuiMenuItem-root": {
+                        color: "white",
+                        fontSize: "0.875rem",
+                        "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                        "&.Mui-selected": { bgcolor: alpha("#D32F2F", 0.3) },
+                      },
                     },
                   },
                 }}
@@ -370,14 +323,18 @@ const PDFViewer = ({
                 )}
               </Select>
 
-              <IconButton
-                size="small"
-                sx={{ color: "white" }}
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-              >
-                <NavigateNextIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Trang sau" arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={toolbarButtonSx}
+                    onClick={goToNextPage}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <NavigateNextIcon sx={{ fontSize: 22 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Box>
           )}
 
@@ -386,9 +343,10 @@ const PDFViewer = ({
             <Box
               sx={{
                 width: "1px",
-                height: 24,
-                backgroundColor: "#525252",
-                mx: 1,
+                height: 28,
+                bgcolor: "rgba(255,255,255,0.15)",
+                mx: 1.5,
+                borderRadius: 1,
               }}
             />
           )}
@@ -396,52 +354,57 @@ const PDFViewer = ({
           {/* Zoom Controls */}
           {!loading && !error && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <IconButton
-                size="small"
-                sx={{ color: "white" }}
-                onClick={handleZoomOut}
-                disabled={scale <= 0.5}
-              >
-                <ZoomOutIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Thu nhỏ" arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={toolbarButtonSx}
+                    onClick={handleZoomOut}
+                    disabled={scale <= 0.5}
+                  >
+                    <ZoomOutIcon sx={{ fontSize: 20 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
 
               <Select
                 value={scale}
                 onChange={handleZoomChange}
                 size="small"
-                sx={{
-                  color: "white",
-                  minWidth: 80,
-                  height: 32,
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#525252",
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#757575",
-                  },
-                  "& .MuiSvgIcon-root": {
-                    color: "white",
+                sx={{ ...selectSx, minWidth: 85, height: 36 }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: "#2D2D44",
+                      "& .MuiMenuItem-root": {
+                        color: "white",
+                        fontSize: "0.875rem",
+                        "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+                        "&.Mui-selected": { bgcolor: alpha("#D32F2F", 0.3) },
+                      },
+                    },
                   },
                 }}
               >
-                <MenuItem value={0.5}>50%</MenuItem>
-                <MenuItem value={0.75}>75%</MenuItem>
-                <MenuItem value={1.0}>100%</MenuItem>
-                <MenuItem value={1.25}>125%</MenuItem>
-                <MenuItem value={1.5}>150%</MenuItem>
-                <MenuItem value={2.0}>200%</MenuItem>
-                <MenuItem value={2.5}>250%</MenuItem>
-                <MenuItem value={3.0}>300%</MenuItem>
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0].map((z) => (
+                  <MenuItem key={z} value={z}>
+                    {z * 100}%
+                  </MenuItem>
+                ))}
               </Select>
 
-              <IconButton
-                size="small"
-                sx={{ color: "white" }}
-                onClick={handleZoomIn}
-                disabled={scale >= 3.0}
-              >
-                <ZoomInIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Phóng to" arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={toolbarButtonSx}
+                    onClick={handleZoomIn}
+                    disabled={scale >= 3.0}
+                  >
+                    <ZoomInIcon sx={{ fontSize: 20 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Box>
           )}
 
@@ -450,52 +413,56 @@ const PDFViewer = ({
 
           {/* Right Controls */}
           {!loading && !error && (
-            <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
               <Tooltip
                 title={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+                arrow
               >
                 <IconButton
                   size="small"
-                  sx={{ color: "white" }}
+                  sx={toolbarButtonSx}
                   onClick={toggleFullscreen}
                 >
                   {isFullscreen ? (
-                    <FullscreenExitIcon fontSize="small" />
+                    <FullscreenExitIcon sx={{ fontSize: 22 }} />
                   ) : (
-                    <FullscreenIcon fontSize="small" />
+                    <FullscreenIcon sx={{ fontSize: 22 }} />
                   )}
                 </IconButton>
               </Tooltip>
 
               {showDownload && (
-                <Tooltip title="Tải xuống">
+                <Tooltip title="Tải xuống" arrow>
                   <IconButton
                     size="small"
                     onClick={handleDownload}
-                    sx={{ color: "white" }}
+                    sx={{
+                      ...toolbarButtonSx,
+                      bgcolor: alpha("#D32F2F", 0.8),
+                      "&:hover": { bgcolor: "#D32F2F" },
+                    }}
                   >
-                    <DownloadIcon fontSize="small" />
+                    <DownloadIcon sx={{ fontSize: 20 }} />
                   </IconButton>
                 </Tooltip>
               )}
-            </>
+            </Box>
           )}
         </Box>
       )}
 
-      {/* PDF Content - FIX: Thêm overflow controls */}
+      {/* PDF Content */}
       <Box
         sx={{
           flex: 1,
           position: "relative",
-          overflow: "auto", // Cho phép scroll trong container này
-          backgroundColor: "#525252",
+          overflow: "auto",
+          background: "linear-gradient(180deg, #3D3D5C 0%, #2D2D44 100%)",
           display: "flex",
           justifyContent: "center",
           alignItems: "flex-start",
-          p: 2,
-          // FIX: Giới hạn chiều cao để không tràn ra ngoài
-          minHeight: 0, // Quan trọng cho flexbox
+          p: 3,
+          minHeight: 0,
         }}
       >
         {loading && (
@@ -506,12 +473,28 @@ const PDFViewer = ({
               justifyContent: "center",
               alignItems: "center",
               height: "100%",
-              color: "white",
               gap: 2,
             }}
           >
-            <CircularProgress sx={{ color: "white" }} />
-            <Typography variant="body1">Đang tải PDF...</Typography>
+            <Box
+              sx={{
+                width: 72,
+                height: 72,
+                borderRadius: "18px",
+                background: "linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 8px 32px rgba(211, 47, 47, 0.4)",
+              }}
+            >
+              <CircularProgress size={32} sx={{ color: "white" }} />
+            </Box>
+            <Typography
+              sx={{ color: "white", fontWeight: 500, fontSize: "0.9375rem" }}
+            >
+              Đang tải PDF...
+            </Typography>
           </Box>
         )}
 
@@ -519,25 +502,74 @@ const PDFViewer = ({
           <Box
             sx={{
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               height: "100%",
-              color: "white",
+              gap: 2,
             }}
           >
-            <Typography variant="body1">{error}</Typography>
+            <Box
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: "20px",
+                bgcolor: "rgba(239, 68, 68, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <PdfIcon sx={{ fontSize: 40, color: "#EF4444" }} />
+            </Box>
+            <Typography
+              sx={{ color: "#EF4444", fontWeight: 600, fontSize: "1rem" }}
+            >
+              Không thể tải PDF
+            </Typography>
+            <Typography
+              sx={{
+                color: "rgba(255,255,255,0.7)",
+                fontSize: "0.9375rem",
+                textAlign: "center",
+                maxWidth: 300,
+              }}
+            >
+              {error}
+            </Typography>
           </Box>
         )}
 
         {!loading && !error && (
           <Box
             sx={{
-              backgroundColor: "white",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-              // FIX: Canvas wrapper không cần thêm overflow vì container cha đã có
+              bgcolor: "white",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              borderRadius: "4px",
+              overflow: "hidden",
             }}
           >
             <canvas ref={canvasRef} />
+          </Box>
+        )}
+
+        {/* Rendering overlay */}
+        {rendering && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(0,0,0,0.3)",
+              zIndex: 5,
+            }}
+          >
+            <CircularProgress size={40} sx={{ color: "white" }} />
           </Box>
         )}
       </Box>
