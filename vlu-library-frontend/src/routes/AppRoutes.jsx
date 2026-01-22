@@ -19,6 +19,7 @@ import ModeratorModerationPage from "../pages/moderator/ModeratorModerationPage"
 import ModeratorReviewDocumentPage from "../pages/moderator/ModeratorReviewDocumentPage";
 import LandingPage from "../pages/public/LandingPage";
 import CategoriesPage from "../pages/public/CategoriesPage";
+import AuthorStatsPage from "../pages/author/AuthorStatsPage";
 
 /**
  * ProtectedRoute Component
@@ -202,6 +203,16 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["Author", "Admin"]}>
             <MyDocumentsPage />
+          </RoleBasedRoute>
+        }
+      />
+
+      {/* Author Stats Page */}
+      <Route
+        path="/author/stats"
+        element={
+          <RoleBasedRoute allowedRoles={["Author", "Admin"]}>
+            <AuthorStatsPage />
           </RoleBasedRoute>
         }
       />

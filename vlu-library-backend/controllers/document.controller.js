@@ -131,8 +131,15 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    const { title, description, category, author, publisher, publishYear } =
-      req.body;
+    const {
+      title,
+      description,
+      category,
+      author,
+      publisher,
+      publishYear,
+      language,
+    } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({
@@ -185,6 +192,7 @@ const uploadDocument = async (req, res) => {
       author: author ? author.trim() : null,
       publisher: publisher ? publisher.trim() : null,
       publishYear: publishYear ? parseInt(publishYear) : null,
+      documentLanguage: language ? language.trim() : "Tiếng Việt",
       categoryId: category,
       uploadedBy: req.user.id,
       // S3: req.file.location (full URL)
@@ -218,6 +226,7 @@ const uploadDocument = async (req, res) => {
           author: populatedDoc.author,
           publisher: populatedDoc.publisher,
           publishYear: populatedDoc.publishYear,
+          language: document.documentLanguage,
           category: {
             id: populatedDoc.categoryId._id,
             name: populatedDoc.categoryId.name,
@@ -545,6 +554,7 @@ const getDocuments = async (req, res) => {
           author: doc.author,
           publisher: doc.publisher,
           publishYear: doc.publishYear,
+          documentLanguage: doc.documentLanguage,
           category: doc.categoryId
             ? {
                 id: doc.categoryId._id,
@@ -806,20 +816,31 @@ const getDocumentById = async (req, res) => {
 };
 
 /**
- * API: Update document
- * PUT /api/documents/:id
- * Access: Owner (pending only), Admin
- */
+  API: Update document (API 2.10)
+  PUT /api/documents/:id
+  Access: Owner (pending/rejected only), Admin (all)
+  Business Rules:
+  Owner chỉ có thể sửa tài liệu 'pending' hoặc 'rejected'
+  Admin có thể sửa tất cả
+  Nếu tài liệu đang 'rejected', sau khi sửa sẽ tự động chuyển về 'pending'
+  Hỗ trợ thay đổi file (optional)
+*/
 const updateDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, author, publisher, publishYear, category } =
-      req.body;
+    const {
+      title,
+      description,
+      author,
+      publisher,
+      publishYear,
+      category,
+      language,
+    } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
     const document = await Document.findById(id);
-
     if (!document) {
       return res.status(404).json({
         status: "error",
@@ -827,11 +848,21 @@ const updateDocument = async (req, res) => {
         message: "Không tìm thấy tài liệu",
       });
     }
-
     // Check permission
-    const isOwner = document.uploadedBy.toString() === userId;
-    const isAdmin = userRole === "Admin";
+    const uploadedById = document.uploadedBy?._id
+      ? document.uploadedBy._id.toString()
+      : document.uploadedBy?.toString();
+    const currentUserId = userId?.toString();
 
+    const isOwner = uploadedById === currentUserId;
+    const isAdmin = userRole === "Admin";
+    console.log("[UpdateDocument] Permission check:", {
+      documentId: id,
+      uploadedById,
+      currentUserId,
+      isOwner,
+      isAdmin,
+    });
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
         status: "error",
@@ -839,16 +870,21 @@ const updateDocument = async (req, res) => {
         message: "Bạn không có quyền chỉnh sửa tài liệu này",
       });
     }
-
-    // Owner can only edit pending documents
-    if (isOwner && !isAdmin && document.status !== "pending") {
-      return res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Chỉ có thể chỉnh sửa tài liệu đang chờ duyệt",
-      });
+    // Owner can only edit pending or rejected documents
+    // Admin can edit all documents
+    if (isOwner && !isAdmin) {
+      if (document.status === "approved") {
+        return res.status(400).json({
+          status: "error",
+          code: 400,
+          message:
+            "Không thể chỉnh sửa tài liệu đã được duyệt. Vui lòng liên hệ Admin.",
+        });
+      }
     }
-
+    // Store old status for comparison
+    const oldStatus = document.status;
+    const oldCategoryId = document.categoryId?.toString();
     // Update fields
     if (title) document.title = title.trim();
     if (description !== undefined) document.description = description.trim();
@@ -857,17 +893,58 @@ const updateDocument = async (req, res) => {
       document.publisher = publisher ? publisher.trim() : null;
     if (publishYear !== undefined)
       document.publishYear = publishYear ? parseInt(publishYear) : null;
-    if (category) document.categoryId = category;
-
+    if (language !== undefined)
+      document.documentLanguage = language || "Tiếng Việt";
+    // Handle category change
+    if (category && category !== oldCategoryId) {
+      // Decrease count on old category
+      if (oldCategoryId) {
+        await Category.findByIdAndUpdate(oldCategoryId, {
+          $inc: { documentCount: -1 },
+        });
+      }
+      // Increase count on new category
+      await Category.findByIdAndUpdate(category, {
+        $inc: { documentCount: 1 },
+      });
+      document.categoryId = category;
+    }
+    // Handle file update if provided (via multer)
+    if (req.file) {
+      // Delete old file from storage
+      if (document.fileUrl) {
+        await deleteFile(document.fileUrl);
+      }
+      // Determine file format
+      let fileFormat = "pdf";
+      if (req.file.mimetype === "application/epub+zip") {
+        fileFormat = "epub";
+      }
+      // Update file info
+      document.fileUrl = getFileUrl(req.file);
+      document.fileName = req.file.originalname;
+      document.fileSize = req.file.size;
+      document.fileFormat = fileFormat;
+    }
+    // If document was rejected, reset to pending for re-review
+    if (oldStatus === "rejected") {
+      document.status = "pending";
+      document.rejectionReason = null;
+      document.reviewedBy = null;
+      document.reviewedAt = null;
+    }
+    // Save changes
     await document.save();
-
+    // Populate for response
     await document.populate("categoryId", "name slug");
     await document.populate("uploadedBy", "name email role");
-
     return res.status(200).json({
       status: "success",
       code: 200,
-      message: "Cập nhật tài liệu thành công",
+      message:
+        oldStatus === "rejected"
+          ? "Cập nhật tài liệu thành công. Tài liệu đã được gửi lại để kiểm duyệt."
+          : "Cập nhật tài liệu thành công",
       data: {
         document: {
           id: document._id,
@@ -876,20 +953,27 @@ const updateDocument = async (req, res) => {
           author: document.author,
           publisher: document.publisher,
           publishYear: document.publishYear,
+          language: document.language,
           category: document.categoryId
             ? {
                 id: document.categoryId._id,
                 name: document.categoryId.name,
+                slug: document.categoryId.slug,
               }
             : null,
+          fileUrl: document.fileUrl,
+          fileName: document.fileName,
+          fileSize: document.fileSize,
+          fileFormat: document.fileFormat,
           status: document.status,
+          statusChanged: oldStatus !== document.status,
+          previousStatus: oldStatus !== document.status ? oldStatus : undefined,
           updatedAt: document.updatedAt,
         },
       },
     });
   } catch (error) {
     console.error("Update document error:", error);
-
     return res.status(500).json({
       status: "error",
       code: 500,
@@ -1584,6 +1668,198 @@ const getPublicStats = async (req, res) => {
   }
 };
 
+/**
+ * API: Thống kê tài liệu của Author
+ * GET /api/documents/stats/author
+ * Access: Author, Admin (phải đăng nhập)
+ *
+ * @query {string} period - 'day' | 'month' | 'year' (default: 'month')
+ * @query {string} date - ISO date string (default: current date)
+ *
+ * Response:
+ * - period = 'day': Thống kê theo giờ (0-23) trong ngày được chọn
+ * - period = 'month': Thống kê theo ngày (1-31) trong tháng được chọn
+ * - period = 'year': Thống kê theo tháng (1-12) trong năm được chọn
+ */
+const getAuthorStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { period = "month", date } = req.query;
+
+    // Parse date hoặc dùng ngày hiện tại
+    const selectedDate = date ? new Date(date) : new Date();
+
+    // Validate period
+    if (!["day", "month", "year"].includes(period)) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Period phải là 'day', 'month' hoặc 'year'",
+      });
+    }
+
+    // Xác định khoảng thời gian và format group
+    let startDate, endDate, groupFormat, totalSlots, labelFormat;
+
+    if (period === "day") {
+      // Thống kê theo giờ trong ngày
+      startDate = new Date(selectedDate);
+      startDate.setHours(0, 0, 0, 0);
+
+      endDate = new Date(selectedDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      groupFormat = { $hour: "$createdAt" };
+      totalSlots = 24;
+      labelFormat = (i) => `${i}h`;
+    } else if (period === "month") {
+      // Thống kê theo ngày trong tháng
+      startDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        1,
+      );
+
+      endDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
+
+      groupFormat = { $dayOfMonth: "$createdAt" };
+      totalSlots = endDate.getDate(); // Số ngày trong tháng
+      labelFormat = (i) => `${i}`;
+    } else {
+      // period === 'year' - Thống kê theo tháng trong năm
+      startDate = new Date(selectedDate.getFullYear(), 0, 1);
+
+      endDate = new Date(selectedDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+      groupFormat = { $month: "$createdAt" };
+      totalSlots = 12;
+      labelFormat = (i) => `T${i}`;
+    }
+
+    // Aggregation query
+    const stats = await Document.aggregate([
+      {
+        $match: {
+          uploadedBy: new mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: groupFormat,
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    // Tạo map từ kết quả aggregation
+    const statsMap = {};
+    stats.forEach((item) => {
+      statsMap[item._id] = item.count;
+    });
+
+    // Fill data với các khoảng thời gian trống = 0
+    const chartData = [];
+    const startIndex = period === "day" ? 0 : 1;
+    const endIndex = period === "day" ? totalSlots - 1 : totalSlots;
+
+    for (let i = startIndex; i <= endIndex; i++) {
+      chartData.push({
+        name: labelFormat(i),
+        value: statsMap[i] || 0,
+      });
+    }
+
+    // Tính tổng số tài liệu trong khoảng thời gian
+    const totalDocuments = chartData.reduce((sum, item) => sum + item.value, 0);
+
+    // Thống kê theo status
+    const statusStats = await Document.aggregate([
+      {
+        $match: {
+          uploadedBy: new mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const statusMap = { pending: 0, approved: 0, rejected: 0 };
+    statusStats.forEach((item) => {
+      statusMap[item._id] = item.count;
+    });
+
+    // Thống kê views và downloads
+    const engagementStats = await Document.aggregate([
+      {
+        $match: {
+          uploadedBy: new mongoose.Types.ObjectId(userId),
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: "$views" },
+          totalDownloads: { $sum: "$downloads" },
+        },
+      },
+    ]);
+
+    const engagement = engagementStats[0] || {
+      totalViews: 0,
+      totalDownloads: 0,
+    };
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy thống kê thành công",
+      data: {
+        period,
+        selectedDate: selectedDate.toISOString(),
+        range: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
+        chartData,
+        summary: {
+          totalDocuments,
+          pending: statusMap.pending,
+          approved: statusMap.approved,
+          rejected: statusMap.rejected,
+          totalViews: engagement.totalViews,
+          totalDownloads: engagement.totalDownloads,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get author stats error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy thống kê",
+    });
+  }
+};
+
 module.exports = {
   uploadDocument,
   reviewDocument,
@@ -1598,4 +1874,5 @@ module.exports = {
   getDashboardStats,
   getFeaturedDocuments,
   getPublicStats,
+  getAuthorStats,
 };

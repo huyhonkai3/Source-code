@@ -381,19 +381,25 @@ const SearchPage = () => {
       <Box
         sx={{
           position: "relative",
-          overflow: "hidden",
+          overflow: "visible",
+          zIndex: 10,
           pt: { xs: 6, md: 10 },
           pb: { xs: 8, md: 12 },
           mb: { xs: 3, md: 5 },
-          background: `linear-gradient(135deg, #D32F2F 0%, #FF6B6B 50%, #FFC107 100%)`,
+          // Đồng bộ với LandingPage HeroSection
+          background: `
+            linear-gradient(135deg,
+              rgba(26, 26, 46, 0.95) 0%,
+              rgba(139, 0, 0, 0.9) 50%,
+              rgba(211, 47, 47, 0.85) 100%
+            )
+          `,
           "&::before": {
             content: '""',
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            inset: 0,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            opacity: 0.5,
           },
         }}
       >
@@ -516,9 +522,9 @@ const SearchPage = () => {
                   mt: 1,
                   bgcolor: "white",
                   borderRadius: "16px",
-                  boxShadow: "0 16px 48px rgba(0,0,0,0.15)",
+                  boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
                   overflow: "hidden",
-                  zIndex: 10,
+                  zIndex: 1000,
                 }}
               >
                 {/* Recent Searches */}

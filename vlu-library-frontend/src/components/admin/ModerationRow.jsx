@@ -25,7 +25,7 @@ import { vi } from "date-fns/locale";
  * ModerationRow Component - VLU Design System v2.0.1
  * UPDATED: Tăng font sizes để UX tốt hơn
  */
-const ModerationRow = ({ document, currentTab = 0, onReview }) => {
+const ModerationRow = ({ document, currentTab = 0, onReview, userRole }) => {
   const formatFileSize = (bytes) => {
     if (!bytes) return "N/A";
     const mb = bytes / (1024 * 1024);
@@ -256,31 +256,38 @@ const ModerationRow = ({ document, currentTab = 0, onReview }) => {
         sx={{ py: 2.5, borderBottom: "1px solid", borderColor: "#F0F0F5" }}
       >
         {currentTab === 0 ? (
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<VisibilityIcon />}
-            onClick={() => onReview(document._id || document.id)}
-            sx={{
-              textTransform: "none",
-              borderRadius: "10px",
-              px: 2.5,
-              py: 1,
-              fontWeight: 600,
-              fontSize: "0.875rem",
-              bgcolor: "#D32F2F",
-              boxShadow: "0 4px 14px rgba(211, 47, 47, 0.3)",
-              transition: "all 0.2s ease",
-              "&:hover": {
-                bgcolor: "#B71C1C",
-                transform: "translateY(-2px)",
-                boxShadow: "0 6px 20px rgba(211, 47, 47, 0.4)",
-              },
-              "&:active": { transform: "translateY(0)" },
-            }}
-          >
-            Xem xét
-          </Button>
+          userRole === "Moderator" ? (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<VisibilityIcon />}
+              onClick={() => onReview(document._id || document.id)}
+              sx={{
+                textTransform: "none",
+                borderRadius: "10px",
+                px: 2.5,
+                py: 1,
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                bgcolor: "#D32F2F",
+                boxShadow: "0 4px 14px rgba(211, 47, 47, 0.3)",
+                "&:hover": { bgcolor: "#B71C1C" },
+              }}
+            >
+              Xem xét
+            </Button>
+          ) : (
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#8E8EA9",
+                fontStyle: "italic",
+                fontSize: "0.8125rem",
+              }}
+            >
+              Chức năng này chỉ dành cho Kiểm duyệt viên
+            </Typography>
+          )
         ) : (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Avatar

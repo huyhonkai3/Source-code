@@ -230,14 +230,9 @@ const startServer = async () => {
 
     // Sau đó mới start server
     app.listen(PORT, () => {
-      console.log(`\n🚀 Server is running on port ${PORT}`);
-      console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`🌐 API URL: http://localhost:${PORT}`);
-      console.log(`\n✅ Authentication APIs ready:`);
-      console.log(`   POST /api/auth/register`);
-      console.log(`   POST /api/auth/login`);
-      console.log(`   POST /api/auth/refresh`);
-      console.log(`\n💡 Press Ctrl+C to stop the server\n`);
+      console.log(`\nServer is running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`API URL: http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

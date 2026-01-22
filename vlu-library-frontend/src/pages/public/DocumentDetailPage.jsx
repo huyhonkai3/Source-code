@@ -45,6 +45,7 @@ import {
   Storage as SizeIcon,
   Category as FormatIcon,
 } from "@mui/icons-material";
+import LanguageIcon from "@mui/icons-material/Language";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import useDownload from "../../hooks/useDownload";
@@ -194,6 +195,15 @@ const DocumentDetailPage = () => {
         icon: PublisherIcon,
         label: "Nhà xuất bản",
         value: document.publisher,
+        color: "#7C4DFF",
+      });
+    }
+
+    if (document.documentLanguage) {
+      items.push({
+        icon: LanguageIcon,
+        label: "Language",
+        value: document.documentLanguage,
         color: "#7C4DFF",
       });
     }

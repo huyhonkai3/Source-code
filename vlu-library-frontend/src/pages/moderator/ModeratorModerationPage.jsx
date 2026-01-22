@@ -25,6 +25,7 @@ import Header from "../../components/common/Header";
 import UserSidebar from "../../components/user/UserSidebar";
 import ModerationTable from "../../components/admin/ModerationTable";
 import documentsAPI from "../../api/documents.api";
+import userAPI from "../../api/user.api";
 
 /**
  * ModeratorModerationPage Component
@@ -38,6 +39,9 @@ const ModeratorModerationPage = () => {
 
   // Tab state
   const [currentTab, setCurrentTab] = useState(0); // 0: pending, 1: approved, 2: rejected
+
+  // Thông tin user hiện tại
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Data state
   const [documents, setDocuments] = useState([]);
@@ -86,6 +90,20 @@ const ModeratorModerationPage = () => {
       "Lịch sử Từ chối",
     ];
     return titleMap[tabIndex];
+  };
+
+  /**
+   * Fetch current logged-in user profile
+   */
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await userAPI.getProfile();
+      if (response.status === "success") {
+        setCurrentUser(response.data);
+      }
+    } catch (error) {
+      console.error("Fetch current user error:", error);
+    }
   };
 
   /**
@@ -153,6 +171,7 @@ const ModeratorModerationPage = () => {
    * Initial data load
    */
   useEffect(() => {
+    fetchCurrentUser();
     fetchDocuments();
     fetchStatusCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,6 +399,7 @@ const ModeratorModerationPage = () => {
                 currentTab={currentTab}
                 onPageChange={handlePageChange}
                 onReview={handleReview}
+                userRole={currentUser?.role}
               />
             </Box>
           </Grid>

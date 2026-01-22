@@ -242,13 +242,28 @@ export const deleteDocument = async (id) => {
 
 /**
  * Update document
+ * Hỗ trợ cả 2 mode:
+ * - JSON data (không có file mới)
+ * - FormData (có file mới)
+ *
  * @param {string} id - Document ID
- * @param {Object} data - Document data to update
+ * @param {Object|FormData} data - Document data to update
  * @returns {Promise} Response data
  */
 export const updateDocument = async (id, data) => {
   try {
-    const response = await axiosInstance.put(`/documents/${id}`, data);
+    // Check if data is FormData (has file)
+    const isFormData = data instanceof FormData;
+
+    const config = isFormData
+      ? {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      : {};
+
+    const response = await axiosInstance.put(`/documents/${id}`, data, config);
     return response.data;
   } catch (error) {
     throw error;
@@ -307,6 +322,29 @@ export const getPublicStats = async () => {
   }
 };
 
+/**
+ * Lấy thống kê tài liệu của Author
+ * GET /api/documents/stats/author
+ * @param {Object} params - Query parameters
+ * @param {string} params.period - 'day' | 'month' | 'year'
+ * @param {string} params.date - ISO date string (ngày được chọn)
+ * @returns {Promise} Response chứa { chartData, summary }
+ */
+export const getAuthorStats = async (params = {}) => {
+  try {
+    const response = await axiosInstance.get("/documents/stats/author", {
+      params: {
+        period: params.period || "month",
+        date: params.date || new Date().toISOString(),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Get author stats error:", error);
+    throw error;
+  }
+};
+
 // Export as default object
 const documentsAPI = {
   getAll,
@@ -325,6 +363,7 @@ const documentsAPI = {
   reviewDocument,
   getFeatured,
   getPublicStats,
+  getAuthorStats,
 };
 
 export default documentsAPI;

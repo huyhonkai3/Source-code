@@ -97,7 +97,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
    * Handle view document
    */
   const handleView = (docId) => {
-    navigate(`/admin/moderation/${docId}`);
+    navigate(`/documents/${docId}`);
   };
 
   /**

@@ -63,6 +63,21 @@ router.get("/featured", documentController.getFeaturedDocuments);
 router.get("/public-stats", documentController.getPublicStats);
 
 /**
+ * @route   GET /api/documents/stats/author
+ * @desc    Lấy thống kê tài liệu của Author hiện tại
+ * @access  Author (phải đăng nhập)
+ * @query   period - 'day' | 'month' | 'year' (default: 'month')
+ * @query   date - ISO date string (default: current date)
+ * @returns { chartData, summary }
+ */
+router.get(
+  "/stats/author",
+  checkAuth,
+  checkRole(["Author", "Admin"]),
+  documentController.getAuthorStats,
+);
+
+/**
  * route   GET /api/documents
  * desc    Lấy danh sách tài liệu đã duyệt (API 2.7 - F11)
  * access  Public (không cần đăng nhập)
@@ -73,11 +88,22 @@ router.get("/", documentController.getDocuments);
 /**
  * @route   PUT /api/documents/:id (API 2.10 - Author)
  * @desc    Cập nhật tài liệu (API 2.10 - Author)
- * @access  Author/Admin
+ * @access  Author
  * @param   id - Document ID
+ * @body    title, description, category, author, publisher, publishYear, language
+ * @file    File mới để thay thế file cũ
+ *
+ * Business Rules:
+ * - Owner chỉ được sửa tài liệu 'pending' hoặc 'rejected'
+ * - Admin được sửa tất cả
+ * - Nếu tài liệu đang 'rejected', sau khi sửa sẽ tự động chuyển về 'pending'
  */
-router.put("/:id", checkAuth, documentController.updateDocument);
-
+router.put(
+  "/:id",
+  checkAuth,
+  uploadMiddleware, // Hỗ trợ upload file mới
+  documentController.updateDocument,
+);
 /**
  * @route   DELETE /api/documents/:id (API 2.11 - Author/Admin)
  * @desc    Xóa tài liệu (API 2.11 - Author/Admin)

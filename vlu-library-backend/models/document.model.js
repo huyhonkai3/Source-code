@@ -64,6 +64,11 @@ const documentSchema = new mongoose.Schema(
       default: null,
     },
 
+    documentLanguage: {
+      type: String,
+      default: "Tiếng Việt",
+    },
+
     publishYear: {
       type: Number,
       min: [1000, "Năm xuất bản không hợp lệ"],

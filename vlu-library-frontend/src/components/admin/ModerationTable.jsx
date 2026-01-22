@@ -33,6 +33,7 @@ const ModerationTable = ({
   totalDocuments = 0,
   currentTab = 0,
   onPageChange,
+  userRole,
   onReview,
 }) => {
   const getHeaders = () => {
@@ -267,6 +268,7 @@ const ModerationTable = ({
                   <ModerationRow
                     document={document}
                     currentTab={currentTab}
+                    userRole={userRole}
                     onReview={onReview}
                   />
                 </TableRow>
