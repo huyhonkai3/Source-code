@@ -87,6 +87,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
     author: "",
     publisher: "",
     language: "Tiếng Việt",
+    isbn: "",
   });
 
   // Data từ API
@@ -113,6 +114,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
         author: document.author || "",
         publisher: document.publisher || "",
         language: document.language || "Tiếng Việt",
+        isbn: document.isbn || "",
       });
       setNewFile(null);
       setError("");
@@ -222,6 +224,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
         publishYear: formData.publishYear,
         author: formData.author?.trim() || null,
         publisher: formData.publisher?.trim() || null,
+        isbn: formData.isbn?.trim() || "",
         language: formData.language,
       };
 
@@ -680,6 +683,19 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
                   fullWidth
                   disabled={saving}
                   placeholder="Nhập tên tác giả gốc"
+                  sx={textFieldStyles}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="ISBN"
+                  name="isbn"
+                  value={formData.isbn}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={saving}
+                  placeholder="Ví dụ: 9786041234567"
                   sx={textFieldStyles}
                 />
               </Grid>

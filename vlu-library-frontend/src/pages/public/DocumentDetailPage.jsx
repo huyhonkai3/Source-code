@@ -25,6 +25,11 @@ import {
   alpha,
   Skeleton,
   IconButton,
+  TableContainer,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@mui/material";
 import {
   Home as HomeIcon,
@@ -44,6 +49,7 @@ import {
   Layers as PagesIcon,
   Storage as SizeIcon,
   Category as FormatIcon,
+  Public as WikidataIcon,
 } from "@mui/icons-material";
 import LanguageIcon from "@mui/icons-material/Language";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
@@ -65,6 +71,9 @@ const DocumentDetailPage = () => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
+  const [lodData, setLodData] = useState(null);
+  const [lodLoading, setLodLoading] = useState(false);
+  const [lodLoaded, setLodLoaded] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -101,6 +110,12 @@ const DocumentDetailPage = () => {
   useEffect(() => {
     fetchDocument();
   }, [fetchDocument]);
+
+  useEffect(() => {
+    setLodData(null);
+    setLodLoaded(false);
+    setLodLoading(false);
+  }, [id]);
 
   /**
    * Tạo URL đầy đủ cho file viewer
@@ -173,7 +188,31 @@ const DocumentDetailPage = () => {
     { label: "Đọc tài liệu", icon: <ReadIcon /> },
     { label: "Đánh giá", icon: <StarIcon /> },
     { label: "Bình luận", icon: <CommentIcon /> },
+    { label: "Liên kết dữ liệu (LOD)", icon: <WikidataIcon /> },
   ];
+
+  const fetchLodData = useCallback(async () => {
+    if (lodLoading || lodLoaded || !document) return;
+    setLodLoading(true);
+    try {
+      const response = await documentsAPI.getLOD(document.id || document._id);
+      setLodData(response?.data?.lod || null);
+      console.log("LOD data fetched:", response?.data?.lod);
+    } catch (error) {
+      console.error("Fetch LOD error:", error);
+      showSnackbar("Không thể tải dữ liệu liên kết từ Wikidata", "error");
+    } finally {
+      setLodLoaded(true);
+      setLodLoading(false);
+    }
+  }, [document, lodLoaded, lodLoading, showSnackbar]);
+
+  const handleTabChange = (nextTab) => {
+    setTabValue(nextTab);
+    if (nextTab === 4 && !lodLoaded && !lodLoading) {
+      fetchLodData();
+    }
+  };
 
   // Detail info items cho Tab 0
   const getDetailItems = () => {
@@ -490,7 +529,7 @@ const DocumentDetailPage = () => {
           >
             <Tabs
               value={tabValue}
-              onChange={(e, v) => setTabValue(v)}
+              onChange={(e, v) => handleTabChange(v)} // onChange={(e, v) => setTabValue(v)}
               variant="scrollable"
               scrollButtons="auto"
               sx={{
@@ -697,6 +736,74 @@ const DocumentDetailPage = () => {
             {tabValue === 3 && (
               <Box>
                 <CommentSection docId={id} />
+              </Box>
+            )}
+
+            {/* ========== TAB 4: LINKED OPEN DATA ========== */}
+            {tabValue === 4 && (
+              <Box>
+                {lodLoading ? (
+                  <Box sx={{ display: "grid", gap: 1.5 }}>
+                    {[...Array(5)].map((_, idx) => (
+                      <Skeleton key={idx} variant="rounded" height={48} />
+                    ))}
+                  </Box>
+                ) : lodData ? (
+                  <Box>
+                    <TableContainer
+                      sx={{ border: "1px solid #F0F0F5", borderRadius: "14px" }}
+                    >
+                      <Table size="small">
+                        <TableBody>
+                          {[
+                            ["Mô tả", lodData.description || "-"],
+                            ["Nhà xuất bản gốc", lodData.publisher || "-"],
+                            [
+                              "Năm xuất bản",
+                              lodData.publicationDate
+                                ? new Date(
+                                    lodData.publicationDate,
+                                  ).getFullYear()
+                                : "-",
+                            ],
+                            ["Thể loại", lodData.genre || "-"],
+                            ["Số trang", lodData.pages || "-"],
+                          ].map(([key, value]) => (
+                            <TableRow key={key}>
+                              <TableCell sx={{ fontWeight: 600, width: 220 }}>
+                                {key}
+                              </TableCell>
+                              <TableCell>{value}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    {lodData.itemUri && (
+                      <Button
+                        component={Link}
+                        href={lodData.itemUri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="outlined"
+                        startIcon={<WikidataIcon />}
+                        sx={{
+                          mt: 2,
+                          borderRadius: "10px",
+                          textTransform: "none",
+                        }}
+                      >
+                        Xem trên Wikidata
+                      </Button>
+                    )}
+                  </Box>
+                ) : (
+                  <Alert severity="info">
+                    Chưa tìm thấy dữ liệu liên kết phù hợp trên Wikidata cho tài
+                    liệu này.
+                  </Alert>
+                )}
               </Box>
             )}
           </Box>

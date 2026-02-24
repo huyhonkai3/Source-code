@@ -58,6 +58,12 @@ const documentSchema = new mongoose.Schema(
       default: null,
     },
 
+    isbn: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     publisher: {
       type: String,
       trim: true,
@@ -190,7 +196,13 @@ const documentSchema = new mongoose.Schema(
       type: wikidataInfoSchema,
       default: null,
     },
+
+    lodMetadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
+
   {
     timestamps: true, // createdAt, updatedAt
   },

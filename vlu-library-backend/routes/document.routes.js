@@ -148,6 +148,13 @@ router.get(
 router.post("/:id/track", checkAuth, documentController.trackDocument);
 
 /**
+ * @route   GET /api/documents/:id/lod
+ * @desc    Lấy metadata LOD từ Wikidata (có cache DB)
+ * @access  Public
+ */
+router.get("/:id/lod", checkAuthOptional, documentController.getLinkedData);
+
+/**
  * route   GET /api/documents/:id/read
  * desc    Đọc tài liệu trực tuyến (API 2.15 - F12)
  * access  User, Author, Moderator, Admin (phải đăng nhập)

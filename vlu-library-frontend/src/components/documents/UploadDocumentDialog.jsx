@@ -68,6 +68,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
     description: "",
     author: "",
     publisher: "",
+    isbn: "",
   });
 
   // Data từ API
@@ -118,6 +119,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       description: "",
       author: "",
       publisher: "",
+      isbn: "",
     });
     setUploadStatus("idle");
     setProgress(0);
@@ -214,6 +216,7 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       data.append("description", formData.description.trim());
       data.append("publishYear", formData.publishYear);
       if (formData.author) data.append("author", formData.author);
+      if (formData.isbn) data.append("isbn", formData.isbn.trim());
       if (formData.publisher) data.append("publisher", formData.publisher);
 
       await documentsAPI.upload(data, (percentCompleted) => {
@@ -664,6 +667,19 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
                   fullWidth
                   disabled={isUploading}
                   placeholder="Nhập tên tác giả gốc"
+                  sx={textFieldStyles}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="ISBN"
+                  name="isbn"
+                  value={formData.isbn}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={isUploading}
+                  placeholder="Ví dụ: 9786041234567"
                   sx={textFieldStyles}
                 />
               </Grid>

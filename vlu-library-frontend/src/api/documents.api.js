@@ -189,6 +189,15 @@ export const getRelated = async (categoryId, currentDocId, limit = 4) => {
   }
 };
 
+export const getLOD = async (id) => {
+  try {
+    const response = await axiosInstance.get(`/documents/${id}/lod`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 /**
  * Download document
  * @param {string} id - Document ID
@@ -356,6 +365,7 @@ const documentsAPI = {
   trackView,
   getRelated,
   trackDownload,
+  getLOD,
   download,
   getMyDocuments,
   deleteDocument,

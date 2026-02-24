@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const https = require("https");
 const http = require("http");
+const axios = require("axios");
 // Import helper functions từ upload middleware
 const {
   getFileUrl,
@@ -108,6 +109,72 @@ const buildSmartSearchQuery = (searchKeyword) => {
   return { $and: andConditions };
 };
 
+const escapeSparqlLiteral = (value = "") => {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, " ")
+    .replace(/\r/g, " ");
+};
+
+const sanitizeIsbn = (value = "") => value.replace(/[^0-9Xx]/g, "").trim();
+
+const buildWikidataQuery = ({ isbn, title, author }) => {
+  const safeTitle = escapeSparqlLiteral((title || "").trim());
+  const safeAuthor = escapeSparqlLiteral((author || "").trim());
+  const safeIsbn = sanitizeIsbn(isbn || "");
+
+  const whereClause = safeIsbn
+    ? `
+      {
+        ?item wdt:P212 "${safeIsbn}".
+      }
+      UNION
+      {
+        ?item wdt:P957 "${safeIsbn}".
+      }
+    `
+    : `
+      ?item rdfs:label ?titleLabel.
+      FILTER(LANG(?titleLabel) IN ("vi", "en")).
+      FILTER(CONTAINS(LCASE(STR(?titleLabel)), LCASE("${safeTitle}"))).
+      ${
+        safeAuthor
+          ? `
+      ?item wdt:P50 ?authorItem.
+      ?authorItem rdfs:label ?authorLabelRaw.
+      FILTER(LANG(?authorLabelRaw) IN ("vi", "en")).
+      FILTER(CONTAINS(LCASE(STR(?authorLabelRaw)), LCASE("${safeAuthor}"))).
+      `
+          : ""
+      }
+    `;
+
+  return `
+    SELECT DISTINCT
+      ?item
+      ?itemLabel
+      ?itemDescription
+      ?publisherLabel
+      ?publicationDate
+      ?genreLabel
+      ?pages
+    WHERE {
+      ${whereClause}
+
+      OPTIONAL { ?item wdt:P123 ?publisher. }
+      OPTIONAL { ?item wdt:P577 ?publicationDate. }
+      OPTIONAL { ?item wdt:P136 ?genre. }
+      OPTIONAL { ?item wdt:P1104 ?pages. }
+
+      SERVICE wikibase:label {
+        bd:serviceParam wikibase:language "vi,en".
+      }
+    }
+    LIMIT 1
+  `;
+};
+
 /**
  * API 2.5: Tải lên tài liệu (F6)
  * POST /api/documents/upload
@@ -136,6 +203,7 @@ const uploadDocument = async (req, res) => {
       description,
       category,
       author,
+      isbn,
       publisher,
       publishYear,
       language,
@@ -190,6 +258,7 @@ const uploadDocument = async (req, res) => {
       title: title.trim(),
       description: description ? description.trim() : "",
       author: author ? author.trim() : null,
+      isbn: isbn ? isbn.trim() : "",
       publisher: publisher ? publisher.trim() : null,
       publishYear: publishYear ? parseInt(publishYear) : null,
       documentLanguage: language ? language.trim() : "Tiếng Việt",
@@ -224,6 +293,7 @@ const uploadDocument = async (req, res) => {
           title: populatedDoc.title,
           description: populatedDoc.description,
           author: populatedDoc.author,
+          isbn: populatedDoc.isbn,
           publisher: populatedDoc.publisher,
           publishYear: populatedDoc.publishYear,
           language: document.documentLanguage,
@@ -360,6 +430,7 @@ const reviewDocument = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
           category: {
@@ -767,6 +838,7 @@ const getDocumentById = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
           category: document.categoryId
@@ -832,6 +904,7 @@ const updateDocument = async (req, res) => {
       title,
       description,
       author,
+      isbn,
       publisher,
       publishYear,
       category,
@@ -889,6 +962,7 @@ const updateDocument = async (req, res) => {
     if (title) document.title = title.trim();
     if (description !== undefined) document.description = description.trim();
     if (author !== undefined) document.author = author ? author.trim() : null;
+    if (isbn !== undefined) document.isbn = isbn ? isbn.trim() : "";
     if (publisher !== undefined)
       document.publisher = publisher ? publisher.trim() : null;
     if (publishYear !== undefined)
@@ -951,6 +1025,7 @@ const updateDocument = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
           language: document.language,
@@ -978,6 +1053,104 @@ const updateDocument = async (req, res) => {
       status: "error",
       code: 500,
       message: "Lỗi server khi cập nhật tài liệu",
+    });
+  }
+};
+
+const getLinkedData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Không tìm thấy tài liệu",
+      });
+    }
+
+    if (document.lodMetadata) {
+      return res.status(200).json({
+        status: "success",
+        code: 200,
+        message: "Lấy dữ liệu liên kết thành công (cache)",
+        data: {
+          source: "cache",
+          lod: document.lodMetadata,
+        },
+      });
+    }
+
+    const sparqlQuery = buildWikidataQuery({
+      isbn: document.isbn,
+      title: document.title,
+      author: document.author,
+    });
+
+    let response;
+    try {
+      response = await axios.get("https://query.wikidata.org/sparql", {
+        params: {
+          query: sparqlQuery,
+          format: "json",
+        },
+        headers: {
+          "User-Agent": "VLU-Library-Student-Project/1.0",
+        },
+      });
+    } catch (externalError) {
+      console.error("Wikidata SPARQL error:", externalError.message);
+      return res.status(502).json({
+        status: "error",
+        code: 502,
+        message: "Không thể truy vấn dữ liệu từ Wikidata",
+      });
+    }
+
+    const firstBinding = response.data?.results?.bindings?.[0] || null;
+
+    if (!firstBinding) {
+      return res.status(200).json({
+        status: "success",
+        code: 200,
+        message: "Không tìm thấy dữ liệu liên kết phù hợp",
+        data: {
+          source: "wikidata",
+          lod: null,
+        },
+      });
+    }
+
+    const parsedLod = {
+      itemUri: firstBinding.item?.value || "",
+      label: firstBinding.itemLabel?.value || "",
+      description: firstBinding.itemDescription?.value || "",
+      publisher: firstBinding.publisherLabel?.value || "",
+      publicationDate: firstBinding.publicationDate?.value || "",
+      genre: firstBinding.genreLabel?.value || "",
+      pages: firstBinding.pages?.value || "",
+      rawBinding: firstBinding,
+    };
+
+    document.lodMetadata = parsedLod;
+    await document.save();
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy dữ liệu liên kết thành công",
+      data: {
+        source: "wikidata",
+        lod: parsedLod,
+      },
+    });
+  } catch (error) {
+    console.error("Get linked data error:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy dữ liệu liên kết",
     });
   }
 };
@@ -1875,4 +2048,5 @@ module.exports = {
   getFeaturedDocuments,
   getPublicStats,
   getAuthorStats,
+  getLinkedData,
 };
