@@ -25,11 +25,9 @@ import {
   alpha,
   Skeleton,
   IconButton,
-  TableContainer,
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
+  Card,
+  CardContent,
+  Grid,
 } from "@mui/material";
 import {
   Home as HomeIcon,
@@ -50,6 +48,8 @@ import {
   Storage as SizeIcon,
   Category as FormatIcon,
   Public as WikidataIcon,
+  SearchOff as SearchOffIcon,
+  SentimentDissatisfied as SadIcon,
 } from "@mui/icons-material";
 import LanguageIcon from "@mui/icons-material/Language";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
@@ -743,66 +743,131 @@ const DocumentDetailPage = () => {
             {tabValue === 4 && (
               <Box>
                 {lodLoading ? (
-                  <Box sx={{ display: "grid", gap: 1.5 }}>
-                    {[...Array(5)].map((_, idx) => (
-                      <Skeleton key={idx} variant="rounded" height={48} />
+                  <Grid container spacing={2}>
+                    {[...Array(4)].map((_, idx) => (
+                      <Grid item xs={12} md={6} key={idx}>
+                        <Skeleton variant="rounded" height={120} />
+                      </Grid>
                     ))}
-                  </Box>
+                  </Grid>
                 ) : lodData ? (
                   <Box>
-                    <TableContainer
-                      sx={{ border: "1px solid #F0F0F5", borderRadius: "14px" }}
+                    <Box
+                      sx={{
+                        mb: 2.5,
+                        p: 2,
+                        borderRadius: "14px",
+                        bgcolor: alpha("#00A1D6", 0.08),
+                        border: "1px solid",
+                        borderColor: alpha("#00A1D6", 0.2),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        flexWrap: "wrap",
+                      }}
                     >
-                      <Table size="small">
-                        <TableBody>
-                          {[
-                            ["Mô tả", lodData.description || "-"],
-                            ["Nhà xuất bản gốc", lodData.publisher || "-"],
-                            [
-                              "Năm xuất bản",
-                              lodData.publicationDate
-                                ? new Date(
-                                    lodData.publicationDate,
-                                  ).getFullYear()
-                                : "-",
-                            ],
-                            ["Thể loại", lodData.genre || "-"],
-                            ["Số trang", lodData.pages || "-"],
-                          ].map(([key, value]) => (
-                            <TableRow key={key}>
-                              <TableCell sx={{ fontWeight: 600, width: 220 }}>
-                                {key}
-                              </TableCell>
-                              <TableCell>{value}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-
-                    {lodData.itemUri && (
-                      <Button
-                        component={Link}
-                        href={lodData.itemUri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variant="outlined"
-                        startIcon={<WikidataIcon />}
-                        sx={{
-                          mt: 2,
-                          borderRadius: "10px",
-                          textTransform: "none",
-                        }}
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
                       >
-                        Xem trên Wikidata
-                      </Button>
-                    )}
+                        <WikidataIcon sx={{ color: "#00A1D6" }} />
+                        <Typography sx={{ fontWeight: 700, color: "#1A1A2E" }}>
+                          Dữ liệu từ Wikidata{" "}
+                          {lodData.qid ? `(${lodData.qid})` : ""}
+                        </Typography>
+                      </Box>
+                      {lodData.wikidataUrl && (
+                        <Button
+                          component={Link}
+                          href={lodData.wikidataUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="contained"
+                          size="small"
+                          startIcon={<WikidataIcon />}
+                          sx={{ textTransform: "none", borderRadius: "10px" }}
+                        >
+                          Xem chi tiết trên Wikidata
+                        </Button>
+                      )}
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      {[
+                        {
+                          label: "Nhà xuất bản",
+                          value: lodData.publisher || "-",
+                        },
+                        { label: "Thể loại", value: lodData.genre || "-" },
+                        { label: "Số trang", value: lodData.pages || "-" },
+                        {
+                          label: "Mô tả ngắn",
+                          value: lodData.description || "-",
+                        },
+                      ].map((item) => (
+                        <Grid item xs={12} md={6} key={item.label}>
+                          <Card
+                            elevation={0}
+                            sx={{
+                              borderRadius: "14px",
+                              border: "1px solid #F0F0F5",
+                              bgcolor: "#FAFAFC",
+                              height: "100%",
+                            }}
+                          >
+                            <CardContent>
+                              <Typography
+                                variant="caption"
+                                sx={{ color: "#8E8EA9" }}
+                              >
+                                {item.label}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontWeight: 600,
+                                  color: "#1A1A2E",
+                                  mt: 0.5,
+                                }}
+                              >
+                                {item.value}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
                   </Box>
                 ) : (
-                  <Alert severity="info">
-                    Chưa tìm thấy dữ liệu liên kết phù hợp trên Wikidata cho tài
-                    liệu này.
-                  </Alert>
+                  <Box
+                    sx={{
+                      textAlign: "center",
+                      py: 6,
+                      px: 3,
+                      borderRadius: "16px",
+                      border: "1px dashed #D5D9E2",
+                      bgcolor: "#FCFCFE",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: 1,
+                        mb: 2,
+                      }}
+                    >
+                      <SadIcon sx={{ color: "#8E8EA9" }} />
+                      <SearchOffIcon sx={{ color: "#8E8EA9" }} />
+                    </Box>
+                    <Typography
+                      sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
+                    >
+                      Chưa có dữ liệu liên kết trên Wikidata
+                    </Typography>
+                    <Typography sx={{ color: "#8E8EA9" }}>
+                      Hệ thống chưa tìm thấy bản ghi phù hợp cho tài liệu này.
+                    </Typography>
+                  </Box>
                 )}
               </Box>
             )}

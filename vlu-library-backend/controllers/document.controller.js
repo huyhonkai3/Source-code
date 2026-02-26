@@ -109,71 +109,7 @@ const buildSmartSearchQuery = (searchKeyword) => {
   return { $and: andConditions };
 };
 
-const escapeSparqlLiteral = (value = "") => {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, " ")
-    .replace(/\r/g, " ");
-};
-
-const sanitizeIsbn = (value = "") => value.replace(/[^0-9Xx]/g, "").trim();
-
-const buildWikidataQuery = ({ isbn, title, author }) => {
-  const safeTitle = escapeSparqlLiteral((title || "").trim());
-  const safeAuthor = escapeSparqlLiteral((author || "").trim());
-  const safeIsbn = sanitizeIsbn(isbn || "");
-
-  const whereClause = safeIsbn
-    ? `
-      {
-        ?item wdt:P212 "${safeIsbn}".
-      }
-      UNION
-      {
-        ?item wdt:P957 "${safeIsbn}".
-      }
-    `
-    : `
-      ?item rdfs:label ?titleLabel.
-      FILTER(LANG(?titleLabel) IN ("vi", "en")).
-      FILTER(CONTAINS(LCASE(STR(?titleLabel)), LCASE("${safeTitle}"))).
-      ${
-        safeAuthor
-          ? `
-      ?item wdt:P50 ?authorItem.
-      ?authorItem rdfs:label ?authorLabelRaw.
-      FILTER(LANG(?authorLabelRaw) IN ("vi", "en")).
-      FILTER(CONTAINS(LCASE(STR(?authorLabelRaw)), LCASE("${safeAuthor}"))).
-      `
-          : ""
-      }
-    `;
-
-  return `
-    SELECT DISTINCT
-      ?item
-      ?itemLabel
-      ?itemDescription
-      ?publisherLabel
-      ?publicationDate
-      ?genreLabel
-      ?pages
-    WHERE {
-      ${whereClause}
-
-      OPTIONAL { ?item wdt:P123 ?publisher. }
-      OPTIONAL { ?item wdt:P577 ?publicationDate. }
-      OPTIONAL { ?item wdt:P136 ?genre. }
-      OPTIONAL { ?item wdt:P1104 ?pages. }
-
-      SERVICE wikibase:label {
-        bd:serviceParam wikibase:language "vi,en".
-      }
-    }
-    LIMIT 1
-  `;
-};
+const WIKIDATA_USER_AGENT = "VLU-Library-Bot/1.0 (contact@vlu.edu.vn)";
 
 /**
  * API 2.5: Tải lên tài liệu (F6)
@@ -205,6 +141,7 @@ const uploadDocument = async (req, res) => {
       author,
       isbn,
       publisher,
+      englishTitle,
       publishYear,
       language,
     } = req.body;
@@ -260,6 +197,7 @@ const uploadDocument = async (req, res) => {
       author: author ? author.trim() : null,
       isbn: isbn ? isbn.trim() : "",
       publisher: publisher ? publisher.trim() : null,
+      englishTitle: englishTitle ? englishTitle.trim() : "",
       publishYear: publishYear ? parseInt(publishYear) : null,
       documentLanguage: language ? language.trim() : "Tiếng Việt",
       categoryId: category,
@@ -293,6 +231,7 @@ const uploadDocument = async (req, res) => {
           title: populatedDoc.title,
           description: populatedDoc.description,
           author: populatedDoc.author,
+          englishTitle: populatedDoc.englishTitle,
           isbn: populatedDoc.isbn,
           publisher: populatedDoc.publisher,
           publishYear: populatedDoc.publishYear,
@@ -430,6 +369,7 @@ const reviewDocument = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          englishTitle: document.englishTitle,
           isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
@@ -623,6 +563,7 @@ const getDocuments = async (req, res) => {
           title: doc.title,
           description: doc.description,
           author: doc.author,
+          englishTitle: doc.englishTitle,
           publisher: doc.publisher,
           publishYear: doc.publishYear,
           documentLanguage: doc.documentLanguage,
@@ -752,6 +693,7 @@ const getMyDocuments = async (req, res) => {
           title: doc.title,
           description: doc.description,
           author: doc.author,
+          englishTitle: doc.englishTitle,
           category: doc.categoryId
             ? {
                 id: doc.categoryId._id,
@@ -838,6 +780,7 @@ const getDocumentById = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          englishTitle: document.englishTitle,
           isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
@@ -904,6 +847,7 @@ const updateDocument = async (req, res) => {
       title,
       description,
       author,
+      englishTitle,
       isbn,
       publisher,
       publishYear,
@@ -962,6 +906,8 @@ const updateDocument = async (req, res) => {
     if (title) document.title = title.trim();
     if (description !== undefined) document.description = description.trim();
     if (author !== undefined) document.author = author ? author.trim() : null;
+    if (englishTitle !== undefined)
+      document.englishTitle = englishTitle ? englishTitle.trim() : "";
     if (isbn !== undefined) document.isbn = isbn ? isbn.trim() : "";
     if (publisher !== undefined)
       document.publisher = publisher ? publisher.trim() : null;
@@ -1025,6 +971,7 @@ const updateDocument = async (req, res) => {
           title: document.title,
           description: document.description,
           author: document.author,
+          englishTitle: document.englishTitle,
           isbn: document.isbn,
           publisher: document.publisher,
           publishYear: document.publishYear,
@@ -1062,6 +1009,9 @@ const getLinkedData = async (req, res) => {
     const { id } = req.params;
     const document = await Document.findById(id);
 
+    console.log("FOUND DOCUMENT:", document?._id);
+    console.log("CURRENT lodMetadata:", document?.lodMetadata);
+
     if (!document) {
       return res.status(404).json({
         status: "error",
@@ -1082,39 +1032,36 @@ const getLinkedData = async (req, res) => {
       });
     }
 
-    const sparqlQuery = buildWikidataQuery({
-      isbn: document.isbn,
-      title: document.title,
-      author: document.author,
-    });
+    const searchKey = document.englishTitle || document.title;
 
-    let response;
-    try {
-      response = await axios.get("https://query.wikidata.org/sparql", {
+    const searchResponse = await axios.get(
+      "https://www.wikidata.org/w/api.php",
+      {
         params: {
-          query: sparqlQuery,
+          action: "wbsearchentities",
+          search: searchKey,
+          language: "en",
           format: "json",
         },
         headers: {
-          "User-Agent": "VLU-Library-Student-Project/1.0",
+          "User-Agent": WIKIDATA_USER_AGENT,
         },
-      });
-    } catch (externalError) {
-      console.error("Wikidata SPARQL error:", externalError.message);
-      return res.status(502).json({
-        status: "error",
-        code: 502,
-        message: "Không thể truy vấn dữ liệu từ Wikidata",
-      });
-    }
+      },
+    );
 
-    const firstBinding = response.data?.results?.bindings?.[0] || null;
+    console.log("WIKIDATA SEARCH RAW:", searchResponse.data);
+    console.log("SEARCH RESULTS COUNT:", searchResponse.data?.search?.length);
+    console.log("FIRST RESULT:", searchResponse.data?.search?.[0]);
 
-    if (!firstBinding) {
+    const qid = searchResponse.data?.search?.[0]?.id;
+
+    console.log("SELECTED QID:", qid);
+
+    if (!qid) {
       return res.status(200).json({
         status: "success",
         code: 200,
-        message: "Không tìm thấy dữ liệu liên kết phù hợp",
+        message: "Không tìm thấy trên Wikidata",
         data: {
           source: "wikidata",
           lod: null,
@@ -1122,19 +1069,52 @@ const getLinkedData = async (req, res) => {
       });
     }
 
+    const sparqlQuery = `
+      SELECT ?description ?publisherLabel ?date ?genreLabel ?pages WHERE {
+        wd:${qid} wdt:P31 ?instance.
+        OPTIONAL { wd:${qid} schema:description ?description . FILTER(LANG(?description) = "vi" || LANG(?description) = "en") }
+        OPTIONAL { wd:${qid} wdt:P123 ?publisher . }
+        OPTIONAL { wd:${qid} wdt:P577 ?date . }
+        OPTIONAL { wd:${qid} wdt:P136 ?genre . }
+        OPTIONAL { wd:${qid} wdt:P1104 ?pages . }
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "vi,en". }
+      } LIMIT 1
+    `;
+
+    const sparqlResponse = await axios.get(
+      "https://query.wikidata.org/sparql",
+      {
+        params: {
+          query: sparqlQuery,
+          format: "json",
+        },
+        headers: {
+          "User-Agent": WIKIDATA_USER_AGENT,
+        },
+      },
+    );
+
+    console.log("SPARQL RAW:", sparqlResponse.data);
+    console.log("SPARQL BINDINGS:", sparqlResponse.data?.results?.bindings);
+
+    const firstBinding = sparqlResponse.data?.results?.bindings?.[0] || null;
+
     const parsedLod = {
-      itemUri: firstBinding.item?.value || "",
-      label: firstBinding.itemLabel?.value || "",
-      description: firstBinding.itemDescription?.value || "",
-      publisher: firstBinding.publisherLabel?.value || "",
-      publicationDate: firstBinding.publicationDate?.value || "",
-      genre: firstBinding.genreLabel?.value || "",
-      pages: firstBinding.pages?.value || "",
-      rawBinding: firstBinding,
+      qid,
+      wikidataUrl: `https://www.wikidata.org/wiki/${qid}`,
+      description: firstBinding?.description?.value || "",
+      publisher: firstBinding?.publisherLabel?.value || "",
+      publicationDate: firstBinding?.date?.value || "",
+      genre: firstBinding?.genreLabel?.value || "",
+      pages: firstBinding?.pages?.value || "",
+      searchKey,
     };
+
+    console.log("PARSED LOD:", parsedLod);
 
     document.lodMetadata = parsedLod;
     await document.save();
+    console.log("SAVED lodMetadata:", document.lodMetadata);
 
     return res.status(200).json({
       status: "success",
@@ -1741,6 +1721,7 @@ const getFeaturedDocuments = async (req, res) => {
       title: doc.title,
       description: doc.description,
       author: doc.author,
+      englishTitle: doc.englishTitle,
       publisher: doc.publisher,
       publishYear: doc.publishYear,
       fileFormat: doc.fileFormat,

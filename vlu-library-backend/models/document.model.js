@@ -45,6 +45,12 @@ const documentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    englishTitle: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     description: {
       type: String,
       maxlength: [2000, "Mô tả không được vượt quá 2000 ký tự"],
@@ -198,7 +204,7 @@ const documentSchema = new mongoose.Schema(
     },
 
     lodMetadata: {
-      type: mongoose.Schema.Types.Mixed,
+      type: Object,
       default: null,
     },
   },

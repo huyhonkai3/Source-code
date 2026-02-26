@@ -16,6 +16,7 @@ import {
   alpha,
   Fade,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
@@ -27,6 +28,7 @@ import {
   PictureAsPdf as PdfIcon,
   Description as FileIcon,
   Upload as UploadIcon,
+  InfoOutlined as InfoOutlinedIcon,
 } from "@mui/icons-material";
 import documentsAPI from "../../api/documents.api";
 import categoriesAPI from "../../api/categories.api";
@@ -69,6 +71,8 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
     author: "",
     publisher: "",
     isbn: "",
+    englishTitle: "",
+    language: "Tiếng Việt",
   });
 
   // Data từ API
@@ -120,6 +124,8 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       author: "",
       publisher: "",
       isbn: "",
+      englishTitle: "",
+      language: "Tiếng Việt",
     });
     setUploadStatus("idle");
     setProgress(0);
@@ -216,6 +222,8 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
       data.append("description", formData.description.trim());
       data.append("publishYear", formData.publishYear);
       if (formData.author) data.append("author", formData.author);
+      if (formData.englishTitle)
+        data.append("englishTitle", formData.englishTitle.trim());
       if (formData.isbn) data.append("isbn", formData.isbn.trim());
       if (formData.publisher) data.append("publisher", formData.publisher);
 
@@ -668,6 +676,29 @@ const UploadDocumentDialog = ({ open, onClose, onSuccess }) => {
                   disabled={isUploading}
                   placeholder="Nhập tên tác giả gốc"
                   sx={textFieldStyles}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Tên gốc/Tiếng Anh (Optional)"
+                  name="englishTitle"
+                  value={formData.englishTitle}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={isUploading}
+                  placeholder="Ví dụ: Clean Code"
+                  helperText="Giúp hệ thống liên kết dữ liệu Wikidata chính xác hơn"
+                  sx={textFieldStyles}
+                  InputProps={{
+                    endAdornment: (
+                      <Tooltip title="Giúp hệ thống liên kết dữ liệu Wikidata chính xác hơn">
+                        <InfoOutlinedIcon
+                          sx={{ color: "#8E8EA9", fontSize: 18 }}
+                        />
+                      </Tooltip>
+                    ),
+                  }}
                 />
               </Grid>
 

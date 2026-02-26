@@ -29,6 +29,7 @@ import {
   Fade,
   CircularProgress,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -42,6 +43,7 @@ import {
   CloudUpload as UploadIcon,
   Edit as EditIcon,
   Refresh as RefreshIcon,
+  InfoOutlined as InfoOutlinedIcon,
 } from "@mui/icons-material";
 import documentsAPI from "../../api/documents.api";
 import categoriesAPI from "../../api/categories.api";
@@ -88,6 +90,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
     publisher: "",
     language: "Tiếng Việt",
     isbn: "",
+    englishTitle: "",
   });
 
   // Data từ API
@@ -115,6 +118,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
         publisher: document.publisher || "",
         language: document.language || "Tiếng Việt",
         isbn: document.isbn || "",
+        englishTitle: "",
       });
       setNewFile(null);
       setError("");
@@ -226,6 +230,7 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
         publisher: formData.publisher?.trim() || null,
         isbn: formData.isbn?.trim() || "",
         language: formData.language,
+        englishTitle: formData.englishTitle?.trim() || "",
       };
 
       // Nếu có file mới, sử dụng FormData
@@ -687,6 +692,28 @@ const EditDocumentDialog = ({ open, onClose, onSuccess, document }) => {
                 />
               </Grid>
 
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Tên gốc/Tiếng Anh (Optional)"
+                  name="englishTitle"
+                  value={formData.englishTitle}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={saving}
+                  placeholder="Ví dụ: Clean Code"
+                  helperText="Giúp hệ thống liên kết dữ liệu Wikidata chính xác hơn"
+                  sx={textFieldStyles}
+                  InputProps={{
+                    endAdornment: (
+                      <Tooltip title="Giúp hệ thống liên kết dữ liệu Wikidata chính xác hơn">
+                        <InfoOutlinedIcon
+                          sx={{ color: "#8E8EA9", fontSize: 18 }}
+                        />
+                      </Tooltip>
+                    ),
+                  }}
+                />
+              </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   label="ISBN"
