@@ -235,7 +235,7 @@ const uploadDocument = async (req, res) => {
           isbn: populatedDoc.isbn,
           publisher: populatedDoc.publisher,
           publishYear: populatedDoc.publishYear,
-          language: document.documentLanguage,
+          language: populatedDoc.documentLanguage,
           category: {
             id: populatedDoc.categoryId._id,
             name: populatedDoc.categoryId.name,
