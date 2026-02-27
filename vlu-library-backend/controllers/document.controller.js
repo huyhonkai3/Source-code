@@ -2,6 +2,7 @@ const Document = require("../models/document.model");
 const Category = require("../models/category.model");
 const Statistic = require("../models/statistics.model");
 const User = require("../models/user.model");
+const Notification = require("../models/notification.model");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
@@ -351,6 +352,32 @@ const reviewDocument = async (req, res) => {
     }
 
     await document.save();
+
+    // ====== TRIGGER NOTIFICATION ======
+    try {
+      const notificationData = {
+        recipient: document.uploadedBy,
+        type: "DOCUMENT_MODERATION",
+        relatedDocument: document._id,
+      };
+
+      if (status === "approved") {
+        notificationData.title = "Tài liệu đã được duyệt ✅";
+        notificationData.message = `Tài liệu "${document.title}" của bạn đã được kiểm duyệt và xuất bản thành công.`;
+      } else {
+        notificationData.title = "Tài liệu bị từ chối ❌";
+        notificationData.message = `Tài liệu "${document.title}" của bạn đã bị từ chối. Lý do: ${reason.trim()}`;
+      }
+
+      await Notification.create(notificationData);
+    } catch (notifError) {
+      // Không để lỗi notification làm fail request chính
+      console.error(
+        "[Notification] Failed to create notification:",
+        notifError,
+      );
+    }
+    // ====== END TRIGGER ======
 
     await document.populate("reviewedBy", "name email role");
     await document.populate("categoryId", "name slug");

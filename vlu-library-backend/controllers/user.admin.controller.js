@@ -1,5 +1,6 @@
 const User = require("../models/user.model");
 const UpgradeRequest = require("../models/upgradeRequest.model");
+const Notification = require("../models/notification.model");
 
 /** 1.6 Lấy danh sách người dùng
  * @route GET /api/admin/users
@@ -215,9 +216,8 @@ exports.reviewUpgradeRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
-    const adminId = req.user.id; // Lấy từ middleware checkAuth
+    const adminId = req.user.id;
 
-    // Validation
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({
         status: "error",
@@ -235,7 +235,6 @@ exports.reviewUpgradeRequest = async (req, res) => {
       });
     }
 
-    // Tìm upgrade request
     const request = await UpgradeRequest.findById(id).populate(
       "userId",
       "name email role",
@@ -249,7 +248,6 @@ exports.reviewUpgradeRequest = async (req, res) => {
       });
     }
 
-    // Kiểm tra request đã được xử lý chưa
     if (request.status !== "pending") {
       return res.status(400).json({
         status: "error",
@@ -258,7 +256,6 @@ exports.reviewUpgradeRequest = async (req, res) => {
       });
     }
 
-    // Kiểm tra user đã là Author chưa
     if (request.userId.role === "Author") {
       return res.status(400).json({
         status: "error",
@@ -267,7 +264,6 @@ exports.reviewUpgradeRequest = async (req, res) => {
       });
     }
 
-    // Cập nhật upgrade request
     request.status = status;
     request.reviewedBy = adminId;
     request.reviewedAt = new Date();
@@ -278,14 +274,37 @@ exports.reviewUpgradeRequest = async (req, res) => {
 
     await request.save();
 
-    // QUAN TRỌNG: Nếu chấp thuận -> Nâng cấp User lên Author
     if (status === "approved") {
       await User.findByIdAndUpdate(request.userId._id, {
         role: "Author",
       });
     }
 
-    // Populate lại để trả về data đầy đủ
+    // ====== TRIGGER NOTIFICATION ======
+    try {
+      const notificationData = {
+        recipient: request.userId._id,
+        type: "UPGRADE_REQUEST",
+      };
+
+      if (status === "approved") {
+        notificationData.title = "Yêu cầu nâng cấp được chấp thuận 🎉";
+        notificationData.message =
+          "Chúc mừng! Yêu cầu nâng cấp lên quyền Tác giả (Author) của bạn đã được chấp thuận. Bạn có thể tải lên tài liệu ngay bây giờ.";
+      } else {
+        notificationData.title = "Yêu cầu nâng cấp bị từ chối";
+        notificationData.message = `Yêu cầu nâng cấp lên quyền Tác giả của bạn đã bị từ chối. Lý do: ${rejectionReason}`;
+      }
+
+      await Notification.create(notificationData);
+    } catch (notifError) {
+      console.error(
+        "[Notification] Failed to create notification:",
+        notifError,
+      );
+    }
+    // ====== END TRIGGER ======
+
     await request.populate("reviewedBy", "name email");
 
     res.status(200).json({
