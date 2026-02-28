@@ -285,6 +285,7 @@ exports.reviewUpgradeRequest = async (req, res) => {
       const notificationData = {
         recipient: request.userId._id,
         type: "UPGRADE_REQUEST",
+        actionBy: adminId,
       };
 
       if (status === "approved") {

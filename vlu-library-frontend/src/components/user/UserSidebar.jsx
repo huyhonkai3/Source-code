@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Paper,
   List,
@@ -9,6 +10,7 @@ import {
   Box,
   Divider,
   Avatar,
+  Badge,
   alpha,
 } from "@mui/material";
 import {
@@ -24,20 +26,36 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { getUnreadCount } from "../../api/notifications.api";
 
 /**
- * UserSidebar Component - VLU Design System v2.0
+ * UserSidebar Component - VLU Design System v2.1
  * Modern & Bold sidebar navigation
+ * ✅ UPDATED: Thêm Badge thông báo chưa đọc
  *
  * @param {string} active - Menu item đang active
  */
 const UserSidebar = ({ active = "profile" }) => {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Check user roles
   const isAuthor = user && user.role === "Author";
   const isModerator = user && user.role === "Moderator";
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const count = await getUnreadCount();
+        setUnreadCount(count);
+      } catch {
+        // Silent fail
+      }
+    };
+    fetchCount();
+  }, []);
 
   // Role colors theo Design System v2.0
   const getRoleColor = (role) => {
@@ -50,7 +68,7 @@ const UserSidebar = ({ active = "profile" }) => {
     return colors[role] || "#8E8EA9";
   };
 
-  // Menu items configuration với icons và colors
+  // Menu items configuration
   const menuItems = [
     {
       id: "profile",
@@ -96,25 +114,19 @@ const UserSidebar = ({ active = "profile" }) => {
       id: "notifications",
       label: "Thông báo",
       icon: NotificationsIcon,
-      path: "/profile/notifications",
+      path: "/user/notifications",
       show: true,
       color: "#FFC107",
+      badge: unreadCount, // ✅ Truyền badge count
     },
   ];
 
-  // Filter menu items based on show property
   const visibleMenuItems = menuItems.filter((item) => item.show);
 
-  /**
-   * Handle menu item click
-   */
   const handleMenuClick = (path) => {
     navigate(path);
   };
 
-  /**
-   * Handle logout
-   */
   const handleLogout = async () => {
     try {
       await logout();
@@ -219,7 +231,7 @@ const UserSidebar = ({ active = "profile" }) => {
 
       {/* ========== MENU LIST ========== */}
       <List sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
-        {visibleMenuItems.map((item, index) => {
+        {visibleMenuItems.map((item) => {
           const isActive = active === item.id;
           const Icon = item.icon;
 
@@ -255,11 +267,7 @@ const UserSidebar = ({ active = "profile" }) => {
                   />
                 )}
 
-                <ListItemIcon
-                  sx={{
-                    minWidth: 40,
-                  }}
-                >
+                <ListItemIcon sx={{ minWidth: 40 }}>
                   <Box
                     sx={{
                       width: 32,
@@ -273,12 +281,39 @@ const UserSidebar = ({ active = "profile" }) => {
                       justifyContent: "center",
                     }}
                   >
-                    <Icon
-                      sx={{
-                        fontSize: 18,
-                        color: isActive ? "#D32F2F" : item.color,
-                      }}
-                    />
+                    {/* ✅ Badge cho Notifications */}
+                    {item.badge > 0 ? (
+                      <Badge
+                        badgeContent={item.badge}
+                        max={99}
+                        sx={{
+                          "& .MuiBadge-badge": {
+                            bgcolor: "#D32F2F",
+                            color: "white",
+                            fontSize: "0.625rem",
+                            fontWeight: 700,
+                            minWidth: 16,
+                            height: 16,
+                            top: -2,
+                            right: -2,
+                          },
+                        }}
+                      >
+                        <Icon
+                          sx={{
+                            fontSize: 18,
+                            color: isActive ? "#D32F2F" : item.color,
+                          }}
+                        />
+                      </Badge>
+                    ) : (
+                      <Icon
+                        sx={{
+                          fontSize: 18,
+                          color: isActive ? "#D32F2F" : item.color,
+                        }}
+                      />
+                    )}
                   </Box>
                 </ListItemIcon>
 
@@ -290,6 +325,24 @@ const UserSidebar = ({ active = "profile" }) => {
                     color: isActive ? "#D32F2F" : "#4A4A68",
                   }}
                 />
+
+                {/* Badge text bên cạnh label */}
+                {item.badge > 0 && !isActive && (
+                  <Box
+                    sx={{
+                      px: 0.75,
+                      py: 0.125,
+                      bgcolor: "#D32F2F",
+                      color: "white",
+                      borderRadius: "10px",
+                      fontSize: "0.6875rem",
+                      fontWeight: 700,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {item.badge}
+                  </Box>
+                )}
 
                 {isActive && (
                   <ChevronRightIcon sx={{ fontSize: 18, color: "#D32F2F" }} />

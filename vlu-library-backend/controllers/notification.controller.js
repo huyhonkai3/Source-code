@@ -10,7 +10,7 @@ const getNotifications = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
 
     const pageNum = parseInt(page);
-    const limitNum = Math.min(parseInt(limit), 50); // max 50
+    const limitNum = Math.min(parseInt(limit), 50);
     const skip = (pageNum - 1) * limitNum;
 
     const [notifications, total] = await Promise.all([
@@ -18,7 +18,8 @@ const getNotifications = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .populate("relatedDocument", "title"),
+        .populate("relatedDocument", "title")
+        .populate("actionBy", "name email avatarUrl"), // Populate người thực hiện
       Notification.countDocuments({ recipient: userId }),
     ]);
 
@@ -37,6 +38,15 @@ const getNotifications = async (req, res) => {
             ? {
                 id: n.relatedDocument._id,
                 title: n.relatedDocument.title,
+              }
+            : null,
+          // Trả về thông tin người thực hiện
+          actionBy: n.actionBy
+            ? {
+                id: n.actionBy._id,
+                name: n.actionBy.name,
+                email: n.actionBy.email,
+                avatarUrl: n.actionBy.avatarUrl || null,
               }
             : null,
           createdAt: n.createdAt,

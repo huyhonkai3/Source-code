@@ -20,6 +20,7 @@ import ModeratorReviewDocumentPage from "../pages/moderator/ModeratorReviewDocum
 import LandingPage from "../pages/public/LandingPage";
 import CategoriesPage from "../pages/public/CategoriesPage";
 import AuthorStatsPage from "../pages/author/AuthorStatsPage";
+import NotificationsPage from "../pages/user/NotificationsPage";
 
 /**
  * ProtectedRoute Component
@@ -191,6 +192,16 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Route Notifications */}
+      <Route
+        path="/user/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />

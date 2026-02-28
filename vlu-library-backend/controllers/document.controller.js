@@ -359,6 +359,7 @@ const reviewDocument = async (req, res) => {
         recipient: document.uploadedBy,
         type: "DOCUMENT_MODERATION",
         relatedDocument: document._id,
+        actionBy: reviewerId,
       };
 
       if (status === "approved") {

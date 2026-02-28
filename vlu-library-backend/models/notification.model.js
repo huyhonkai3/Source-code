@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 /**
- * Notification Schema
+ * Notification Schema v2.0
  * Lưu thông báo cho từng user về:
  * - Kết quả duyệt yêu cầu nâng cấp quyền (UPGRADE_REQUEST)
  * - Kết quả duyệt tài liệu (DOCUMENT_MODERATION)
@@ -38,13 +38,18 @@ const notificationSchema = new mongoose.Schema(
       ref: "Document",
       default: null,
     },
+    // Lưu ID Admin/Moderator đã thực hiện hành động
+    actionBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-// Index để query nhanh thông báo của 1 user, sort theo thời gian
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, isRead: 1 });
 
