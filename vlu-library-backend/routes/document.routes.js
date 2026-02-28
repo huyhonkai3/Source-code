@@ -62,6 +62,14 @@ router.get("/featured", documentController.getFeaturedDocuments);
  */
 router.get("/public-stats", documentController.getPublicStats);
 
+// route cho Author gửi yêu cầu edit tài liệu đã duyệt
+router.post(
+  "/:id/edit-requests",
+  checkAuth,
+  checkRole(["Author", "Admin"]),
+  documentController.createEditRequest,
+);
+
 /**
  * @route   GET /api/documents/stats/author
  * @desc    Lấy thống kê tài liệu của Author hiện tại

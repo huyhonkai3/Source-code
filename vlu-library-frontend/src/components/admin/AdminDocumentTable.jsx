@@ -1,3 +1,9 @@
+/**
+ * AdminDocumentTable - VLU Design System v2.0.1
+ * UPDATED: Thêm nút "Sửa nhanh (Admin)" cho mỗi tài liệu
+ *
+ * Đường dẫn: src/components/admin/AdminDocumentTable.jsx
+ */
 import React from "react";
 import {
   Table,
@@ -18,31 +24,30 @@ import {
 import {
   Visibility as ViewIcon,
   Delete as DeleteIcon,
-  Description as FileIcon,
   PictureAsPdf as PdfIcon,
   MenuBook as EpubIcon,
   RemoveRedEye as EyeIcon,
   Download as DownloadIcon,
   Folder as FolderIcon,
+  AdminPanelSettings as AdminEditIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
 /**
- * AdminDocumentTable Component - VLU Design System v2.0.1
- * Modern & Bold data table for documents management
- * UPDATED: Tăng font sizes để UX tốt hơn
- *
- * @param {Array} documents - List of documents
- * @param {Function} onDelete - Delete handler
- * @param {boolean} loading - Loading state
+ * @param {Array} documents
+ * @param {Function} onDelete
+ * @param {Function} onAdminEdit - Callback (doc) khi nhấn nút Sửa nhanh
+ * @param {boolean} loading
  */
-const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
+const AdminDocumentTable = ({
+  documents = [],
+  onDelete,
+  onAdminEdit,
+  loading = false,
+}) => {
   const navigate = useNavigate();
 
-  /**
-   * Get status config - Design System v2.0
-   */
   const getStatusConfig = (status) => {
     const configs = {
       approved: {
@@ -64,9 +69,6 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
     return configs[status] || configs.pending;
   };
 
-  /**
-   * Format file size
-   */
   const formatFileSize = (bytes) => {
     if (!bytes) return "N/A";
     if (bytes < 1024) return `${bytes} B`;
@@ -74,49 +76,23 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  /**
-   * Get document ID (last 4 digits)
-   */
   const getDocumentId = (fullId) => {
     if (!fullId) return "N/A";
     return fullId.slice(-4);
   };
 
-  /**
-   * Get file icon based on format
-   */
   const getFileIcon = (doc) => {
-    const format = doc.fileFormat || doc.fileType || "pdf";
-    if (format.toLowerCase() === "epub") {
+    const fmt = doc.fileFormat || doc.fileType || "pdf";
+    if (fmt.toLowerCase() === "epub")
       return <EpubIcon sx={{ fontSize: 24, color: "#FF7043" }} />;
-    }
     return <PdfIcon sx={{ fontSize: 24, color: "#D32F2F" }} />;
   };
 
-  /**
-   * Handle view document
-   */
-  const handleView = (docId) => {
-    navigate(`/documents/${docId}`);
-  };
-
-  /**
-   * Handle delete document
-   */
-  const handleDelete = (doc) => {
-    if (onDelete) {
-      onDelete(doc);
-    }
-  };
-
-  /**
-   * Format date
-   */
   const formatDate = (date) => {
     if (!date) return "N/A";
     try {
       return format(new Date(date), "dd/MM/yyyy");
-    } catch (error) {
+    } catch {
       return "N/A";
     }
   };
@@ -137,17 +113,17 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                 "THỐNG KÊ",
                 "NGÀY ĐĂNG",
                 "HÀNH ĐỘNG",
-              ].map((header) => (
-                <TableCell key={header}>
+              ].map((h) => (
+                <TableCell key={h}>
                   <Typography
                     sx={{
                       fontWeight: 700,
                       color: "#8E8EA9",
                       letterSpacing: "0.05em",
-                      fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
+                      fontSize: "0.8125rem",
                     }}
                   >
-                    {header}
+                    {h}
                   </Typography>
                 </TableCell>
               ))}
@@ -188,6 +164,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <Skeleton variant="circular" width={32} height={32} />
                     <Skeleton variant="circular" width={32} height={32} />
                     <Skeleton variant="circular" width={32} height={32} />
                   </Box>
@@ -232,17 +209,14 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
             fontWeight: 700,
             color: "#1A1A2E",
             mb: 0.5,
-            fontSize: "1.125rem", // UPDATED: 18px (was 16px h6)
+            fontSize: "1.125rem",
           }}
         >
           Không có tài liệu nào
         </Typography>
         <Typography
           variant="body2"
-          sx={{
-            color: "#8E8EA9",
-            fontSize: "0.9375rem", // UPDATED: 15px (was 14px body2)
-          }}
+          sx={{ color: "#8E8EA9", fontSize: "0.9375rem" }}
         >
           Chưa có tài liệu phù hợp với bộ lọc của bạn
         </Typography>
@@ -253,109 +227,53 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
   return (
     <TableContainer>
       <Table>
-        {/* ========== TABLE HEAD ========== */}
         <TableHead>
           <TableRow sx={{ bgcolor: "#FAFAFC" }}>
-            <TableCell width="7%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
+            {[
+              "ID",
+              "TÊN TÀI LIỆU",
+              "TÁC GIẢ",
+              "DANH MỤC",
+              "TRẠNG THÁI",
+              "THỐNG KÊ",
+              "NGÀY ĐĂNG",
+              "HÀNH ĐỘNG",
+            ].map((h, i) => (
+              <TableCell
+                key={h}
+                width={
+                  i === 0
+                    ? "7%"
+                    : i === 1
+                      ? "26%"
+                      : i === 2
+                        ? "13%"
+                        : i === 3
+                          ? "11%"
+                          : i === 4
+                            ? "10%"
+                            : i === 5
+                              ? "9%"
+                              : i === 6
+                                ? "10%"
+                                : "14%"
+                }
+                align={h === "HÀNH ĐỘNG" ? "center" : "left"}
               >
-                ID
-              </Typography>
-            </TableCell>
-            <TableCell width="28%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                TÊN TÀI LIỆU
-              </Typography>
-            </TableCell>
-            <TableCell width="14%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                TÁC GIẢ
-              </Typography>
-            </TableCell>
-            <TableCell width="12%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                DANH MỤC
-              </Typography>
-            </TableCell>
-            <TableCell width="10%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                TRẠNG THÁI
-              </Typography>
-            </TableCell>
-            <TableCell width="9%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                THỐNG KÊ
-              </Typography>
-            </TableCell>
-            <TableCell width="10%">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                NGÀY ĐĂNG
-              </Typography>
-            </TableCell>
-            <TableCell width="10%" align="center">
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  color: "#8E8EA9",
-                  letterSpacing: "0.05em",
-                  fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                }}
-              >
-                HÀNH ĐỘNG
-              </Typography>
-            </TableCell>
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    color: "#8E8EA9",
+                    letterSpacing: "0.05em",
+                    fontSize: "0.8125rem",
+                  }}
+                >
+                  {h}
+                </Typography>
+              </TableCell>
+            ))}
           </TableRow>
         </TableHead>
-
-        {/* ========== TABLE BODY ========== */}
         <TableBody>
           {documents.map((doc, index) => {
             const docId = doc.id || doc._id;
@@ -368,26 +286,19 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                   animation: "fadeIn 0.3s ease forwards",
                   animationDelay: `${index * 0.05}s`,
                   opacity: 0,
-                  "@keyframes fadeIn": {
-                    to: { opacity: 1 },
-                  },
-                  "&:hover": {
-                    bgcolor: "#FAFAFC",
-                  },
-                  "&:last-child td": {
-                    borderBottom: 0,
-                  },
+                  "@keyframes fadeIn": { to: { opacity: 1 } },
+                  "&:hover": { bgcolor: "#FAFAFC" },
+                  "&:last-child td": { borderBottom: 0 },
                 }}
               >
                 {/* ID */}
                 <TableCell>
                   <Typography
-                    variant="body2"
                     sx={{
                       fontWeight: 600,
                       color: "#7C4DFF",
                       fontFamily: "monospace",
-                      fontSize: "0.875rem", // UPDATED: 14px (was 12px body2)
+                      fontSize: "0.875rem",
                     }}
                   >
                     #{getDocumentId(docId)}
@@ -412,31 +323,23 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography
-                        variant="body2"
                         sx={{
                           fontWeight: 600,
                           color: "#1A1A2E",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          maxWidth: 220,
-                          fontSize: "0.9375rem", // UPDATED: 15px (was 14px body2)
+                          maxWidth: 210,
+                          fontSize: "0.9375rem",
                         }}
                       >
                         {doc.title}
                       </Typography>
                       <Typography
-                        sx={{
-                          color: "#8E8EA9",
-                          fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                        }}
+                        sx={{ color: "#8E8EA9", fontSize: "0.8125rem" }}
                       >
-                        {(
-                          doc.fileFormat ||
-                          doc.fileType ||
-                          "PDF"
-                        ).toUpperCase()}{" "}
-                        • {formatFileSize(doc.fileSize)}
+                        {(doc.fileFormat || "PDF").toUpperCase()} •{" "}
+                        {formatFileSize(doc.fileSize)}
                       </Typography>
                     </Box>
                   </Box>
@@ -449,20 +352,14 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                       sx={{
                         width: 32,
                         height: 32,
-                        fontSize: "0.875rem", // UPDATED: 14px (was 12.8px)
+                        fontSize: "0.875rem",
                         fontWeight: 600,
                         bgcolor: "#D32F2F",
                       }}
                     >
                       {doc.uploadedBy?.name?.charAt(0).toUpperCase() || "A"}
                     </Avatar>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#4A4A68",
-                        fontSize: "0.875rem", // UPDATED: 14px (was 12px body2)
-                      }}
-                    >
+                    <Typography sx={{ color: "#4A4A68", fontSize: "0.875rem" }}>
                       {doc.uploadedBy?.name || "Unknown"}
                     </Typography>
                   </Box>
@@ -470,13 +367,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
 
                 {/* Category */}
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "#4A4A68",
-                      fontSize: "0.875rem", // UPDATED: 14px (was 12px body2)
-                    }}
-                  >
+                  <Typography sx={{ color: "#4A4A68", fontSize: "0.875rem" }}>
                     {doc.category?.name || "N/A"}
                   </Typography>
                 </TableCell>
@@ -490,8 +381,8 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                       bgcolor: statusConfig.bgColor,
                       color: statusConfig.color,
                       fontWeight: 600,
-                      fontSize: "0.8125rem", // UPDATED: 13px (was 12px)
-                      height: 28, // UPDATED: 28px (was 26px)
+                      fontSize: "0.8125rem",
+                      height: 28,
                       borderRadius: "8px",
                     }}
                   />
@@ -507,10 +398,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                     >
                       <EyeIcon sx={{ fontSize: 14, color: "#8E8EA9" }} />
                       <Typography
-                        sx={{
-                          color: "#4A4A68",
-                          fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                        }}
+                        sx={{ color: "#4A4A68", fontSize: "0.8125rem" }}
                       >
                         {doc.views || 0}
                       </Typography>
@@ -520,10 +408,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                     >
                       <DownloadIcon sx={{ fontSize: 14, color: "#8E8EA9" }} />
                       <Typography
-                        sx={{
-                          color: "#4A4A68",
-                          fontSize: "0.8125rem", // UPDATED: 13px (was 12px caption)
-                        }}
+                        sx={{ color: "#4A4A68", fontSize: "0.8125rem" }}
                       >
                         {doc.downloads || 0}
                       </Typography>
@@ -533,13 +418,7 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
 
                 {/* Date */}
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "#4A4A68",
-                      fontSize: "0.875rem", // UPDATED: 14px (was 12px body2)
-                    }}
-                  >
+                  <Typography sx={{ color: "#4A4A68", fontSize: "0.875rem" }}>
                     {formatDate(doc.createdAt)}
                   </Typography>
                 </TableCell>
@@ -552,26 +431,39 @@ const AdminDocumentTable = ({ documents = [], onDelete, loading = false }) => {
                     <Tooltip title="Xem chi tiết" arrow>
                       <IconButton
                         size="small"
-                        onClick={() => handleView(docId)}
+                        onClick={() => navigate(`/documents/${docId}`)}
                         sx={{
                           color: "#2196F3",
-                          "&:hover": {
-                            bgcolor: alpha("#2196F3", 0.1),
-                          },
+                          "&:hover": { bgcolor: alpha("#2196F3", 0.1) },
                         }}
                       >
                         <ViewIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+
+                    {/* ★ NÚT SỬA NHANH (Admin only) */}
+                    {onAdminEdit && (
+                      <Tooltip title="Sửa trực tiếp (Admin)" arrow>
+                        <IconButton
+                          size="small"
+                          onClick={() => onAdminEdit(doc)}
+                          sx={{
+                            color: "#7C4DFF",
+                            "&:hover": { bgcolor: alpha("#7C4DFF", 0.1) },
+                          }}
+                        >
+                          <AdminEditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+
                     <Tooltip title="Xóa" arrow>
                       <IconButton
                         size="small"
-                        onClick={() => handleDelete(doc)}
+                        onClick={() => onDelete && onDelete(doc)}
                         sx={{
                           color: "#D32F2F",
-                          "&:hover": {
-                            bgcolor: alpha("#D32F2F", 0.1),
-                          },
+                          "&:hover": { bgcolor: alpha("#D32F2F", 0.1) },
                         }}
                       >
                         <DeleteIcon fontSize="small" />

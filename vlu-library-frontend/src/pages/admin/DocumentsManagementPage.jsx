@@ -38,6 +38,7 @@ import AdminSidebar from "../../components/admin/AdminSidebar";
 import StatCard from "../../components/admin/StatCard";
 import AdminDocumentTable from "../../components/admin/AdminDocumentTable";
 import DeleteDocumentDialog from "../../components/admin/DeleteDocumentDialog";
+import AdminDirectEditDialog from "../../components/admin/AdminDirectEditDialog";
 import documentsAPI from "../../api/documents.api";
 import categoriesAPI from "../../api/categories.api";
 
@@ -60,6 +61,11 @@ const DocumentsManagementPage = () => {
     approved: 0,
     pending: 0,
     rejected: 0,
+  });
+
+  const [adminEditDialog, setAdminEditDialog] = useState({
+    open: false,
+    document: null,
   });
 
   // Filter state
@@ -766,6 +772,9 @@ const DocumentsManagementPage = () => {
                 <AdminDocumentTable
                   documents={documents}
                   onDelete={handleDelete}
+                  onAdminEdit={(doc) =>
+                    setAdminEditDialog({ open: true, document: doc })
+                  }
                   loading={loading}
                 />
               </Paper>
@@ -836,6 +845,17 @@ const DocumentsManagementPage = () => {
         onConfirm={handleConfirmDelete}
         document={deleteDialog.document}
         loading={deleteLoading}
+      />
+
+      <AdminDirectEditDialog
+        open={adminEditDialog.open}
+        onClose={() => setAdminEditDialog({ open: false, document: null })}
+        document={adminEditDialog.document}
+        onSuccess={() => {
+          showSnackbar("Admin đã cập nhật tài liệu thành công!", "success");
+          setAdminEditDialog({ open: false, document: null });
+          fetchDocuments();
+        }}
       />
 
       <Snackbar

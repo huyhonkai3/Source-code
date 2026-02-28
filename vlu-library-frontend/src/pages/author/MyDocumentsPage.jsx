@@ -1,7 +1,6 @@
 /**
- * MyDocumentsPage - VLU Design System v2.0.1
- * GenZ Style: Tươi sáng, colorful, gradient cards, playful animations
- * Author Dashboard - Quản lý tài liệu của tác giả
+ * MyDocumentsPage - VLU Design System v2.0.1 (UPDATED)
+ * + Thêm nút "Xin quyền sửa" cho tài liệu approved
  *
  * Đường dẫn: src/pages/author/MyDocumentsPage.jsx
  */
@@ -58,6 +57,7 @@ import {
   ArrowForward as ArrowIcon,
   PictureAsPdf as PdfIcon,
   MenuBook as EpubIcon,
+  LockOpen as LockOpenIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -67,24 +67,19 @@ import documentsAPI from "../../api/documents.api";
 import { useAuth } from "../../context/AuthContext";
 import UploadDocumentDialog from "../../components/documents/UploadDocumentDialog";
 import EditDocumentDialog from "../../components/documents/EditDocumentDialog";
+import RequestEditDialog from "../../components/documents/RequestEditDialog";
 
-/**
- * GenZ Vibrant Color Palette
- */
 const COLORS = {
-  primary: "#D32F2F", // VLU Red
-  success: "#34D399", // Green
-  warning: "#FBBF24", // Yellow
-  danger: "#F87171", // Red
-  info: "#60A5FA", // Blue
-  pink: "#FF6B6B", // Light Red/Coral
-  teal: "#2DD4BF", // Teal
-  orange: "#FB923C", // Orange
+  primary: "#D32F2F",
+  success: "#34D399",
+  warning: "#FBBF24",
+  danger: "#F87171",
+  info: "#60A5FA",
+  pink: "#FF6B6B",
+  teal: "#2DD4BF",
+  orange: "#FB923C",
 };
 
-/**
- * Get file icon and color based on file extension
- */
 const getFileIcon = (fileName) => {
   const ext = fileName?.split(".").pop()?.toLowerCase();
   if (ext === "pdf") {
@@ -100,9 +95,6 @@ const getFileIcon = (fileName) => {
   };
 };
 
-/**
- * Stats Card Component - GenZ Style
- */
 const StatsCard = ({
   icon: Icon,
   label,
@@ -125,7 +117,6 @@ const StatsCard = ({
         alignItems: "center",
         gap: 2.5,
         transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-        cursor: "default",
         "&:hover": {
           transform: "translateY(-6px) scale(1.02)",
           boxShadow: `0 20px 40px ${alpha(color, 0.25)}`,
@@ -143,8 +134,6 @@ const StatsCard = ({
           alignItems: "center",
           justifyContent: "center",
           boxShadow: `0 8px 24px ${alpha(color, 0.4)}`,
-          transition: "transform 0.3s ease",
-          "&:hover": { transform: "rotate(-5deg) scale(1.1)" },
         }}
       >
         <Icon sx={{ fontSize: 32, color: "white" }} />
@@ -156,7 +145,6 @@ const StatsCard = ({
             color: "#1A1A2E",
             fontSize: "2rem",
             lineHeight: 1,
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
           {loading ? <Skeleton width={50} /> : value}
@@ -176,14 +164,12 @@ const StatsCard = ({
   </Fade>
 );
 
-/**
- * Document Row Component - GenZ Style
- */
 const DocumentRow = ({
   doc,
   index,
   onEdit,
   onDelete,
+  onRequestEdit,
   getStatusConfig,
   formatDate,
   formatFileSize,
@@ -209,48 +195,31 @@ const DocumentRow = ({
         },
       }}
     >
-      {/* Title with thumbnail */}
+      {/* Title */}
       <TableCell>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {doc.coverImage ? (
-            <Avatar
-              src={doc.coverImage}
-              variant="rounded"
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: "14px",
-                bgcolor: fileInfo.bgColor,
-                transition: "transform 0.3s ease",
-                transform: isHovered ? "scale(1.05)" : "scale(1)",
-              }}
-            >
-              <FileIcon sx={{ color: fileInfo.color }} />
-            </Avatar>
-          ) : (
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: "14px",
-                bgcolor: fileInfo.bgColor,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "transform 0.3s ease",
-                transform: isHovered ? "scale(1.05)" : "scale(1)",
-              }}
-            >
-              <FileIcon sx={{ fontSize: 28, color: fileInfo.color }} />
-            </Box>
-          )}
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: "14px",
+              bgcolor: fileInfo.bgColor,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "transform 0.3s ease",
+              transform: isHovered ? "scale(1.05)" : "scale(1)",
+            }}
+          >
+            <FileIcon sx={{ fontSize: 28, color: fileInfo.color }} />
+          </Box>
           <Box>
             <Typography
               sx={{
                 fontWeight: 600,
                 color: "#1A1A2E",
                 fontSize: "0.9375rem",
-                maxWidth: 280,
+                maxWidth: 260,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -313,7 +282,7 @@ const DocumentRow = ({
         </Box>
       </TableCell>
 
-      {/* Interactions */}
+      {/* Stats */}
       <TableCell align="center">
         <Box
           sx={{
@@ -369,6 +338,29 @@ const DocumentRow = ({
       {/* Actions */}
       <TableCell align="center">
         <Box sx={{ display: "flex", justifyContent: "center", gap: 1 }}>
+          {/* Approved: Nút "Xin quyền sửa" */}
+          {doc.status === "approved" && (
+            <Tooltip title="Xin cấp quyền chỉnh sửa" arrow>
+              <IconButton
+                size="small"
+                onClick={() => onRequestEdit(doc)}
+                sx={{
+                  bgcolor: alpha("#2196F3", 0.1),
+                  color: "#2196F3",
+                  borderRadius: "10px",
+                  "&:hover": {
+                    bgcolor: alpha("#2196F3", 0.2),
+                    transform: "scale(1.1)",
+                  },
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <LockOpenIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Pending/Rejected: Nút Edit */}
           {(doc.status === "pending" || doc.status === "rejected") && (
             <Tooltip
               title={
@@ -394,6 +386,7 @@ const DocumentRow = ({
               </IconButton>
             </Tooltip>
           )}
+
           <Tooltip title="Xóa" arrow>
             <IconButton
               size="small"
@@ -422,18 +415,13 @@ const MyDocumentsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Data state
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
     approved: 0,
     pending: 0,
     rejected: 0,
-    totalViews: 0,
-    totalDownloads: 0,
   });
-
-  // UI state
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -444,14 +432,14 @@ const MyDocumentsPage = () => {
     limit: 10,
   });
 
-  // Dialog states
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     documentId: null,
     documentTitle: "",
   });
-  const [editDialog, setEditDialog] = useState({
+  const [editDialog, setEditDialog] = useState({ open: false, document: null });
+  const [requestEditDialog, setRequestEditDialog] = useState({
     open: false,
     document: null,
   });
@@ -477,87 +465,11 @@ const MyDocumentsPage = () => {
         setStats(response.data.stats || stats);
       }
     } catch (error) {
-      console.error("Fetch documents error:", error);
       showSnackbar("Không thể tải danh sách tài liệu", "error");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleSearch = (event) => {
-    event.preventDefault();
-    setPage(1);
-    fetchDocuments();
-  };
-  const handleSearchChange = (event) => setSearchQuery(event.target.value);
-  const handlePageChange = (event, value) => {
-    setPage(value);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const handleUploadClick = () => setOpenUploadDialog(true);
-  const handleCloseUploadDialog = () => setOpenUploadDialog(false);
-  const handleUploadSuccess = () => {
-    showSnackbar("Tải lên tài liệu thành công! 🎉", "success");
-    setPage(1);
-    fetchDocuments();
-  };
-  const handleEditClick = (doc) => {
-    setEditDialog({
-      open: true,
-      document: doc,
-    });
-  };
-
-  const handleCloseEditDialog = () => {
-    setEditDialog({
-      open: false,
-      document: null,
-    });
-  };
-
-  const handleEditSuccess = () => {
-    const wasRejected = editDialog.document?.status === "rejected";
-    showSnackbar(
-      wasRejected
-        ? "Tài liệu đã được cập nhật và gửi lại để kiểm duyệt! 🔄"
-        : "Cập nhật tài liệu thành công!",
-      "success",
-    );
-    handleCloseEditDialog();
-    fetchDocuments(); // Refresh danh sách
-  };
-
-  const handleDeleteClick = (doc) =>
-    setDeleteDialog({
-      open: true,
-      documentId: doc.id,
-      documentTitle: doc.title,
-    });
-
-  const handleConfirmDelete = async () => {
-    setDeleteLoading(true);
-    try {
-      const response = await documentsAPI.deleteDocument(
-        deleteDialog.documentId,
-      );
-      if (response.status === "success") {
-        showSnackbar("Xóa tài liệu thành công", "success");
-        fetchDocuments();
-      }
-    } catch (error) {
-      console.error("Delete document error:", error);
-      showSnackbar(
-        error.response?.data?.message || "Xóa tài liệu thất bại",
-        "error",
-      );
-    } finally {
-      setDeleteLoading(false);
-      setDeleteDialog({ open: false, documentId: null, documentTitle: "" });
-    }
-  };
-
-  const handleCancelDelete = () =>
-    setDeleteDialog({ open: false, documentId: null, documentTitle: "" });
 
   const getStatusConfig = (status) => {
     const configs = {
@@ -585,13 +497,14 @@ const MyDocumentsPage = () => {
 
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
-  const handleCloseSnackbar = () =>
-    setSnackbar((prev) => ({ ...prev, open: false }));
+
   const formatFileSize = (bytes) => {
+    if (!bytes) return "N/A";
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
+
   const formatDate = (dateString) => {
     try {
       return format(new Date(dateString), "dd/MM/yyyy");
@@ -600,14 +513,13 @@ const MyDocumentsPage = () => {
     }
   };
 
-  // Stats cards configuration - GenZ Style
   const statsCards = [
     {
       label: "Tổng tài liệu",
       value: stats.total,
       icon: FolderIcon,
       color: COLORS.primary,
-      gradient: `linear-gradient(135deg, #D32F2F 0%, #FF6B6B 100%)`,
+      gradient: "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 100%)",
     },
     {
       label: "Đã duyệt",
@@ -628,46 +540,14 @@ const MyDocumentsPage = () => {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
       <Header />
-
       <Container maxWidth="xl" sx={{ pt: 4, pb: 6 }}>
         <Grid container spacing={3}>
-          {/* ========== LEFT SIDEBAR ========== */}
           <Grid item xs={12} md={3}>
             <UserSidebar active="my-documents" />
           </Grid>
-
-          {/* ========== RIGHT CONTENT ========== */}
           <Grid item xs={12} md={9}>
-            {/* Hero Section */}
-            <Box sx={{ mb: 4, position: "relative" }}>
-              {/* Decorative blobs */}
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: -30,
-                  right: "10%",
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.pink} 100%)`,
-                  opacity: 0.15,
-                  filter: "blur(30px)",
-                }}
-              />
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: 20,
-                  right: "30%",
-                  width: 60,
-                  height: 60,
-                  borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${COLORS.teal} 0%, ${COLORS.success} 100%)`,
-                  opacity: 0.15,
-                  filter: "blur(25px)",
-                }}
-              />
-
+            {/* Hero */}
+            <Box sx={{ mb: 4 }}>
               <Box
                 sx={{
                   display: "inline-flex",
@@ -690,7 +570,6 @@ const MyDocumentsPage = () => {
                   Author Dashboard
                 </Typography>
               </Box>
-
               <Typography
                 variant="h4"
                 sx={{
@@ -717,12 +596,11 @@ const MyDocumentsPage = () => {
               <Typography
                 sx={{ color: "#6B7280", fontSize: "1rem", maxWidth: 500 }}
               >
-                Quản lý và theo dõi tài liệu của bạn tại đây. Tiếp tục đóng góp
-                tri thức nào!
+                Quản lý và theo dõi tài liệu của bạn tại đây.
               </Typography>
             </Box>
 
-            {/* ========== STATS CARDS ========== */}
+            {/* Stats */}
             <Grid container spacing={2.5} sx={{ mb: 4 }}>
               {statsCards.map((card, index) => (
                 <Grid item xs={12} sm={4} key={index}>
@@ -731,7 +609,7 @@ const MyDocumentsPage = () => {
               ))}
             </Grid>
 
-            {/* ========== MAIN CONTENT PAPER ========== */}
+            {/* Main Paper */}
             <Paper
               elevation={0}
               sx={{
@@ -752,7 +630,6 @@ const MyDocumentsPage = () => {
                   alignItems: "center",
                   flexWrap: "wrap",
                   gap: 2,
-                  background: `linear-gradient(135deg, ${alpha(COLORS.primary, 0.03)} 0%, transparent 100%)`,
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -797,15 +674,11 @@ const MyDocumentsPage = () => {
                     flexWrap: "wrap",
                   }}
                 >
-                  {/* Search */}
                   <TextField
                     size="small"
-                    placeholder="Tìm kiếm tài liệu..."
+                    placeholder="Tìm kiếm..."
                     value={searchQuery}
-                    onChange={handleSearchChange}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") handleSearch(e);
-                    }}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -814,7 +687,7 @@ const MyDocumentsPage = () => {
                       ),
                     }}
                     sx={{
-                      minWidth: 260,
+                      minWidth: 220,
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "14px",
                         bgcolor: "#F9FAFB",
@@ -827,16 +700,13 @@ const MyDocumentsPage = () => {
                       },
                     }}
                   />
-
-                  {/* Upload Button */}
                   <Button
                     variant="contained"
                     startIcon={<UploadIcon />}
-                    onClick={handleUploadClick}
+                    onClick={() => setOpenUploadDialog(true)}
                     sx={{
                       background:
                         "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 100%)",
-                      color: "white",
                       borderRadius: "14px",
                       px: 3,
                       py: 1.25,
@@ -847,22 +717,19 @@ const MyDocumentsPage = () => {
                       "&:hover": {
                         background:
                           "linear-gradient(135deg, #B71C1C 0%, #EF5350 100%)",
-                        boxShadow: "0 8px 28px rgba(211, 47, 47, 0.5)",
-                        transform: "translateY(-2px)",
                       },
-                      transition: "all 0.3s ease",
                     }}
                   >
-                    Tải lên tài liệu
+                    Tải lên
                   </Button>
                 </Box>
               </Box>
 
-              {/* ========== TABLE ========== */}
+              {/* Table */}
               <TableContainer>
                 {loading ? (
                   <Box sx={{ p: 4 }}>
-                    {[1, 2, 3, 4, 5].map((n) => (
+                    {[1, 2, 3, 4].map((n) => (
                       <Box
                         key={n}
                         sx={{
@@ -880,21 +747,10 @@ const MyDocumentsPage = () => {
                           sx={{ borderRadius: "14px" }}
                         />
                         <Box sx={{ flex: 1 }}>
-                          <Skeleton variant="text" width="60%" height={24} />
-                          <Skeleton variant="text" width="30%" height={20} />
+                          <Skeleton variant="text" width="60%" />
+                          <Skeleton variant="text" width="30%" />
                         </Box>
-                        <Skeleton
-                          variant="rounded"
-                          width={80}
-                          height={28}
-                          sx={{ borderRadius: "10px" }}
-                        />
-                        <Skeleton
-                          variant="rounded"
-                          width={100}
-                          height={28}
-                          sx={{ borderRadius: "10px" }}
-                        />
+                        <Skeleton variant="rounded" width={80} height={28} />
                       </Box>
                     ))}
                   </Box>
@@ -902,68 +758,31 @@ const MyDocumentsPage = () => {
                   <Table>
                     <TableHead>
                       <TableRow sx={{ bgcolor: "#F9FAFB" }}>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                        >
-                          Tên tài liệu
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                        >
-                          Danh mục
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                        >
-                          Ngày đăng
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                        >
-                          Trạng thái
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                          align="center"
-                        >
-                          Tương tác
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontWeight: 700,
-                            color: "#374151",
-                            fontSize: "0.875rem",
-                            py: 2,
-                          }}
-                          align="center"
-                        >
-                          Hành động
-                        </TableCell>
+                        {[
+                          "Tên tài liệu",
+                          "Danh mục",
+                          "Ngày đăng",
+                          "Trạng thái",
+                          "Tương tác",
+                          "Hành động",
+                        ].map((h) => (
+                          <TableCell
+                            key={h}
+                            sx={{
+                              fontWeight: 700,
+                              color: "#374151",
+                              fontSize: "0.875rem",
+                              py: 2,
+                            }}
+                            align={
+                              h === "Tương tác" || h === "Hành động"
+                                ? "center"
+                                : "left"
+                            }
+                          >
+                            {h}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -972,8 +791,19 @@ const MyDocumentsPage = () => {
                           key={doc.id}
                           doc={doc}
                           index={index}
-                          onEdit={handleEditClick}
-                          onDelete={handleDeleteClick}
+                          onEdit={(doc) =>
+                            setEditDialog({ open: true, document: doc })
+                          }
+                          onDelete={(doc) =>
+                            setDeleteDialog({
+                              open: true,
+                              documentId: doc.id,
+                              documentTitle: doc.title,
+                            })
+                          }
+                          onRequestEdit={(doc) =>
+                            setRequestEditDialog({ open: true, document: doc })
+                          }
                           getStatusConfig={getStatusConfig}
                           formatDate={formatDate}
                           formatFileSize={formatFileSize}
@@ -982,7 +812,6 @@ const MyDocumentsPage = () => {
                     </TableBody>
                   </Table>
                 ) : (
-                  /* Empty State - GenZ Style */
                   <Box
                     sx={{
                       display: "flex",
@@ -998,32 +827,16 @@ const MyDocumentsPage = () => {
                         width: 120,
                         height: 120,
                         borderRadius: "32px",
-                        background:
-                          "linear-gradient(135deg, rgba(211, 47, 47, 0.15) 0%, rgba(255, 107, 107, 0.1) 100%)",
+                        bgcolor: alpha(COLORS.primary, 0.1),
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         mb: 3,
-                        position: "relative",
                       }}
                     >
-                      <RocketIcon sx={{ fontSize: 56, color: "#D32F2F" }} />
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: -8,
-                          right: -8,
-                          width: 32,
-                          height: 32,
-                          borderRadius: "10px",
-                          bgcolor: COLORS.warning,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <SparkleIcon sx={{ fontSize: 18, color: "white" }} />
-                      </Box>
+                      <RocketIcon
+                        sx={{ fontSize: 56, color: COLORS.primary }}
+                      />
                     </Box>
                     <Typography
                       sx={{
@@ -1041,20 +854,18 @@ const MyDocumentsPage = () => {
                         mb: 3,
                         fontSize: "0.9375rem",
                         textAlign: "center",
-                        maxWidth: 300,
                       }}
                     >
-                      Bắt đầu hành trình chia sẻ tri thức bằng cách tải lên tài
-                      liệu đầu tiên của bạn! 🚀
+                      Bắt đầu chia sẻ tri thức bằng cách tải lên tài liệu đầu
+                      tiên! 🚀
                     </Typography>
                     <Button
                       variant="contained"
                       startIcon={<UploadIcon />}
-                      onClick={handleUploadClick}
+                      onClick={() => setOpenUploadDialog(true)}
                       sx={{
                         background:
                           "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 100%)",
-                        color: "white",
                         borderRadius: "14px",
                         px: 4,
                         py: 1.5,
@@ -1062,12 +873,6 @@ const MyDocumentsPage = () => {
                         fontSize: "1rem",
                         textTransform: "none",
                         boxShadow: "0 8px 24px rgba(211, 47, 47, 0.4)",
-                        "&:hover": {
-                          background:
-                            "linear-gradient(135deg, #B71C1C 0%, #EF5350 100%)",
-                          transform: "translateY(-3px)",
-                        },
-                        transition: "all 0.3s ease",
                       }}
                     >
                       Tải lên tài liệu đầu tiên
@@ -1090,26 +895,24 @@ const MyDocumentsPage = () => {
                     }}
                   >
                     <Typography sx={{ color: "#6B7280", fontSize: "0.875rem" }}>
-                      Hiển thị {documents.length} trong số{" "}
+                      Hiển thị {documents.length} trong{" "}
                       {pagination.totalDocuments} tài liệu
                     </Typography>
                     <Pagination
                       count={pagination.totalPages}
                       page={page}
-                      onChange={handlePageChange}
+                      onChange={(e, v) => {
+                        setPage(v);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
                       sx={{
                         "& .MuiPaginationItem-root": {
                           borderRadius: "12px",
                           fontWeight: 600,
-                          fontSize: "0.875rem",
                           "&.Mui-selected": {
                             background:
                               "linear-gradient(135deg, #D32F2F 0%, #FF6B6B 100%)",
                             color: "white",
-                            "&:hover": {
-                              background:
-                                "linear-gradient(135deg, #B71C1C 0%, #EF5350 100%)",
-                            },
                           },
                         },
                       }}
@@ -1121,33 +924,53 @@ const MyDocumentsPage = () => {
         </Grid>
       </Container>
 
-      {/* ========== UPLOAD DIALOG ========== */}
+      {/* Dialogs */}
       <UploadDocumentDialog
         open={openUploadDialog}
-        onClose={handleCloseUploadDialog}
-        onSuccess={handleUploadSuccess}
+        onClose={() => setOpenUploadDialog(false)}
+        onSuccess={() => {
+          showSnackbar("Tải lên thành công! 🎉");
+          setPage(1);
+          fetchDocuments();
+        }}
       />
-
-      {/* ========== EDIT DIALOG ========== */}
       <EditDocumentDialog
         open={editDialog.open}
-        onClose={handleCloseEditDialog}
-        onSuccess={handleEditSuccess}
+        onClose={() => setEditDialog({ open: false, document: null })}
+        onSuccess={() => {
+          const wasRejected = editDialog.document?.status === "rejected";
+          showSnackbar(
+            wasRejected
+              ? "Đã cập nhật và gửi lại để kiểm duyệt! 🔄"
+              : "Cập nhật thành công!",
+          );
+          setEditDialog({ open: false, document: null });
+          fetchDocuments();
+        }}
         document={editDialog.document}
       />
+      <RequestEditDialog
+        open={requestEditDialog.open}
+        onClose={() => setRequestEditDialog({ open: false, document: null })}
+        document={requestEditDialog.document}
+        onSuccess={() => {
+          showSnackbar(
+            "Đã gửi yêu cầu chỉnh sửa! Admin sẽ xem xét sớm. 📨",
+            "success",
+          );
+        }}
+      />
 
-      {/* ========== DELETE CONFIRMATION DIALOG - GenZ Style ========== */}
+      {/* Delete Dialog */}
       <Dialog
         open={deleteDialog.open}
-        onClose={handleCancelDelete}
+        onClose={() =>
+          !deleteLoading &&
+          setDeleteDialog({ open: false, documentId: null, documentTitle: "" })
+        }
         maxWidth="xs"
         fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: "24px",
-            boxShadow: "0 24px 48px rgba(26,26,46,0.2)",
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: "24px" } }}
       >
         <DialogTitle sx={{ p: 0 }}>
           <Box sx={{ p: 3, textAlign: "center" }}>
@@ -1158,7 +981,7 @@ const MyDocumentsPage = () => {
                 mx: "auto",
                 mb: 2,
                 borderRadius: "24px",
-                background: `linear-gradient(135deg, ${alpha(COLORS.danger, 0.15)} 0%, ${alpha(COLORS.orange, 0.1)} 100%)`,
+                bgcolor: alpha(COLORS.danger, 0.1),
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1169,11 +992,10 @@ const MyDocumentsPage = () => {
             <Typography
               sx={{ fontWeight: 700, color: "#1A1A2E", fontSize: "1.25rem" }}
             >
-              Xác nhận xóa tài liệu
+              Xác nhận xóa
             </Typography>
           </Box>
         </DialogTitle>
-
         <DialogContent sx={{ px: 3, pb: 0 }}>
           <Typography
             sx={{
@@ -1182,11 +1004,8 @@ const MyDocumentsPage = () => {
               fontSize: "0.9375rem",
             }}
           >
-            Bạn có chắc chắn muốn xóa tài liệu{" "}
-            <Box component="span" sx={{ fontWeight: 700, color: "#1A1A2E" }}>
-              "{deleteDialog.documentTitle}"
-            </Box>
-            ?
+            Bạn có chắc muốn xóa tài liệu{" "}
+            <strong>"{deleteDialog.documentTitle}"</strong>?
           </Typography>
           <Typography
             sx={{
@@ -1200,10 +1019,15 @@ const MyDocumentsPage = () => {
             Hành động này không thể hoàn tác
           </Typography>
         </DialogContent>
-
         <DialogActions sx={{ p: 3, gap: 1.5 }}>
           <Button
-            onClick={handleCancelDelete}
+            onClick={() =>
+              setDeleteDialog({
+                open: false,
+                documentId: null,
+                documentTitle: "",
+              })
+            }
             disabled={deleteLoading}
             sx={{
               flex: 1,
@@ -1214,15 +1038,33 @@ const MyDocumentsPage = () => {
               fontSize: "0.9375rem",
               textTransform: "none",
               border: "1px solid #E5E7EB",
-              "&:hover": { bgcolor: "#F9FAFB", borderColor: "#D1D5DB" },
             }}
           >
             Hủy
           </Button>
           <Button
-            onClick={handleConfirmDelete}
             variant="contained"
             disabled={deleteLoading}
+            onClick={async () => {
+              setDeleteLoading(true);
+              try {
+                await documentsAPI.deleteDocument(deleteDialog.documentId);
+                showSnackbar("Xóa thành công");
+                fetchDocuments();
+              } catch (err) {
+                showSnackbar(
+                  err.response?.data?.message || "Xóa thất bại",
+                  "error",
+                );
+              } finally {
+                setDeleteLoading(false);
+                setDeleteDialog({
+                  open: false,
+                  documentId: null,
+                  documentTitle: "",
+                });
+              }
+            }}
             startIcon={
               deleteLoading ? (
                 <CircularProgress size={20} color="inherit" />
@@ -1233,40 +1075,28 @@ const MyDocumentsPage = () => {
             sx={{
               flex: 1,
               background: `linear-gradient(135deg, ${COLORS.danger} 0%, ${COLORS.orange} 100%)`,
-              color: "white",
               borderRadius: "14px",
               py: 1.25,
               fontWeight: 600,
               fontSize: "0.9375rem",
               textTransform: "none",
-              boxShadow: `0 6px 20px ${alpha(COLORS.danger, 0.4)}`,
-              "&:hover": {
-                background: `linear-gradient(135deg, #EF4444 0%, #F97316 100%)`,
-              },
-              "&.Mui-disabled": { bgcolor: "#E5E7EB", color: "#9CA3AF" },
             }}
           >
-            {deleteLoading ? "Đang xóa..." : "Xóa tài liệu"}
+            {deleteLoading ? "Đang xóa..." : "Xóa"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* ========== SNACKBAR ========== */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert
-          onClose={handleCloseSnackbar}
+          onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
           severity={snackbar.severity}
-          sx={{
-            borderRadius: "14px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-            fontSize: "0.9375rem",
-            fontWeight: 500,
-          }}
+          sx={{ borderRadius: "14px", fontWeight: 500 }}
         >
           {snackbar.message}
         </Alert>

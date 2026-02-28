@@ -1,7 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const documentController = require("../controllers/document.controller");
+const editRequestAdminController = require("../controllers/editRequest.admin.controller");
 const { checkAuth, checkRole } = require("../middleware/auth.middleware");
+const uploadMiddleware = require("../middleware/upload.middleware");
 
 /**
  * Document Admin Routes
@@ -13,6 +15,31 @@ const { checkAuth, checkRole } = require("../middleware/auth.middleware");
  * Admin: Có toàn quyền (CRUD, thống kê, duyệt bài)
  * Moderator: Chỉ được xem danh sách và duyệt/từ chối tài liệu
  */
+
+// Lấy danh sách yêu cầu sửa tài liệu
+router.get(
+  "/edit-requests",
+  checkAuth,
+  checkRole(["Admin"]),
+  editRequestAdminController.getEditRequests,
+);
+
+// Duyệt / Từ chối yêu cầu
+router.put(
+  "/edit-requests/:reqId/review",
+  checkAuth,
+  checkRole(["Admin"]),
+  editRequestAdminController.reviewEditRequest,
+);
+
+// Admin sửa trực tiếp (safeguard)
+router.put(
+  "/:id/direct-edit",
+  checkAuth,
+  checkRole(["Admin"]),
+  uploadMiddleware,
+  editRequestAdminController.adminDirectEdit,
+);
 
 /**
  * route   PUT /api/admin/documents/:id/status

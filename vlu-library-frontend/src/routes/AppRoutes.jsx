@@ -21,6 +21,7 @@ import LandingPage from "../pages/public/LandingPage";
 import CategoriesPage from "../pages/public/CategoriesPage";
 import AuthorStatsPage from "../pages/author/AuthorStatsPage";
 import NotificationsPage from "../pages/user/NotificationsPage";
+import RequestsManagementPage from "../pages/admin/RequestsManagementPage";
 
 /**
  * ProtectedRoute Component
@@ -310,6 +311,15 @@ const AppRoutes = () => {
           <RoleBasedRoute allowedRoles={["Admin"]}>
             <UpgradeRequestsPage />
           </RoleBasedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/requests"
+        element={
+          <ProtectedRoute>
+            <RequestsManagementPage />
+          </ProtectedRoute>
         }
       />
 

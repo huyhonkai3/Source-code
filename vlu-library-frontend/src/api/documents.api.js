@@ -359,6 +359,76 @@ export const getAuthorStats = async (params = {}) => {
   }
 };
 
+/**
+ * Author gửi yêu cầu chỉnh sửa tài liệu đã xuất bản
+ * POST /api/documents/:id/edit-requests
+ * @param {string} id - Document ID
+ * @param {string} reason - Lý do xin chỉnh sửa
+ */
+export const requestEdit = async (id, reason) => {
+  try {
+    const response = await axiosInstance.post(
+      `/documents/${id}/edit-requests`,
+      { reason },
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Admin lấy danh sách yêu cầu chỉnh sửa tài liệu
+ * GET /api/admin/documents/edit-requests
+ * @param {Object} params - { status, page, limit }
+ */
+export const getEditRequests = async (params = {}) => {
+  try {
+    const response = await axiosInstance.get("/admin/documents/edit-requests", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Admin duyệt / từ chối yêu cầu chỉnh sửa
+ * PUT /api/admin/documents/edit-requests/:reqId/review
+ * @param {string} reqId - EditRequest ID
+ * @param {Object} data - { status: 'approved'|'rejected', adminReason?: string }
+ */
+export const reviewEditRequest = async (reqId, data) => {
+  try {
+    const response = await axiosInstance.put(
+      `/admin/documents/edit-requests/${reqId}/review`,
+      data,
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Admin sửa trực tiếp tài liệu (bỏ qua ràng buộc status - có Safeguard)
+ * PUT /api/admin/documents/:id/direct-edit
+ * @param {string} id - Document ID
+ * @param {Object} data - { safeguardConfirmed: true, title, ... }
+ */
+export const adminDirectEdit = async (id, data) => {
+  try {
+    const response = await axiosInstance.put(
+      `/admin/documents/${id}/direct-edit`,
+      data,
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Export as default object
 const documentsAPI = {
   getAll,
@@ -379,6 +449,10 @@ const documentsAPI = {
   getFeatured,
   getPublicStats,
   getAuthorStats,
+  requestEdit,
+  getEditRequests,
+  reviewEditRequest,
+  adminDirectEdit,
 };
 
 export default documentsAPI;

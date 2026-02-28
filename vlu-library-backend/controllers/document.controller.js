@@ -3,6 +3,7 @@ const Category = require("../models/category.model");
 const Statistic = require("../models/statistics.model");
 const User = require("../models/user.model");
 const Notification = require("../models/notification.model");
+const EditRequest = require("../models/editRequest.model");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
@@ -2042,6 +2043,137 @@ const getAuthorStats = async (req, res) => {
   }
 };
 
+/**
+ * API: Tạo yêu cầu chỉnh sửa tài liệu đã duyệt
+ * POST /api/documents/:id/edit-requests
+ * Access: Author (chủ sở hữu tài liệu)
+ *
+ * Business Rules:
+ * - Tài liệu phải có status = 'approved'
+ * - Người gửi phải là chủ sở hữu tài liệu
+ * - Không được gửi trùng yêu cầu (kiểm tra pending request)
+ */
+const createEditRequest = async (req, res) => {
+  try {
+    const { id: documentId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user.id;
+
+    // Validate reason
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Lý do xin chỉnh sửa là bắt buộc",
+        errors: [{ field: "reason", message: "Vui lòng nhập lý do xin sửa" }],
+      });
+    }
+
+    if (reason.trim().length < 10) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Lý do quá ngắn",
+        errors: [
+          {
+            field: "reason",
+            message: "Lý do phải có ít nhất 10 ký tự",
+          },
+        ],
+      });
+    }
+
+    // Lấy document
+    const document = await Document.findById(documentId);
+    if (!document) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Không tìm thấy tài liệu",
+      });
+    }
+
+    // Kiểm tra quyền sở hữu
+    const uploadedById = document.uploadedBy?.toString();
+    if (uploadedById !== userId.toString()) {
+      return res.status(403).json({
+        status: "error",
+        code: 403,
+        message: "Bạn không có quyền gửi yêu cầu cho tài liệu này",
+      });
+    }
+
+    // Tài liệu phải đang approved
+    if (document.status !== "approved") {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message:
+          document.status === "pending"
+            ? "Tài liệu đang chờ duyệt. Bạn có thể chỉnh sửa trực tiếp."
+            : "Chỉ có thể yêu cầu chỉnh sửa tài liệu đã được duyệt",
+      });
+    }
+
+    // Kiểm tra yêu cầu pending đã tồn tại chưa
+    const existingRequest = await EditRequest.findOne({
+      document: documentId,
+      author: userId,
+      status: "pending",
+    });
+
+    if (existingRequest) {
+      return res.status(409).json({
+        status: "error",
+        code: 409,
+        message:
+          "Bạn đã gửi yêu cầu chỉnh sửa cho tài liệu này và đang chờ Admin xét duyệt",
+      });
+    }
+
+    // Tạo edit request
+    const editRequest = await EditRequest.create({
+      document: documentId,
+      author: userId,
+      reason: reason.trim(),
+      status: "pending",
+    });
+
+    await editRequest.populate("document", "title");
+    await editRequest.populate("author", "name email");
+
+    return res.status(201).json({
+      status: "success",
+      code: 201,
+      message:
+        "Gửi yêu cầu chỉnh sửa thành công. Vui lòng chờ Admin xét duyệt.",
+      data: {
+        editRequest: {
+          id: editRequest._id,
+          document: {
+            id: editRequest.document._id,
+            title: editRequest.document.title,
+          },
+          author: {
+            id: editRequest.author._id,
+            name: editRequest.author.name,
+          },
+          reason: editRequest.reason,
+          status: editRequest.status,
+          createdAt: editRequest.createdAt,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Create edit request error:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi gửi yêu cầu chỉnh sửa",
+    });
+  }
+};
+
 module.exports = {
   uploadDocument,
   reviewDocument,
@@ -2058,4 +2190,5 @@ module.exports = {
   getPublicStats,
   getAuthorStats,
   getLinkedData,
+  createEditRequest,
 };
