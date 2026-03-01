@@ -20,6 +20,8 @@ import {
   PlayArrow as PlayIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { toggleBookmark } from "../../api/bookmark.api";
+import { useEffect } from "react";
 
 /**
  * DocumentCard Component - VLU Design System v2.0.1
@@ -127,10 +129,27 @@ const DocumentCard = ({ document }) => {
   /**
    * Handle bookmark toggle
    */
-  const handleBookmark = (e) => {
+  const handleBookmark = async (e) => {
     e.stopPropagation();
-    setIsBookmarked(!isBookmarked);
+
+    try {
+      const res = await toggleBookmark(document.id);
+
+      // Backend nên trả:
+      // { data: { bookmarked: true } }
+
+      const bookmarked = res.data?.data?.bookmarked;
+
+      setIsBookmarked(bookmarked);
+    } catch (error) {
+      console.error("Bookmark error:", error.response?.data || error.message);
+    }
   };
+  useEffect(() => {
+    if (document?.isBookmarked !== undefined) {
+      setIsBookmarked(document.isBookmarked);
+    }
+  }, [document]);
 
   /**
    * Handle quick read

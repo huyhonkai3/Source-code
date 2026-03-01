@@ -22,6 +22,7 @@ import CategoriesPage from "../pages/public/CategoriesPage";
 import AuthorStatsPage from "../pages/author/AuthorStatsPage";
 import NotificationsPage from "../pages/user/NotificationsPage";
 import RequestsManagementPage from "../pages/admin/RequestsManagementPage";
+import BookmarksPage from "../pages/public/BookmarksPage";
 
 /**
  * ProtectedRoute Component
@@ -330,6 +331,15 @@ const AppRoutes = () => {
           <RoleBasedRoute allowedRoles={["Admin"]}>
             <UsersManagementPage />
           </RoleBasedRoute>
+        }
+      />
+      
+      <Route
+        path="/bookmarks"
+        element={
+          <ProtectedRoute>
+            <BookmarksPage />
+          </ProtectedRoute>
         }
       />
 

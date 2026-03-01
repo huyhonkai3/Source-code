@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-
+console.log("Connecting to:", process.env.MONGO_URI);
 /**
  * Kết nối đến MongoDB
  * Sử dụng mongoose với cấu hình từ biến môi trường MONGO_URI

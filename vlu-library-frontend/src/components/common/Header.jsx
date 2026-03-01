@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   AppBar,
   Toolbar,
@@ -21,8 +21,6 @@ import {
   ListItemIcon,
   Divider,
   alpha,
-  Popover,
-  CircularProgress,
 } from "@mui/material";
 import {
   Notifications as NotificationsIcon,
@@ -37,22 +35,14 @@ import {
   Logout as LogoutIcon,
   Article as ArticleIcon,
   Close as CloseIcon,
-  NotificationsNone as NotificationsNoneIcon,
-  DoneAll as DoneAllIcon,
 } from "@mui/icons-material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import {
-  getNotifications,
-  getUnreadCount,
-  markAsRead,
-  markAllAsRead,
-} from "../../api/notifications.api";
 
 /**
  * Header Component - VLU Design System v2.0
  * Modern & Bold navigation với glass morphism effect
- * UPDATED v2.1: Thêm Notification Bell với Popover Dropdown
+ * UPDATED: Tăng font sizes để UX tốt hơn (min +2px)
  */
 const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -66,19 +56,14 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // ====== NOTIFICATION STATE ======
-  const [notifAnchorEl, setNotifAnchorEl] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifLoading, setNotifLoading] = useState(false);
-  // ====== END NOTIFICATION STATE ======
-
   // Navigation items
   const navItems = [
     { label: "Trang chủ", path: "/", icon: <HomeIcon /> },
     { label: "Tài liệu", path: "/documents", icon: <DocumentIcon /> },
     { label: "Danh mục", path: "/categories", icon: <CategoryIcon /> },
+    { label: "Bookmark", path: "/bookmarks", icon: <ArticleIcon /> },
     { label: "Về chúng tôi", path: "/about", icon: <InfoIcon /> },
+    
   ];
 
   // Handle scroll effect
@@ -90,107 +75,54 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // ====== FETCH UNREAD COUNT ON MOUNT ======
-  const fetchUnreadCount = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const count = await getUnreadCount();
-      setUnreadCount(count);
-    } catch (err) {
-      // Silent fail
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    fetchUnreadCount();
-    // Poll every 60 seconds
-    const interval = setInterval(fetchUnreadCount, 60000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
-  // ====== END FETCH ======
-
-  // ====== NOTIFICATION HANDLERS ======
-  const handleOpenNotifications = async (event) => {
-    setNotifAnchorEl(event.currentTarget);
-    setNotifLoading(true);
-    try {
-      const data = await getNotifications({ limit: 20 });
-      setNotifications(data?.data?.notifications || []);
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
-    } finally {
-      setNotifLoading(false);
-    }
-  };
-
-  const handleCloseNotifications = () => {
-    setNotifAnchorEl(null);
-  };
-
-  const handleNotificationClick = async (notification) => {
-    // Mark as read nếu chưa đọc
-    if (!notification.isRead) {
-      try {
-        await markAsRead(notification.id);
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notification.id ? { ...n, isRead: true } : n,
-          ),
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      } catch (err) {
-        // Silent fail
-      }
-    }
-
-    handleCloseNotifications();
-
-    // Điều hướng theo type
-    if (notification.type === "DOCUMENT_MODERATION") {
-      navigate("/author/documents");
-    } else if (notification.type === "UPGRADE_REQUEST") {
-      navigate("/profile");
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error("Failed to mark all as read:", err);
-    }
-  };
-  // ====== END NOTIFICATION HANDLERS ======
-
+  /**
+   * Handle user menu open
+   */
   const handleOpenUserMenu = (event) => {
     setAnchorElUser(event.currentTarget);
   };
 
+  /**
+   * Handle user menu close
+   */
   const handleCloseUserMenu = () => {
     setAnchorElUser(null);
   };
 
+  /**
+   * Handle mobile drawer toggle
+   */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  /**
+   * Handle logout
+   */
   const handleLogout = () => {
     handleCloseUserMenu();
     logout();
   };
 
+  /**
+   * Handle profile click
+   */
   const handleProfile = () => {
     handleCloseUserMenu();
     navigate("/profile");
   };
 
+  /**
+   * Check if nav item is active
+   */
   const isActiveRoute = (path) => {
-    if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
-  };
+  return location.pathname === path ||
+         location.pathname.startsWith(path + "/");
+};
 
+  /**
+   * Get role display name
+   */
   const getRoleDisplayName = (role) => {
     const roles = {
       Admin: "Quản trị viên",
@@ -201,6 +133,9 @@ const Header = () => {
     return roles[role] || role;
   };
 
+  /**
+   * Get role color
+   */
   const getRoleColor = (role) => {
     const colors = {
       Admin: "#D32F2F",
@@ -210,221 +145,6 @@ const Header = () => {
     };
     return colors[role] || "#8E8EA9";
   };
-
-  /**
-   * Format thời gian relative
-   */
-  const formatRelativeTime = (dateStr) => {
-    const now = new Date();
-    const date = new Date(dateStr);
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return "Vừa xong";
-    if (diffMins < 60) return `${diffMins} phút trước`;
-    if (diffHours < 24) return `${diffHours} giờ trước`;
-    if (diffDays < 7) return `${diffDays} ngày trước`;
-    return date.toLocaleDateString("vi-VN");
-  };
-
-  // ====== NOTIFICATION POPOVER ======
-  const notifOpen = Boolean(notifAnchorEl);
-
-  const NotificationPopover = () => (
-    <Popover
-      open={notifOpen}
-      anchorEl={notifAnchorEl}
-      onClose={handleCloseNotifications}
-      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      transformOrigin={{ vertical: "top", horizontal: "right" }}
-      PaperProps={{
-        elevation: 0,
-        sx: {
-          mt: 1.5,
-          width: 380,
-          maxHeight: 520,
-          borderRadius: "16px",
-          boxShadow: "0 10px 40px rgba(26, 26, 46, 0.14)",
-          border: "1px solid #F0F0F5",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        },
-      }}
-    >
-      {/* Header */}
-      <Box
-        sx={{
-          px: 2.5,
-          py: 2,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid #F0F0F5",
-          flexShrink: 0,
-        }}
-      >
-        <Typography
-          sx={{ fontWeight: 700, fontSize: "1rem", color: "#1A1A2E" }}
-        >
-          Thông báo
-          {unreadCount > 0 && (
-            <Box
-              component="span"
-              sx={{
-                ml: 1,
-                px: 1,
-                py: 0.25,
-                bgcolor: "#D32F2F",
-                color: "white",
-                borderRadius: "20px",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-              }}
-            >
-              {unreadCount}
-            </Box>
-          )}
-        </Typography>
-
-        {unreadCount > 0 && (
-          <Button
-            size="small"
-            startIcon={<DoneAllIcon sx={{ fontSize: 16 }} />}
-            onClick={handleMarkAllAsRead}
-            sx={{
-              fontSize: "0.8125rem",
-              color: "#2196F3",
-              fontWeight: 600,
-              textTransform: "none",
-              "&:hover": { bgcolor: alpha("#2196F3", 0.06) },
-            }}
-          >
-            Đọc tất cả
-          </Button>
-        )}
-      </Box>
-
-      {/* Notification List */}
-      <Box sx={{ overflowY: "auto", flex: 1 }}>
-        {notifLoading ? (
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              py: 4,
-            }}
-          >
-            <CircularProgress size={28} sx={{ color: "#D32F2F" }} />
-          </Box>
-        ) : notifications.length === 0 ? (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              py: 5,
-              gap: 1.5,
-            }}
-          >
-            <NotificationsNoneIcon sx={{ fontSize: 48, color: "#C0C0C8" }} />
-            <Typography sx={{ color: "#8E8EA9", fontSize: "0.9375rem" }}>
-              Chưa có thông báo nào
-            </Typography>
-          </Box>
-        ) : (
-          notifications.map((notification) => (
-            <Box
-              key={notification.id}
-              onClick={() => handleNotificationClick(notification)}
-              sx={{
-                px: 2.5,
-                py: 1.75,
-                cursor: "pointer",
-                bgcolor: notification.isRead ? "white" : alpha("#D32F2F", 0.04),
-                borderLeft: notification.isRead
-                  ? "3px solid transparent"
-                  : "3px solid #D32F2F",
-                transition: "all 0.15s ease",
-                "&:hover": {
-                  bgcolor: notification.isRead
-                    ? "#FAFAFC"
-                    : alpha("#D32F2F", 0.07),
-                },
-                "&:not(:last-child)": {
-                  borderBottom: "1px solid #F5F5F8",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 1,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: notification.isRead ? 500 : 700,
-                    fontSize: "0.9rem",
-                    color: "#1A1A2E",
-                    lineHeight: 1.4,
-                    flex: 1,
-                  }}
-                >
-                  {notification.title}
-                </Typography>
-                {!notification.isRead && (
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      bgcolor: "#D32F2F",
-                      flexShrink: 0,
-                      mt: 0.5,
-                    }}
-                  />
-                )}
-              </Box>
-
-              <Typography
-                sx={{
-                  fontSize: "0.8125rem",
-                  color: "#6B6B8A",
-                  mt: 0.5,
-                  lineHeight: 1.5,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {notification.message}
-              </Typography>
-
-              <Typography
-                sx={{
-                  fontSize: "0.75rem",
-                  color: "#A0A0B4",
-                  mt: 0.75,
-                  fontWeight: 500,
-                }}
-              >
-                {formatRelativeTime(notification.createdAt)}
-              </Typography>
-            </Box>
-          ))
-        )}
-      </Box>
-    </Popover>
-  );
-  // ====== END NOTIFICATION POPOVER ======
 
   /**
    * Mobile drawer content
@@ -546,7 +266,7 @@ const Header = () => {
                   primaryTypographyProps={{
                     fontWeight: isActive ? 600 : 500,
                     color: isActive ? "#D32F2F" : "#4A4A68",
-                    fontSize: "1rem",
+                    fontSize: "1rem", // UPDATED: 16px thay vì 14px
                   }}
                 />
               </ListItemButton>
@@ -574,7 +294,7 @@ const Header = () => {
               borderRadius: "12px",
               py: 1.25,
               fontWeight: 600,
-              fontSize: "0.9375rem",
+              fontSize: "0.9375rem", // UPDATED: 15px thay vì 14px
               textTransform: "none",
               "&:hover": {
                 borderColor: "#D32F2F",
@@ -597,10 +317,12 @@ const Header = () => {
                 borderRadius: "12px",
                 py: 1.25,
                 fontWeight: 600,
-                fontSize: "0.9375rem",
+                fontSize: "0.9375rem", // UPDATED: 15px
                 textTransform: "none",
                 boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
-                "&:hover": { bgcolor: "#B71C1C" },
+                "&:hover": {
+                  bgcolor: "#B71C1C",
+                },
               }}
             >
               Đăng nhập
@@ -617,7 +339,7 @@ const Header = () => {
                 borderRadius: "12px",
                 py: 1.25,
                 fontWeight: 600,
-                fontSize: "0.9375rem",
+                fontSize: "0.9375rem", // UPDATED: 15px
                 textTransform: "none",
                 "&:hover": {
                   borderColor: "#D32F2F",
@@ -659,7 +381,10 @@ const Header = () => {
             {isMobile && (
               <IconButton
                 onClick={handleDrawerToggle}
-                sx={{ color: "#4A4A68", mr: 1 }}
+                sx={{
+                  color: "#4A4A68",
+                  mr: 1,
+                }}
               >
                 <MenuIcon />
               </IconButton>
@@ -692,7 +417,11 @@ const Header = () => {
                 }}
               >
                 <Typography
-                  sx={{ color: "white", fontWeight: 800, fontSize: "1.5rem" }}
+                  sx={{
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: "1.5rem", // UPDATED: 24px thay vì 22px
+                  }}
                 >
                   V
                 </Typography>
@@ -703,7 +432,7 @@ const Header = () => {
                 sx={{
                   fontWeight: 700,
                   color: "#1A1A2E",
-                  fontSize: "1.375rem",
+                  fontSize: "1.375rem", // UPDATED: 22px thay vì 20px
                   display: { xs: "none", sm: "block" },
                   letterSpacing: "-0.01em",
                 }}
@@ -728,11 +457,12 @@ const Header = () => {
                         borderRadius: "10px",
                         color: isActive ? "#D32F2F" : "#4A4A68",
                         fontWeight: isActive ? 600 : 500,
-                        fontSize: "1rem",
+                        fontSize: "1rem", // UPDATED: 16px thay vì 15px
                         textTransform: "none",
                         bgcolor: isActive
                           ? alpha("#D32F2F", 0.08)
                           : "transparent",
+                        position: "relative",
                         "&:hover": {
                           bgcolor: isActive
                             ? alpha("#D32F2F", 0.12)
@@ -760,7 +490,10 @@ const Header = () => {
                     color: "#8E8EA9",
                     bgcolor: "#F0F0F5",
                     borderRadius: "10px",
-                    "&:hover": { bgcolor: "#E8E8ED", color: "#4A4A68" },
+                    "&:hover": {
+                      bgcolor: "#E8E8ED",
+                      color: "#4A4A68",
+                    },
                   }}
                 >
                   <SearchIcon />
@@ -769,38 +502,32 @@ const Header = () => {
 
               {isAuthenticated ? (
                 <>
-                  {/* ====== NOTIFICATION BELL ====== */}
+                  {/* Notifications Icon */}
                   <IconButton
-                    onClick={handleOpenNotifications}
                     sx={{
-                      color: notifOpen ? "#D32F2F" : "#8E8EA9",
-                      bgcolor: notifOpen ? alpha("#D32F2F", 0.08) : "#F0F0F5",
+                      color: "#8E8EA9",
+                      bgcolor: "#F0F0F5",
                       borderRadius: "10px",
-                      transition: "all 0.2s ease",
                       "&:hover": {
-                        bgcolor: alpha("#D32F2F", 0.08),
-                        color: "#D32F2F",
+                        bgcolor: "#E8E8ED",
+                        color: "#4A4A68",
                       },
                     }}
                   >
                     <Badge
-                      badgeContent={unreadCount}
-                      max={99}
+                      badgeContent={3}
                       sx={{
                         "& .MuiBadge-badge": {
                           bgcolor: "#D32F2F",
                           color: "white",
-                          fontWeight: 700,
-                          fontSize: "0.6875rem",
-                          minWidth: 18,
-                          height: 18,
+                          fontWeight: 600,
+                          fontSize: "0.75rem", // UPDATED: 12px
                         },
                       }}
                     >
                       <NotificationsIcon />
                     </Badge>
                   </IconButton>
-                  {/* ====== END NOTIFICATION BELL ====== */}
 
                   {/* User Avatar & Menu */}
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -823,7 +550,7 @@ const Header = () => {
                           width: 38,
                           height: 38,
                           bgcolor: "#D32F2F",
-                          fontSize: "1.125rem",
+                          fontSize: "1.125rem", // UPDATED: 18px thay vì 16px
                           fontWeight: 600,
                         }}
                       >
@@ -831,6 +558,7 @@ const Header = () => {
                       </Avatar>
                     </IconButton>
 
+                    {/* User Info - Desktop only */}
                     {!isMobile && (
                       <Box sx={{ display: { xs: "none", lg: "block" } }}>
                         <Typography
@@ -839,7 +567,7 @@ const Header = () => {
                             fontWeight: 600,
                             color: "#1A1A2E",
                             lineHeight: 1.3,
-                            fontSize: "0.9375rem",
+                            fontSize: "0.9375rem", // UPDATED: 15px thay vì 14px
                           }}
                         >
                           {user?.name}
@@ -848,7 +576,7 @@ const Header = () => {
                           sx={{
                             color: getRoleColor(user?.role),
                             fontWeight: 600,
-                            fontSize: "0.8125rem",
+                            fontSize: "0.8125rem", // UPDATED: 13px thay vì 11px
                           }}
                         >
                           {getRoleDisplayName(user?.role)}
@@ -861,8 +589,14 @@ const Header = () => {
                   <Menu
                     id="menu-appbar"
                     anchorEl={anchorElUser}
-                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                    transformOrigin={{ vertical: "top", horizontal: "right" }}
+                    anchorOrigin={{
+                      vertical: "bottom",
+                      horizontal: "right",
+                    }}
+                    transformOrigin={{
+                      vertical: "top",
+                      horizontal: "right",
+                    }}
                     open={Boolean(anchorElUser)}
                     onClose={handleCloseUserMenu}
                     PaperProps={{
@@ -914,6 +648,7 @@ const Header = () => {
 
                     <Divider sx={{ borderColor: "#F0F0F5" }} />
 
+                    {/* Menu Items */}
                     <Box sx={{ py: 1 }}>
                       <MenuItem
                         onClick={handleProfile}
@@ -931,7 +666,24 @@ const Header = () => {
                           Trang cá nhân
                         </Typography>
                       </MenuItem>
-
+                      {/*Bookmark*/}
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseUserMenu();
+                          navigate("/bookmarks");
+                        }}
+                        sx={{
+                          py: 1.25,
+                          px: 2,
+                          gap: 1.5,
+                          "&:hover": { bgcolor: "#FAFAFC" },
+                        }}
+                      >
+                        <ArticleIcon sx={{ fontSize: 20, color: "#8E8EA9" }} />
+                        <Typography sx={{ fontWeight: 500, fontSize: "0.9375rem" }}>
+                          Tài liệu đã lưu
+                        </Typography>
+                      </MenuItem>
                       {user?.role === "Author" && (
                         <MenuItem
                           onClick={() => {
@@ -956,6 +708,7 @@ const Header = () => {
                         </MenuItem>
                       )}
 
+                      {/* menu của admin */}
                       {user?.role === "Admin" && (
                         <MenuItem
                           onClick={() => {
@@ -982,6 +735,7 @@ const Header = () => {
                         </MenuItem>
                       )}
 
+                      {/* menu của kiểm duyệt viên */}
                       {user?.role === "Moderator" && (
                         <MenuItem
                           onClick={() => {
@@ -1011,6 +765,7 @@ const Header = () => {
 
                     <Divider sx={{ borderColor: "#F0F0F5" }} />
 
+                    {/* Logout */}
                     <Box sx={{ py: 1 }}>
                       <MenuItem
                         onClick={handleLogout}
@@ -1037,6 +792,7 @@ const Header = () => {
                 </>
               ) : (
                 <>
+                  {/* Login/Register Buttons - Desktop only */}
                   {!isMobile && (
                     <Box sx={{ display: "flex", gap: 1.5 }}>
                       <Button
@@ -1050,7 +806,7 @@ const Header = () => {
                           px: 2.5,
                           py: 1,
                           fontWeight: 600,
-                          fontSize: "0.9375rem",
+                          fontSize: "0.9375rem", // UPDATED: 15px
                           textTransform: "none",
                           "&:hover": {
                             borderColor: "#D32F2F",
@@ -1072,7 +828,7 @@ const Header = () => {
                           px: 2.5,
                           py: 1,
                           fontWeight: 600,
-                          fontSize: "0.9375rem",
+                          fontSize: "0.9375rem", // UPDATED: 15px
                           textTransform: "none",
                           boxShadow: "0 4px 14px rgba(211,47,47,0.3)",
                           "&:hover": {
@@ -1092,16 +848,15 @@ const Header = () => {
         </Container>
       </AppBar>
 
-      {/* Notification Popover */}
-      <NotificationPopover />
-
       {/* Mobile Drawer */}
       <Drawer
         variant="temporary"
         anchor="left"
         open={mobileOpen}
         onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
+        ModalProps={{
+          keepMounted: true,
+        }}
         sx={{
           display: { xs: "block", md: "none" },
           "& .MuiDrawer-paper": {

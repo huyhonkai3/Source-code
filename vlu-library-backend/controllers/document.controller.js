@@ -10,6 +10,7 @@ const fs = require("fs");
 const https = require("https");
 const http = require("http");
 const axios = require("axios");
+const Bookmark = require("../models/bookmark.model");
 // Import helper functions từ upload middleware
 const {
   getFileUrl,
@@ -798,6 +799,16 @@ const getDocumentById = async (req, res) => {
         message: "Bạn không có quyền xem tài liệu này",
       });
     }
+    // Kiểm tra người dùng đã bookmark tài liệu chưa
+    let isBookmarked = false;
+    if (req.user) {
+      const bookmark = await Bookmark.findOne({
+        userId: req.user.id,
+        documentId: document._id,
+      });
+
+      isBookmarked = !!bookmark;
+    }
 
     return res.status(200).json({
       status: "success",
@@ -843,6 +854,8 @@ const getDocumentById = async (req, res) => {
           reviewedAt: document.reviewedAt,
           views: document.views,
           downloads: document.downloads,
+          bookmarkCount: document.bookmarkCount,
+          isBookmarked,
           createdAt: document.createdAt,
           updatedAt: document.updatedAt,
         },
@@ -2040,6 +2053,166 @@ const getAuthorStats = async (req, res) => {
       code: 500,
       message: "Lỗi server khi lấy thống kê",
     });
+    
+  }
+};
+/**
+ * API: Toggle Bookmark
+ * POST /api/documents/:id/bookmark
+ * Access: Authenticated users
+ *
+ * Business Rules:
+ * - Chỉ bookmark tài liệu đã được duyệt (approved)
+ * - Nếu đã bookmark → bỏ bookmark
+ * - Nếu chưa bookmark → thêm bookmark
+ * - Tự động cập nhật bookmarkCount
+ */
+const toggleBookmark = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const document = await Document.findById(id);
+
+    if (!document || document.status !== "approved") {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Tài liệu không tồn tại hoặc chưa được duyệt",
+      });
+    }
+
+    const existingBookmark = await Bookmark.findOne({
+      userId,
+      documentId: id,
+    });
+
+    // Nếu đã bookmark → bỏ bookmark
+    if (existingBookmark) {
+      await Bookmark.deleteOne({ _id: existingBookmark._id });
+
+      await Document.findByIdAndUpdate(id, {
+        $inc: { bookmarkCount: -1 },
+      });
+
+      return res.status(200).json({
+        status: "success",
+        code: 200,
+        message: "Đã bỏ bookmark",
+        data: {
+          bookmarked: false,
+          bookmarkCount: document.bookmarkCount - 1,
+        },
+      });
+    }
+
+    // Nếu chưa bookmark → thêm bookmark
+    await Bookmark.create({
+      userId,
+      documentId: id,
+    });
+
+    await Document.findByIdAndUpdate(id, {
+      $inc: { bookmarkCount: 1 },
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Đã thêm bookmark",
+      data: {
+        bookmarked: true,
+        bookmarkCount: document.bookmarkCount + 1,
+      },
+    });
+  } catch (error) {
+    console.error("Toggle bookmark error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        status: "error",
+        code: 409,
+        message: "Bạn đã bookmark tài liệu này trước đó",
+      });
+    }
+
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi bookmark tài liệu",
+    });
+  }
+};
+/**
+ * API: Lấy danh sách bookmark của người dùng
+ * GET /api/bookmarks
+ * Access: Authenticated users
+ *
+ * Hỗ trợ:
+ * - Phân trang
+ * - Chỉ trả tài liệu approved
+ */
+const getMyBookmarks = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [bookmarks, totalDocuments] = await Promise.all([
+      Bookmark.find({ userId })
+        .populate({
+          path: "documentId",
+          match: { status: "approved" },
+          populate: { path: "categoryId", select: "name slug" },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+
+      Bookmark.countDocuments({ userId }),
+    ]);
+
+    const validBookmarks = bookmarks.filter((b) => b.documentId);
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách bookmark thành công",
+      data: {
+        documents: validBookmarks.map((item) => ({
+          id: item.documentId._id,
+          title: item.documentId.title,
+          description: item.documentId.description,
+          author: item.documentId.author,
+          bookmarkCount: item.documentId.bookmarkCount,
+          category: item.documentId.categoryId
+            ? {
+                id: item.documentId.categoryId._id,
+                name: item.documentId.categoryId.name,
+                slug: item.documentId.categoryId.slug,
+              }
+            : null,
+          createdAt: item.createdAt,
+        })),
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalDocuments / limitNum),
+          totalDocuments,
+          limit: limitNum,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get my bookmarks error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy danh sách bookmark",
+    });
   }
 };
 
@@ -2191,4 +2364,6 @@ module.exports = {
   getAuthorStats,
   getLinkedData,
   createEditRequest,
+  toggleBookmark,
+  getMyBookmarks,
 };
