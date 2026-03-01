@@ -178,6 +178,20 @@ router.get(
   documentController.readDocument,
 );
 
+// Toggle bookmark
+router.post(
+  "/:id/bookmark",
+  checkAuth,
+  documentController.toggleBookmark
+);
+
+// Get my bookmarks
+router.get(
+  "/bookmarks",
+  checkAuth,
+  documentController.getMyBookmarks
+);
+
 /**
  * route   GET /api/documents/:id
  * desc    Lấy chi tiết tài liệu (API 2.9)

@@ -184,6 +184,12 @@ const documentSchema = new mongoose.Schema(
       min: [0, "Số lượt tải không thể âm"],
     },
 
+    bookmarkCount: {
+      type: Number,
+      default: 0,
+      min: [0, "Số bookmark không thể âm"],
+    },
+
     rating: {
       type: Number,
       min: [0, "Đánh giá không thể âm"],
