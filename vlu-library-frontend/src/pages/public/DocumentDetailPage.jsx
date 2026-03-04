@@ -1,8 +1,3 @@
-/**
- * DocumentDetailPage - VLU Design System v2.0
- * Modern & Bold document detail page với visual-first approach
- */
-
 import { useState, useEffect, useCallback } from "react";
 import {
   Container,
@@ -50,6 +45,7 @@ import {
   Public as WikidataIcon,
   SearchOff as SearchOffIcon,
   SentimentDissatisfied as SadIcon,
+  Flag as FlagIcon,
 } from "@mui/icons-material";
 import LanguageIcon from "@mui/icons-material/Language";
 import { useParams, useNavigate, Link as RouterLink } from "react-router-dom";
@@ -62,6 +58,7 @@ import ReviewSection from "../../components/reviews/ReviewSection";
 import CommentSection from "../../components/comments/CommentSection";
 import documentsAPI from "../../api/documents.api";
 import { FileViewer } from "../../components/common/file-viewer";
+import ReportDialog from "../../components/documents/ReportDialog";
 
 const DocumentDetailPage = () => {
   const { id } = useParams();
@@ -75,6 +72,7 @@ const DocumentDetailPage = () => {
   const [lodLoading, setLodLoading] = useState(false);
   const [lodLoaded, setLodLoaded] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -507,6 +505,33 @@ const DocumentDetailPage = () => {
           onCategoryClick={handleCategoryClick}
           isAuthenticated={isAuthenticated}
         />
+
+        {/* ========== BÁO CÁO VI PHẠM BẢN QUYỀN ========== */}
+        {isAuthenticated && document?.status === "approved" && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FlagIcon />}
+              onClick={() => setReportDialogOpen(true)}
+              sx={{
+                borderColor: "#E0E0E0",
+                color: "#8E8EA9",
+                borderRadius: "10px",
+                textTransform: "none",
+                fontSize: "0.8125rem",
+                fontWeight: 600,
+                "&:hover": {
+                  borderColor: "#D32F2F",
+                  color: "#D32F2F",
+                  bgcolor: alpha("#D32F2F", 0.04),
+                },
+              }}
+            >
+              Báo cáo vi phạm
+            </Button>
+          </Box>
+        )}
 
         {/* ========== TABS SECTION ========== */}
         <Paper
@@ -974,6 +999,13 @@ const DocumentDetailPage = () => {
 
       {/* Download Dialogs */}
       {DownloadUI}
+
+      <ReportDialog
+        open={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        documentId={id}
+        documentTitle={document?.title}
+      />
 
       {/* Snackbar */}
       <Snackbar

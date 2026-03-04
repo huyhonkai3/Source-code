@@ -10,27 +10,16 @@ const mongoose = require("mongoose");
  * - Tích hợp thông tin từ Wikidata (optional)
  * - MVP: fileUrl lưu local path (mock cloud storage)
  * - Hỗ trợ định dạng PDF và EPUB
+ * - [NEW] Quản lý bản quyền & Notice/Takedown
  */
 
 // Schema nhúng cho wikidataInfo
 const wikidataInfoSchema = new mongoose.Schema(
   {
-    wikidataId: {
-      type: String,
-      default: null,
-    },
-    label: {
-      type: String,
-      default: null,
-    },
-    description: {
-      type: String,
-      default: null,
-    },
-    externalLinks: {
-      type: [String],
-      default: [],
-    },
+    wikidataId: { type: String, default: null },
+    label: { type: String, default: null },
+    description: { type: String, default: null },
+    externalLinks: { type: [String], default: [] },
   },
   { _id: false },
 );
@@ -45,11 +34,7 @@ const documentSchema = new mongoose.Schema(
       trim: true,
     },
 
-    englishTitle: {
-      type: String,
-      trim: true,
-      default: "",
-    },
+    englishTitle: { type: String, trim: true, default: "" },
 
     description: {
       type: String,
@@ -58,28 +43,10 @@ const documentSchema = new mongoose.Schema(
       default: "",
     },
 
-    author: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-
-    isbn: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    publisher: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-
-    documentLanguage: {
-      type: String,
-      default: "Tiếng Việt",
-    },
+    author: { type: String, trim: true, default: null },
+    isbn: { type: String, trim: true, default: "" },
+    publisher: { type: String, trim: true, default: null },
+    documentLanguage: { type: String, default: "Tiếng Việt" },
 
     publishYear: {
       type: Number,
@@ -103,7 +70,6 @@ const documentSchema = new mongoose.Schema(
       required: [true, "Người upload là bắt buộc"],
     },
 
-    // MVP: Local file storage (mock cloud)
     fileUrl: {
       type: String,
       required: [true, "Đường dẫn file là bắt buộc"],
@@ -117,14 +83,9 @@ const documentSchema = new mongoose.Schema(
     fileSize: {
       type: Number,
       required: [true, "Kích thước file là bắt buộc"],
-      max: [52428800, "Kích thước file không được vượt quá 50MB"], // 50MB
+      max: [52428800, "Kích thước file không được vượt quá 50MB"],
     },
 
-    /**
-     * File Format - Định dạng file
-     * - pdf: File PDF
-     * - epub: File EPUB (Ebook)
-     */
     fileFormat: {
       type: String,
       enum: {
@@ -134,50 +95,82 @@ const documentSchema = new mongoose.Schema(
       default: "pdf",
     },
 
-    coverImage: {
-      type: String,
-      default: null,
-    },
-
+    coverImage: { type: String, default: null },
     pageCount: {
       type: Number,
       min: [0, "Số trang không thể âm"],
       default: null,
     },
 
-    // Workflow: pending -> approved/rejected
+    /**
+     * Workflow: pending -> approved | rejected
+     * [NEW] HIDDEN: bị ẩn do report vi phạm, chờ Admin xử lý
+     */
     status: {
       type: String,
       enum: {
-        values: ["pending", "approved", "rejected"],
+        values: ["pending", "approved", "rejected", "hidden"],
         message: "Trạng thái không hợp lệ",
       },
       default: "pending",
     },
 
-    rejectionReason: {
-      type: String,
-      default: null,
-    },
+    rejectionReason: { type: String, default: null },
 
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
+    reviewedAt: { type: Date, default: null },
 
-    reviewedAt: {
-      type: Date,
+    // ==================== [NEW] COPYRIGHT FIELDS ====================
+
+    /**
+     * Loại bản quyền do người đăng tải khai báo
+     * - OWN_CREATION: Tác phẩm của chính mình
+     * - PUBLIC_DOMAIN: Tài liệu thuộc phạm vi công cộng / mã nguồn mở
+     * - THIRD_PARTY_AUTHORIZED: Tài liệu bên thứ 3, có giấy ủy quyền
+     */
+    copyrightType: {
+      type: String,
+      enum: {
+        values: ["OWN_CREATION", "PUBLIC_DOMAIN", "THIRD_PARTY_AUTHORIZED"],
+        message:
+          "Loại bản quyền không hợp lệ. Phải là OWN_CREATION, PUBLIC_DOMAIN hoặc THIRD_PARTY_AUTHORIZED.",
+      },
+      default: "OWN_CREATION",
+    },
+
+    /**
+     * URL file giấy ủy quyền / minh chứng bản quyền
+     * Bắt buộc khi copyrightType === 'THIRD_PARTY_AUTHORIZED'
+     */
+    authorizationFileUrl: {
+      type: String,
       default: null,
     },
 
-    // Analytics
-    views: {
-      type: Number,
-      default: 0,
-      min: [0, "Số lượt xem không thể âm"],
+    /**
+     * Người dùng đã đồng ý Điều khoản Dịch vụ
+     * Lưu vết để làm bằng chứng pháp lý
+     */
+    isTosAccepted: {
+      type: Boolean,
+      default: true,
     },
 
+    /**
+     * Cam đoan là tác giả gốc (chỉ áp dụng cho OWN_CREATION)
+     */
+    authorDeclaration: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ==================== ANALYTICS ====================
+
+    views: { type: Number, default: 0, min: [0, "Số lượt xem không thể âm"] },
     downloads: {
       type: Number,
       default: 0,
@@ -194,42 +187,30 @@ const documentSchema = new mongoose.Schema(
     commentCount: {
       type: Number,
       default: 0,
-      min: [0, "Số lượng bình luận không thể âm"],
+      min: [0, "Số bình luận không thể âm"],
     },
 
     // LOD/Wikidata integration (optional)
-    wikidataInfo: {
-      type: wikidataInfoSchema,
-      default: null,
-    },
-
-    lodMetadata: {
-      type: Object,
-      default: null,
-    },
+    wikidataInfo: { type: wikidataInfoSchema, default: null },
+    lodMetadata: { type: Object, default: null },
   },
-
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true,
   },
 );
 
-/**
- * Indexes
- * - Full-text search trên title và description
- * - Index các field thường xuyên query
- */
-documentSchema.index({ title: "text", description: "text" }); // Full-text search
-documentSchema.index({ categoryId: 1 }); // Query by category
-documentSchema.index({ uploadedBy: 1 }); // Query by uploader
-documentSchema.index({ status: 1 }); // Query by status (pending/approved/rejected)
-documentSchema.index({ views: -1 }); // Sort by views (descending)
-documentSchema.index({ downloads: -1 }); // Sort by downloads (descending)
-documentSchema.index({ fileFormat: 1 }); // Query by file format
+// ==================== INDEXES ====================
+documentSchema.index({ title: "text", description: "text" });
+documentSchema.index({ categoryId: 1 });
+documentSchema.index({ uploadedBy: 1 });
+documentSchema.index({ status: 1 });
+documentSchema.index({ views: -1 });
+documentSchema.index({ downloads: -1 });
+documentSchema.index({ fileFormat: 1 });
+documentSchema.index({ copyrightType: 1 }); // [NEW]
 
-/**
- * Virtual: Lấy đường dẫn đầy đủ của file (nếu cần)
- */
+// ==================== VIRTUALS ====================
+
 documentSchema.virtual("fullFileUrl").get(function () {
   if (this.fileUrl && !this.fileUrl.startsWith("http")) {
     return `${process.env.BASE_URL || "http://localhost:5000"}${this.fileUrl}`;
@@ -237,53 +218,36 @@ documentSchema.virtual("fullFileUrl").get(function () {
   return this.fileUrl;
 });
 
-/**
- * Virtual: Kiểm tra file có phải EPUB không
- */
 documentSchema.virtual("isEpub").get(function () {
   return this.fileFormat === "epub";
 });
 
-/**
- * Virtual: Kiểm tra file có phải PDF không
- */
 documentSchema.virtual("isPdf").get(function () {
   return this.fileFormat === "pdf";
 });
 
-/**
- * Instance Method: Tăng view count
- */
+// ==================== INSTANCE METHODS ====================
+
 documentSchema.methods.incrementViews = async function () {
   this.views += 1;
   return await this.save();
 };
 
-/**
- * Instance Method: Tăng download count
- */
 documentSchema.methods.incrementDownloads = async function () {
   this.downloads += 1;
   return await this.save();
 };
 
-/**
- * Static Method: Tìm tài liệu đã được duyệt
- */
+// ==================== STATIC METHODS ====================
+
 documentSchema.statics.findApproved = function (filters = {}) {
   return this.find({ ...filters, status: "approved" });
 };
 
-/**
- * Static Method: Tìm tài liệu đang chờ duyệt
- */
 documentSchema.statics.findPending = function (filters = {}) {
   return this.find({ ...filters, status: "pending" });
 };
 
-/**
- * Static Method: Tìm tài liệu theo format
- */
 documentSchema.statics.findByFormat = function (format, filters = {}) {
   return this.find({ ...filters, fileFormat: format });
 };

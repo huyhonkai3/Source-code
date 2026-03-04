@@ -25,7 +25,7 @@ router.post(
   "/upload",
   checkAuth,
   checkRole(["Author", "Admin"]),
-  uploadMiddleware,
+  uploadMiddleware.uploadDocumentFields,
   documentController.uploadDocument,
 );
 

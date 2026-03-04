@@ -122,7 +122,10 @@ const WIKIDATA_USER_AGENT = "VLU-Library-Bot/1.0 (contact@vlu.edu.vn)";
  */
 const uploadDocument = async (req, res) => {
   try {
-    if (!req.file) {
+    // Với upload.fields(), file chính nằm trong req.files['file']
+    const mainFile = req.files?.file?.[0];
+
+    if (!mainFile) {
       return res.status(400).json({
         status: "error",
         code: 400,
@@ -146,19 +149,20 @@ const uploadDocument = async (req, res) => {
       englishTitle,
       publishYear,
       language,
+      // [NEW] Copyright fields
+      copyrightType,
+      isTosAccepted,
+      authorDeclaration,
     } = req.body;
+
+    // ==================== VALIDATIONS ====================
 
     if (!title || !title.trim()) {
       return res.status(400).json({
         status: "error",
         code: 400,
         message: "Dữ liệu không hợp lệ",
-        errors: [
-          {
-            field: "title",
-            message: "Tiêu đề tài liệu là bắt buộc",
-          },
-        ],
+        errors: [{ field: "title", message: "Tiêu đề tài liệu là bắt buộc" }],
       });
     }
 
@@ -167,10 +171,76 @@ const uploadDocument = async (req, res) => {
         status: "error",
         code: 400,
         message: "Dữ liệu không hợp lệ",
+        errors: [{ field: "category", message: "Danh mục là bắt buộc" }],
+      });
+    }
+
+    // [NEW] Kiểm tra ToS
+    const tosAccepted = isTosAccepted === "true" || isTosAccepted === true;
+    if (!tosAccepted) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Bạn phải đồng ý với Điều khoản Dịch vụ để tải lên tài liệu",
         errors: [
           {
-            field: "category",
-            message: "Danh mục là bắt buộc",
+            field: "isTosAccepted",
+            message: "Vui lòng đọc và đồng ý với Điều khoản Dịch vụ",
+          },
+        ],
+      });
+    }
+
+    // [NEW] Validate copyrightType
+    const validCopyrightTypes = [
+      "OWN_CREATION",
+      "PUBLIC_DOMAIN",
+      "THIRD_PARTY_AUTHORIZED",
+    ];
+    const finalCopyrightType = copyrightType || "OWN_CREATION";
+    if (!validCopyrightTypes.includes(finalCopyrightType)) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Loại bản quyền không hợp lệ",
+        errors: [
+          {
+            field: "copyrightType",
+            message: "Vui lòng chọn loại bản quyền hợp lệ",
+          },
+        ],
+      });
+    }
+
+    // [NEW] Nếu là bên thứ 3, bắt buộc có file giấy ủy quyền
+    const authorizationFile = req.files?.authorizationFile?.[0];
+    if (finalCopyrightType === "THIRD_PARTY_AUTHORIZED" && !authorizationFile) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Tài liệu bên thứ 3 bắt buộc phải có file giấy ủy quyền",
+        errors: [
+          {
+            field: "authorizationFile",
+            message:
+              "Vui lòng tải lên Giấy ủy quyền / Minh chứng bản quyền (PDF hoặc ảnh)",
+          },
+        ],
+      });
+    }
+
+    // [NEW] OWN_CREATION bắt buộc cam đoan
+    const isAuthorDeclaration =
+      authorDeclaration === "true" || authorDeclaration === true;
+    if (finalCopyrightType === "OWN_CREATION" && !isAuthorDeclaration) {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Bạn phải xác nhận cam đoan là tác giả gốc",
+        errors: [
+          {
+            field: "authorDeclaration",
+            message: "Vui lòng xác nhận cam đoan tác giả",
           },
         ],
       });
@@ -185,12 +255,16 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // Xác định file format dựa trên mimetype
-    let fileFormat = "pdf"; // Default
-    if (req.file.mimetype === "application/epub+zip") {
+    // Xác định file format
+    let fileFormat = "pdf";
+    if (mainFile.mimetype === "application/epub+zip") {
       fileFormat = "epub";
-    } else if (req.file.mimetype === "application/pdf") {
-      fileFormat = "pdf";
+    }
+
+    // [NEW] Lấy URL của file giấy ủy quyền (nếu có)
+    let authorizationFileUrl = null;
+    if (authorizationFile) {
+      authorizationFileUrl = getFileUrl(authorizationFile);
     }
 
     const newDocument = new Document({
@@ -204,13 +278,17 @@ const uploadDocument = async (req, res) => {
       documentLanguage: language ? language.trim() : "Tiếng Việt",
       categoryId: category,
       uploadedBy: req.user.id,
-      // S3: req.file.location (full URL)
-      // Local: /uploads/filename
-      fileUrl: getFileUrl(req.file),
-      fileName: req.file.originalname,
-      fileSize: req.file.size,
+      fileUrl: getFileUrl(mainFile),
+      fileName: mainFile.originalname,
+      fileSize: mainFile.size,
       fileFormat: fileFormat,
       status: "pending",
+      // [NEW] Copyright fields
+      copyrightType: finalCopyrightType,
+      authorizationFileUrl: authorizationFileUrl,
+      isTosAccepted: true,
+      authorDeclaration:
+        finalCopyrightType === "OWN_CREATION" ? isAuthorDeclaration : false,
     });
 
     const savedDocument = await newDocument.save();
@@ -254,6 +332,10 @@ const uploadDocument = async (req, res) => {
           fileSize: populatedDoc.fileSize,
           fileFormat: populatedDoc.fileFormat,
           status: populatedDoc.status,
+          // [NEW]
+          copyrightType: populatedDoc.copyrightType,
+          authorizationFileUrl: populatedDoc.authorizationFileUrl,
+          isTosAccepted: populatedDoc.isTosAccepted,
           views: populatedDoc.views,
           downloads: populatedDoc.downloads,
           createdAt: populatedDoc.createdAt,
@@ -268,7 +350,6 @@ const uploadDocument = async (req, res) => {
         field,
         message: error.errors[field].message,
       }));
-
       return res.status(400).json({
         status: "error",
         code: 400,

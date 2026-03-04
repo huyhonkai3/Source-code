@@ -8,20 +8,54 @@ import {
   Chip,
   Button,
   Alert,
+  Divider,
+  alpha,
 } from "@mui/material";
 import {
   Security as SecurityIcon,
   CheckCircle as CheckIcon,
   Close as CloseIcon,
+  Gavel as GavelIcon,
+  OpenInNew as OpenInNewIcon,
+  AssignmentInd as OwnCreationIcon,
+  PublicOutlined as PublicDomainIcon,
+  HandshakeOutlined as ThirdPartyIcon,
+  VerifiedUser as VerifiedIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
 
+// ==================== COPYRIGHT HELPERS ====================
+
+const COPYRIGHT_TYPE_CONFIG = {
+  OWN_CREATION: {
+    label: "Tác phẩm gốc",
+    color: "#4CAF50",
+    bgcolor: alpha("#4CAF50", 0.08),
+    borderColor: alpha("#4CAF50", 0.25),
+    Icon: OwnCreationIcon,
+  },
+  PUBLIC_DOMAIN: {
+    label: "Phạm vi công cộng / Mã nguồn mở",
+    color: "#2196F3",
+    bgcolor: alpha("#2196F3", 0.08),
+    borderColor: alpha("#2196F3", 0.25),
+    Icon: PublicDomainIcon,
+  },
+  THIRD_PARTY_AUTHORIZED: {
+    label: "Được ủy quyền bởi bên thứ 3",
+    color: "#FF9800",
+    bgcolor: alpha("#FF9800", 0.08),
+    borderColor: alpha("#FF9800", 0.35),
+    Icon: ThirdPartyIcon,
+  },
+};
+
 /**
- * ReviewPanel Component
- * Panel hiển thị thông tin tài liệu và actions để duyệt/từ chối
+ * ReviewPanel Component - [UPDATED v2: Copyright info + Authorization file viewer]
  *
  * @param {Object} document - Document data
- * @param {Function} onApprove - Callback khi duyệt tài liệu
- * @param {Function} onReject - Callback khi từ chối tài liệu
+ * @param {Function} onApprove - Callback khi duyệt
+ * @param {Function} onReject - Callback khi từ chối
  * @param {boolean} loading - Trạng thái đang xử lý
  */
 const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
@@ -40,20 +74,34 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
   const uploaderName = uploader.name || "N/A";
   const uploaderEmail = uploader.email || "N/A";
   const uploaderInitial = uploaderName.charAt(0).toUpperCase();
-
-  // Category - handle both nested object and direct value
   const categoryName =
     document.category?.name ||
     document.categoryId?.name ||
     document.category ||
     "N/A";
-
-  // Year
   const publishYear = document.publishYear || "N/A";
-
-  // Tags/Keywords
   const tags = document.keywords || document.tags || [];
   const tagArray = Array.isArray(tags) ? tags : [];
+
+  // [NEW] Copyright info
+  const copyrightType = document.copyrightType || "OWN_CREATION";
+  const copyrightConfig =
+    COPYRIGHT_TYPE_CONFIG[copyrightType] || COPYRIGHT_TYPE_CONFIG.OWN_CREATION;
+  const CopyrightIcon = copyrightConfig.Icon;
+  const authorizationFileUrl = document.authorizationFileUrl;
+  const isTosAccepted = document.isTosAccepted !== false; // default true
+
+  /**
+   * Xử lý xem file giấy ủy quyền
+   */
+  const handleViewAuthorizationFile = () => {
+    if (!authorizationFileUrl) return;
+    // Build full URL nếu là path local
+    const fullUrl = authorizationFileUrl.startsWith("http")
+      ? authorizationFileUrl
+      : `${process.env.REACT_APP_API_URL?.replace("/api", "") || "http://localhost:5000"}${authorizationFileUrl}`;
+    window.open(fullUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <Box
@@ -65,7 +113,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
         flexDirection: "column",
       }}
     >
-      {/* User Info Card */}
+      {/* ========== USER INFO CARD ========== */}
       <Paper
         elevation={0}
         sx={{
@@ -76,13 +124,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
           border: "1px solid #90CAF9",
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Avatar
             sx={{
               width: 56,
@@ -105,7 +147,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
         </Box>
       </Paper>
 
-      {/* Document Info Form */}
+      {/* ========== DOCUMENT INFO FORM ========== */}
       <Box sx={{ px: 3, pb: 3, flex: 1 }}>
         {/* Title */}
         <Box sx={{ mb: 3 }}>
@@ -120,9 +162,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
           <TextField
             fullWidth
             value={document.title || ""}
-            InputProps={{
-              readOnly: true,
-            }}
+            InputProps={{ readOnly: true }}
             size="small"
           />
         </Box>
@@ -141,9 +181,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             <TextField
               fullWidth
               value={categoryName}
-              InputProps={{
-                readOnly: true,
-              }}
+              InputProps={{ readOnly: true }}
               size="small"
             />
           </Grid>
@@ -159,9 +197,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             <TextField
               fullWidth
               value={publishYear}
-              InputProps={{
-                readOnly: true,
-              }}
+              InputProps={{ readOnly: true }}
               size="small"
             />
           </Grid>
@@ -182,9 +218,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             multiline
             rows={4}
             value={document.description || "Không có mô tả"}
-            InputProps={{
-              readOnly: true,
-            }}
+            InputProps={{ readOnly: true }}
             size="small"
           />
         </Box>
@@ -212,7 +246,144 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
           </Box>
         </Box>
 
-        {/* System Check Box */}
+        {/* ========== [NEW] THÔNG TIN BẢN QUYỀN ========== */}
+        <Divider sx={{ mb: 2 }} />
+
+        <Box sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+          <GavelIcon sx={{ fontSize: 18, color: "#7C4DFF" }} />
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            sx={{
+              textTransform: "uppercase",
+              color: "#7C4DFF",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Thông tin bản quyền
+          </Typography>
+        </Box>
+
+        {/* Copyright Type Badge */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: "12px",
+            bgcolor: copyrightConfig.bgcolor,
+            border: "1px solid",
+            borderColor: copyrightConfig.borderColor,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: "8px",
+                bgcolor: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <CopyrightIcon
+                sx={{ fontSize: 20, color: copyrightConfig.color }}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: "#8E8EA9", display: "block" }}
+              >
+                Loại bản quyền
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 700, color: copyrightConfig.color }}
+              >
+                {copyrightConfig.label}
+              </Typography>
+            </Box>
+            {isTosAccepted && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <VerifiedIcon sx={{ fontSize: 16, color: "#4CAF50" }} />
+                <Typography
+                  variant="caption"
+                  sx={{ color: "#4CAF50", fontWeight: 600 }}
+                >
+                  Đã đồng ý ToS
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
+          {/* Cam đoan tác giả */}
+          {copyrightType === "OWN_CREATION" && document.authorDeclaration && (
+            <Box
+              sx={{
+                mt: 1.5,
+                pt: 1.5,
+                borderTop: "1px solid",
+                borderColor: alpha("#4CAF50", 0.2),
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+              }}
+            >
+              <CheckIcon sx={{ fontSize: 16, color: "#4CAF50" }} />
+              <Typography variant="caption" sx={{ color: "#2E7D32" }}>
+                Đã cam đoan là tác giả gốc
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* [NEW] Authorization File Viewer - Chỉ hiển thị khi THIRD_PARTY_AUTHORIZED */}
+        {copyrightType === "THIRD_PARTY_AUTHORIZED" && (
+          <Box sx={{ mb: 3 }}>
+            {authorizationFileUrl ? (
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<OpenInNewIcon />}
+                onClick={handleViewAuthorizationFile}
+                sx={{
+                  borderRadius: "10px",
+                  borderColor: "#FF9800",
+                  color: "#E65100",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  py: 1,
+                  "&:hover": {
+                    borderColor: "#E65100",
+                    bgcolor: alpha("#FF9800", 0.05),
+                  },
+                }}
+              >
+                Xem Giấy ủy quyền / Minh chứng bản quyền
+              </Button>
+            ) : (
+              <Alert
+                severity="warning"
+                icon={<WarningIcon />}
+                sx={{ borderRadius: "10px" }}
+              >
+                <Typography variant="body2" fontWeight={600}>
+                  Thiếu giấy ủy quyền!
+                </Typography>
+                <Typography variant="caption">
+                  Tài liệu bên thứ 3 cần có file giấy ủy quyền hợp lệ. Hãy xem
+                  xét từ chối với lý do "Thiếu giấy ủy quyền hợp lệ".
+                </Typography>
+              </Alert>
+            )}
+          </Box>
+        )}
+
+        {/* ========== SYSTEM CHECK BOX ========== */}
         <Paper
           elevation={0}
           sx={{
@@ -222,14 +393,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             mb: 3,
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              mb: 2,
-            }}
-          >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
             <SecurityIcon sx={{ color: "success.main" }} />
             <Typography variant="subtitle2" fontWeight={700}>
               KIỂM TRA HỆ THỐNG
@@ -237,26 +401,23 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
           </Box>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <CheckIcon sx={{ color: "success.main", fontSize: 20 }} />
-              <Typography variant="body2">
-                Không phát hiện virus/malware
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <CheckIcon sx={{ color: "success.main", fontSize: 20 }} />
-              <Typography variant="body2">Định dạng PDF hợp lệ</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <CheckIcon sx={{ color: "success.main", fontSize: 20 }} />
-              <Typography variant="body2">
-                Kích thước tệp trong giới hạn cho phép
-              </Typography>
-            </Box>
+            {[
+              "Không phát hiện virus/malware",
+              "Định dạng file hợp lệ",
+              "Kích thước tệp trong giới hạn cho phép",
+            ].map((check) => (
+              <Box
+                key={check}
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <CheckIcon sx={{ color: "success.main", fontSize: 20 }} />
+                <Typography variant="body2">{check}</Typography>
+              </Box>
+            ))}
           </Box>
         </Paper>
 
-        {/* Action Buttons */}
+        {/* ========== ACTION BUTTONS ========== */}
         <Box
           sx={{
             display: "flex",
@@ -273,10 +434,7 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             startIcon={<CloseIcon />}
             onClick={onReject}
             disabled={loading}
-            sx={{
-              py: 1.5,
-              fontWeight: 600,
-            }}
+            sx={{ py: 1.5, fontWeight: 600 }}
           >
             Từ chối
           </Button>
@@ -287,16 +445,26 @@ const ReviewPanel = ({ document, onApprove, onReject, loading = false }) => {
             startIcon={<CheckIcon />}
             onClick={onApprove}
             disabled={loading}
-            sx={{
-              py: 1.5,
-              fontWeight: 600,
-            }}
+            sx={{ py: 1.5, fontWeight: 600 }}
           >
             Duyệt & Công khai
           </Button>
         </Box>
 
-        {/* Help Text */}
+        {/* Gợi ý từ chối nhanh khi thiếu giấy ủy quyền */}
+        {copyrightType === "THIRD_PARTY_AUTHORIZED" &&
+          !authorizationFileUrl && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="caption">
+                Gợi ý lý do từ chối nhanh:{" "}
+                <strong>
+                  "Tài liệu bên thứ 3 thiếu giấy ủy quyền hợp lệ từ chủ sở hữu
+                  bản quyền."
+                </strong>
+              </Typography>
+            </Alert>
+          )}
+
         <Alert severity="info" sx={{ mt: 2 }}>
           <Typography variant="caption">
             Hành động "Duyệt" sẽ công khai tài liệu này ngay lập tức cho toàn bộ

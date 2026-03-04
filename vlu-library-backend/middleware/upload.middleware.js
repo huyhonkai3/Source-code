@@ -8,18 +8,12 @@ const multerS3 = require("multer-s3");
 
 /**
  * Multer Middleware - File Upload Configuration
- * UPGRADED: Hỗ trợ cả Local Storage và AWS S3
- *
- * Mode:
- * - LOCAL: Lưu file vào thư mục local ./uploads/ (development)
- * - S3: Upload lên AWS S3 (production)
- *
- * Chuyển đổi mode qua biến môi trường: STORAGE_MODE=s3 hoặc STORAGE_MODE=local
+ * Hỗ trợ cả Local Storage và AWS S3
+ * Hỗ trợ upload.fields() cho authorizationFile (minh chứng bản quyền)
  */
 
 // ==================== CONFIGURATION ====================
 
-// Xác định storage mode (mặc định là S3 nếu có config)
 const isS3Enabled =
   process.env.AWS_ACCESS_KEY_ID &&
   process.env.AWS_SECRET_ACCESS_KEY &&
@@ -50,14 +44,14 @@ if (STORAGE_MODE === "s3") {
 
 const uploadDir = "./uploads";
 const avatarDir = "./uploads/avatars";
+const authorizationDir = "./uploads/authorizations"; // [NEW]
 
 if (STORAGE_MODE === "local") {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-  if (!fs.existsSync(avatarDir)) {
-    fs.mkdirSync(avatarDir, { recursive: true });
-  }
+  [uploadDir, avatarDir, authorizationDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
 }
 
 // ==================== ALLOWED FILE TYPES ====================
@@ -74,6 +68,13 @@ const ALLOWED_IMAGE_MIME_TYPES = {
   "image/webp": "webp",
 };
 
+// [NEW] MIME types hợp lệ cho file giấy ủy quyền (PDF + Images)
+const ALLOWED_AUTHORIZATION_MIME_TYPES = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
+
 const ALLOWED_MIME_TYPES = {
   ...ALLOWED_DOCUMENT_MIME_TYPES,
   ...ALLOWED_IMAGE_MIME_TYPES,
@@ -81,6 +82,7 @@ const ALLOWED_MIME_TYPES = {
 
 const ALLOWED_DOCUMENT_EXTENSIONS = [".pdf", ".epub"];
 const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+const ALLOWED_AUTHORIZATION_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"]; // [NEW]
 const ALLOWED_EXTENSIONS = [
   ...ALLOWED_DOCUMENT_EXTENSIONS,
   ...ALLOWED_IMAGE_EXTENSIONS,
@@ -88,10 +90,27 @@ const ALLOWED_EXTENSIONS = [
 
 // ==================== FILE FILTERS ====================
 
-/**
- * File Filter cho TÀI LIỆU (PDF, EPUB)
- */
 const documentFileFilter = function (req, file, cb) {
+  // Lọc theo fieldname
+  if (file.fieldname === "authorizationFile") {
+    // File minh chứng bản quyền: chỉ nhận PDF/Image
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isValidMime = Object.keys(ALLOWED_AUTHORIZATION_MIME_TYPES).includes(
+      file.mimetype,
+    );
+    const isValidExt = ALLOWED_AUTHORIZATION_EXTENSIONS.includes(ext);
+    if (isValidMime && isValidExt) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error("File giấy ủy quyền chỉ chấp nhận PDF, JPG hoặc PNG."),
+        false,
+      );
+    }
+    return;
+  }
+
+  // File tài liệu chính (file, thumbnail)
   const ext = path.extname(file.originalname).toLowerCase();
   const isValidMimeType = Object.keys(ALLOWED_DOCUMENT_MIME_TYPES).includes(
     file.mimetype,
@@ -110,9 +129,6 @@ const documentFileFilter = function (req, file, cb) {
   }
 };
 
-/**
- * File Filter cho AVATAR (Images)
- */
 const avatarFileFilter = function (req, file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   const isValidMimeType = Object.keys(ALLOWED_IMAGE_MIME_TYPES).includes(
@@ -132,9 +148,6 @@ const avatarFileFilter = function (req, file, cb) {
   }
 };
 
-/**
- * File Filter TỔNG HỢP
- */
 const combinedFileFilter = function (req, file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   const isValidMimeType = Object.keys(ALLOWED_MIME_TYPES).includes(
@@ -145,25 +158,16 @@ const combinedFileFilter = function (req, file, cb) {
   if (isValidMimeType && isValidExtension) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Định dạng file không được hỗ trợ. Chỉ chấp nhận file PDF, EPUB hoặc ảnh (JPG, PNG, GIF, WEBP).",
-      ),
-      false,
-    );
+    cb(new Error("Định dạng file không được hỗ trợ."), false);
   }
 };
 
-// ==================== STORAGE CONFIGURATIONS ====================
+// ==================== UNIQUE FILENAME ====================
 
-/**
- * Tạo unique filename
- */
 const generateUniqueFilename = (originalname) => {
   const ext = path.extname(originalname).toLowerCase();
   const timestamp = Date.now();
   const random = Math.round(Math.random() * 1e9);
-  // Sanitize original filename (remove special chars)
   const baseName = path
     .basename(originalname, ext)
     .replace(/[^a-zA-Z0-9-_]/g, "_")
@@ -171,11 +175,16 @@ const generateUniqueFilename = (originalname) => {
   return `${timestamp}-${random}-${baseName}${ext}`;
 };
 
-// ========== LOCAL STORAGE ==========
+// ==================== LOCAL STORAGE CONFIGS ====================
 
 const localDocumentStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadDir);
+    // [NEW] Chọn thư mục theo fieldname
+    if (file.fieldname === "authorizationFile") {
+      cb(null, authorizationDir);
+    } else {
+      cb(null, uploadDir);
+    }
   },
   filename: function (req, file, cb) {
     cb(null, generateUniqueFilename(file.originalname));
@@ -193,16 +202,14 @@ const localAvatarStorage = multer.diskStorage({
   },
 });
 
-// ========== S3 STORAGE ==========
+// ==================== S3 STORAGE CONFIGS ====================
 
 const s3DocumentStorage =
   STORAGE_MODE === "s3"
     ? multerS3({
         s3: s3Client,
         bucket: process.env.AWS_BUCKET_NAME,
-        // Không set ACL vì bucket có thể không cho phép
-        // acl: "public-read",
-        contentType: multerS3.AUTO_CONTENT_TYPE, // QUAN TRỌNG: Để browser hiển thị thay vì download
+        contentType: multerS3.AUTO_CONTENT_TYPE,
         metadata: function (req, file, cb) {
           cb(null, {
             fieldName: file.fieldname,
@@ -212,8 +219,12 @@ const s3DocumentStorage =
         },
         key: function (req, file, cb) {
           const filename = generateUniqueFilename(file.originalname);
-          // Lưu vào folder documents/ trên S3
-          cb(null, `documents/${filename}`);
+          // [NEW] Lưu vào folder tương ứng trên S3
+          if (file.fieldname === "authorizationFile") {
+            cb(null, `authorizations/${filename}`);
+          } else {
+            cb(null, `documents/${filename}`);
+          }
         },
       })
     : null;
@@ -233,7 +244,6 @@ const s3AvatarStorage =
         key: function (req, file, cb) {
           const userId = req.user?.id || "unknown";
           const ext = path.extname(file.originalname).toLowerCase();
-          // Lưu vào folder avatars/ trên S3
           cb(null, `avatars/avatar-${userId}-${Date.now()}${ext}`);
         },
       })
@@ -242,15 +252,29 @@ const s3AvatarStorage =
 // ==================== MULTER INSTANCES ====================
 
 /**
- * Multer cho DOCUMENT upload
+ * Multer cho DOCUMENT upload (single file - backward compat)
  */
 const uploadDocument = multer({
   storage: STORAGE_MODE === "s3" ? s3DocumentStorage : localDocumentStorage,
   fileFilter: documentFileFilter,
-  limits: {
-    fileSize: 52428800, // 50MB
-  },
+  limits: { fileSize: 52428800 }, // 50MB
 });
+
+/**
+ * [NEW] Multer cho upload NHIỀU FIELDS:
+ * - file: Tài liệu chính (PDF/EPUB)
+ * - thumbnail: Ảnh bìa (optional)
+ * - authorizationFile: Giấy ủy quyền bản quyền (PDF/Image, optional)
+ */
+const uploadDocumentFields = multer({
+  storage: STORAGE_MODE === "s3" ? s3DocumentStorage : localDocumentStorage,
+  fileFilter: documentFileFilter,
+  limits: { fileSize: 52428800 }, // 50MB
+}).fields([
+  { name: "file", maxCount: 1 },
+  { name: "thumbnail", maxCount: 1 },
+  { name: "authorizationFile", maxCount: 1 },
+]);
 
 /**
  * Multer cho AVATAR upload
@@ -258,66 +282,50 @@ const uploadDocument = multer({
 const uploadAvatar = multer({
   storage: STORAGE_MODE === "s3" ? s3AvatarStorage : localAvatarStorage,
   fileFilter: avatarFileFilter,
-  limits: {
-    fileSize: 5242880, // 5MB
-  },
+  limits: { fileSize: 5242880 }, // 5MB
 });
 
 /**
  * Multer TỔNG HỢP (backward compatible)
+ * Dùng upload.single("file") như cũ
  */
 const upload = multer({
   storage: STORAGE_MODE === "s3" ? s3DocumentStorage : localDocumentStorage,
   fileFilter: combinedFileFilter,
-  limits: {
-    fileSize: 52428800, // 50MB
-  },
+  limits: { fileSize: 52428800 },
 });
 
 // ==================== HELPER FUNCTIONS ====================
 
-/**
- * Lấy file format từ mimetype
- */
 const getFileFormat = (mimetype) => {
   return ALLOWED_MIME_TYPES[mimetype] || "unknown";
 };
 
-/**
- * Kiểm tra file có phải ảnh không
- */
 const isImageFile = (mimetype) => {
   return Object.keys(ALLOWED_IMAGE_MIME_TYPES).includes(mimetype);
 };
 
-/**
- * Kiểm tra file có phải tài liệu không
- */
 const isDocumentFile = (mimetype) => {
   return Object.keys(ALLOWED_DOCUMENT_MIME_TYPES).includes(mimetype);
 };
 
 /**
- * Lấy URL của file sau khi upload
+ * Lấy URL file sau khi upload
  * - S3: req.file.location (full URL)
- * - Local: /uploads/filename
- *
- * @param {Object} file - req.file object từ multer
- * @returns {string} URL của file
+ * - Local: path tương đối /uploads/... hoặc /uploads/authorizations/...
  */
 const getFileUrl = (file) => {
   if (STORAGE_MODE === "s3") {
-    // multer-s3 trả về location là full URL
     return file.location;
   } else {
-    // Local storage: trả về relative path
+    // Xác định sub-folder dựa trên fieldname
+    if (file.fieldname === "authorizationFile") {
+      return `/uploads/authorizations/${file.filename}`;
+    }
     return `/uploads/${file.filename}`;
   }
 };
 
-/**
- * Lấy URL của avatar sau khi upload
- */
 const getAvatarUrl = (file) => {
   if (STORAGE_MODE === "s3") {
     return file.location;
@@ -328,22 +336,19 @@ const getAvatarUrl = (file) => {
 
 /**
  * Xóa file từ storage (Local hoặc S3)
- *
- * @param {string} fileUrl - URL hoặc path của file cần xóa
  */
 const deleteFile = async (fileUrl) => {
   if (!fileUrl) return;
 
   try {
     if (STORAGE_MODE === "s3") {
-      // Xóa file từ S3
-      // Extract key từ URL: https://bucket.s3.region.amazonaws.com/key
       let key;
       if (fileUrl.includes(".amazonaws.com/")) {
         key = fileUrl.split(".amazonaws.com/")[1];
       } else if (
         fileUrl.startsWith("documents/") ||
-        fileUrl.startsWith("avatars/")
+        fileUrl.startsWith("avatars/") ||
+        fileUrl.startsWith("authorizations/")
       ) {
         key = fileUrl;
       } else {
@@ -359,7 +364,6 @@ const deleteFile = async (fileUrl) => {
       await s3Client.send(command);
       console.log(`[S3 Delete] Deleted: ${key}`);
     } else {
-      // Xóa file từ local storage
       const filePath = fileUrl.startsWith("/")
         ? path.join(".", fileUrl)
         : path.join(process.cwd(), fileUrl);
@@ -374,32 +378,24 @@ const deleteFile = async (fileUrl) => {
   }
 };
 
-/**
- * Xóa file cũ (backward compatible alias)
- */
 const deleteOldFile = deleteFile;
 
-/**
- * Kiểm tra file có phải là S3 URL không
- */
 const isS3Url = (url) => {
   return url && url.includes(".amazonaws.com/");
 };
 
-/**
- * Kiểm tra file có phải local path không
- */
 const isLocalPath = (url) => {
   return url && url.startsWith("/uploads/");
 };
 
 // ==================== EXPORTS ====================
 
-// Export middleware mặc định
+// Export middleware mặc định (backward compat - single file)
 module.exports = upload.single("file");
 
 // Export các middleware riêng biệt
 module.exports.uploadDocument = uploadDocument.single("file");
+module.exports.uploadDocumentFields = uploadDocumentFields; // [NEW] multi-fields
 module.exports.uploadAvatar = uploadAvatar.single("avatar");
 
 // Export helper functions
@@ -418,6 +414,8 @@ module.exports.STORAGE_MODE = STORAGE_MODE;
 module.exports.ALLOWED_MIME_TYPES = ALLOWED_MIME_TYPES;
 module.exports.ALLOWED_IMAGE_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES;
 module.exports.ALLOWED_DOCUMENT_MIME_TYPES = ALLOWED_DOCUMENT_MIME_TYPES;
+module.exports.ALLOWED_AUTHORIZATION_MIME_TYPES =
+  ALLOWED_AUTHORIZATION_MIME_TYPES; // [NEW]
 
-// Export S3 client cho advanced use cases
+// Export S3 client
 module.exports.s3Client = s3Client;
