@@ -343,8 +343,234 @@ const resolveReport = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/reports/admin
+ * Admin lấy tất cả báo cáo (sort mới nhất, PENDING ưu tiên)
+ * Access: Admin only
+ */
+const getAdminReports = async (req, res) => {
+  try {
+    const { status, reason, page = 1, limit = 15 } = req.query;
+
+    const query = {};
+    if (status && status !== "all") query.status = status;
+    if (reason) query.reason = reason;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [reports, total] = await Promise.all([
+      Report.find(query)
+        .populate("document", "title status uploadedBy fileFormat")
+        .populate("reporter", "name email avatarUrl")
+        .populate("resolvedBy", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+      Report.countDocuments(query),
+    ]);
+
+    const pendingCount = await Report.countDocuments({ status: "PENDING" });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Lấy danh sách báo cáo thành công",
+      data: {
+        reports: reports.map((r) => ({
+          id: r._id,
+          document: r.document
+            ? {
+                id: r.document._id,
+                title: r.document.title,
+                status: r.document.status,
+                fileFormat: r.document.fileFormat,
+                uploadedBy: r.document.uploadedBy,
+              }
+            : null,
+          reporter: r.reporter
+            ? {
+                id: r.reporter._id,
+                name: r.reporter.name,
+                email: r.reporter.email,
+                avatarUrl: r.reporter.avatarUrl || null,
+              }
+            : null,
+          reason: r.reason,
+          reasonLabel: Report.REASON_LABELS?.[r.reason] || r.reason,
+          description: r.description,
+          status: r.status,
+          resolvedBy: r.resolvedBy
+            ? { id: r.resolvedBy._id, name: r.resolvedBy.name }
+            : null,
+          resolvedAt: r.resolvedAt,
+          adminNote: r.adminNote,
+          createdAt: r.createdAt,
+        })),
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
+          total,
+          limit: limitNum,
+        },
+        pendingCount,
+      },
+    });
+  } catch (error) {
+    console.error("getAdminReports error:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi lấy danh sách báo cáo",
+    });
+  }
+};
+
+/**
+ * PATCH /api/reports/:id/resolve
+ * Admin đồng ý với báo cáo -> Gỡ bỏ tài liệu vi phạm
+ * Access: Admin only
+ * Body: { adminNote? }
+ */
+const resolveReportAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminNote } = req.body;
+    const adminId = req.user.id;
+
+    const report = await Report.findById(id).populate({
+      path: "document",
+      populate: { path: "uploadedBy", select: "name email" },
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Không tìm thấy báo cáo",
+      });
+    }
+
+    if (report.status !== "PENDING") {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Báo cáo này đã được xử lý trước đó",
+      });
+    }
+
+    const document = report.document;
+
+    // Cập nhật document status sang REJECTED
+    if (document) {
+      await Document.findByIdAndUpdate(document._id, { status: "rejected" });
+
+      // Gửi thông báo cho tác giả tài liệu
+      if (document.uploadedBy) {
+        await Notification.create({
+          recipient: document.uploadedBy._id || document.uploadedBy,
+          title: "Tài liệu của bạn bị gỡ bỏ",
+          message: `Tài liệu "${document.title}" đã bị gỡ bỏ do vi phạm quy định sau khi được Admin xem xét báo cáo.${adminNote ? ` Ghi chú: ${adminNote}` : ""}`,
+          type: "DOCUMENT_REJECTED",
+          relatedDocument: document._id,
+          actionBy: adminId,
+        });
+      }
+    }
+
+    // Cập nhật report status
+    await Report.findByIdAndUpdate(id, {
+      status: "RESOLVED",
+      resolvedBy: adminId,
+      resolvedAt: new Date(),
+      adminNote: adminNote || "Admin đã xác nhận vi phạm và gỡ bỏ tài liệu",
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message:
+        "Đã xử lý báo cáo: tài liệu bị gỡ bỏ và tác giả đã được thông báo",
+    });
+  } catch (error) {
+    console.error("resolveReportAdmin error:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi xử lý báo cáo",
+    });
+  }
+};
+
+/**
+ * PATCH /api/reports/:id/reject
+ * Admin bác bỏ báo cáo -> Khôi phục tài liệu
+ * Access: Admin only
+ * Body: { adminNote? }
+ */
+const rejectReportAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminNote } = req.body;
+    const adminId = req.user.id;
+
+    const report = await Report.findById(id).populate(
+      "document",
+      "title status",
+    );
+
+    if (!report) {
+      return res.status(404).json({
+        status: "error",
+        code: 404,
+        message: "Không tìm thấy báo cáo",
+      });
+    }
+
+    if (report.status !== "PENDING") {
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Báo cáo này đã được xử lý trước đó",
+      });
+    }
+
+    // Khôi phục document về approved
+    if (report.document) {
+      await Document.findByIdAndUpdate(report.document._id, {
+        status: "approved",
+      });
+    }
+
+    // Cập nhật report status
+    await Report.findByIdAndUpdate(id, {
+      status: "REJECTED",
+      resolvedBy: adminId,
+      resolvedAt: new Date(),
+      adminNote: adminNote || "Báo cáo không hợp lệ, tài liệu được khôi phục",
+    });
+
+    return res.status(200).json({
+      status: "success",
+      code: 200,
+      message: "Đã bác bỏ báo cáo và khôi phục tài liệu",
+    });
+  } catch (error) {
+    console.error("rejectReportAdmin error:", error);
+    return res.status(500).json({
+      status: "error",
+      code: 500,
+      message: "Lỗi server khi bác bỏ báo cáo",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getReports,
   resolveReport,
+  getAdminReports,
+  resolveReportAdmin,
+  rejectReportAdmin,
 };

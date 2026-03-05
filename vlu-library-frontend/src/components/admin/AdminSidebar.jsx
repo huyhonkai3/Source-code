@@ -24,6 +24,7 @@ import {
   ExpandMore,
   FiberManualRecord as DotIcon,
   AdminPanelSettings as AdminIcon,
+  Flag as FlagIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -102,6 +103,14 @@ const AdminSidebar = ({
       path: "/admin/upgrade-requests",
       section: "users",
       badge: upgradeCount > 0 ? upgradeCount : null,
+    },
+    {
+      id: "reports",
+      label: "Báo cáo vi phạm",
+      icon: <FlagIcon />,
+      path: "/admin/reports",
+      section: "content",
+      badge: null,
     },
     {
       id: "settings",

@@ -12,8 +12,6 @@ const { checkAuth, checkRole } = require("../middleware/auth.middleware");
  * POST /api/reports
  * Người dùng báo cáo vi phạm một tài liệu
  * Access: Authenticated (User, Author, Moderator, Admin)
- *
- * Body: { documentId, reason, description }
  */
 router.post(
   "/",
@@ -23,11 +21,22 @@ router.post(
 );
 
 /**
- * GET /api/reports
- * Admin lấy danh sách tất cả báo cáo
- * Access: Admin, Moderator
- *
+ * GET /api/reports/admin
+ * Admin lấy tất cả báo cáo (đặt TRƯỚC /:id để tránh conflict)
+ * Access: Admin only
  * Query: { status, reason, page, limit }
+ */
+router.get(
+  "/admin",
+  checkAuth,
+  checkRole(["Admin"]),
+  reportController.getAdminReports,
+);
+
+/**
+ * GET /api/reports
+ * Moderator/Admin lấy danh sách báo cáo
+ * Access: Admin, Moderator
  */
 router.get(
   "/",
@@ -38,16 +47,28 @@ router.get(
 
 /**
  * PATCH /api/reports/:id/resolve
- * Admin xử lý (giải quyết hoặc bác bỏ) một báo cáo
+ * Admin đồng ý báo cáo -> Gỡ bỏ tài liệu
  * Access: Admin only
- *
- * Body: { action: "DELETE_DOCUMENT" | "RESTORE_DOCUMENT", adminNote? }
+ * Body: { adminNote? }
  */
 router.patch(
   "/:id/resolve",
   checkAuth,
   checkRole(["Admin"]),
-  reportController.resolveReport,
+  reportController.resolveReportAdmin,
+);
+
+/**
+ * PATCH /api/reports/:id/reject
+ * Admin bác bỏ báo cáo -> Khôi phục tài liệu
+ * Access: Admin only
+ * Body: { adminNote? }
+ */
+router.patch(
+  "/:id/reject",
+  checkAuth,
+  checkRole(["Admin"]),
+  reportController.rejectReportAdmin,
 );
 
 module.exports = router;

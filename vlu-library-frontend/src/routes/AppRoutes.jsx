@@ -22,6 +22,7 @@ import CategoriesPage from "../pages/public/CategoriesPage";
 import AuthorStatsPage from "../pages/author/AuthorStatsPage";
 import NotificationsPage from "../pages/user/NotificationsPage";
 import RequestsManagementPage from "../pages/admin/RequestsManagementPage";
+import ReportsManagementPage from "../pages/admin/ReportsManagementPage";
 
 /**
  * ProtectedRoute Component
@@ -310,6 +311,16 @@ const AppRoutes = () => {
         element={
           <RoleBasedRoute allowedRoles={["Admin"]}>
             <UpgradeRequestsPage />
+          </RoleBasedRoute>
+        }
+      />
+
+      {/* Admin Reports Management Page - Admin only */}
+      <Route
+        path="/admin/reports"
+        element={
+          <RoleBasedRoute allowedRoles={["Admin"]}>
+            <ReportsManagementPage />
           </RoleBasedRoute>
         }
       />

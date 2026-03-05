@@ -8,62 +8,60 @@ import axiosInstance from "./axiosConfig";
 /**
  * Người dùng gửi báo cáo vi phạm tài liệu
  * POST /api/reports
- *
- * @param {Object} data
- * @param {string} data.documentId - ID tài liệu bị báo cáo
- * @param {string} data.reason    - Lý do: COPYRIGHT_INFRINGEMENT | INAPPROPRIATE_CONTENT | WRONG_CATEGORY | SPAM | OTHER
- * @param {string} data.description - Mô tả chi tiết (optional)
- * @returns {Promise}
  */
 export const createReport = async (data) => {
-  try {
-    const response = await axiosInstance.post("/reports", data);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post("/reports", data);
+  return response.data;
 };
 
 /**
- * Admin lấy danh sách báo cáo
+ * Moderator/Admin lấy danh sách báo cáo (legacy)
  * GET /api/reports
- *
- * @param {Object} params
- * @param {string} params.status  - PENDING | RESOLVED | REJECTED | all
- * @param {string} params.reason  - Filter theo lý do
- * @param {number} params.page
- * @param {number} params.limit
- * @returns {Promise}
  */
 export const getReports = async (params = {}) => {
-  try {
-    const response = await axiosInstance.get("/reports", { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get("/reports", { params });
+  return response.data;
 };
 
 /**
- * Admin xử lý báo cáo
+ * Admin lấy toàn bộ báo cáo (đầy đủ populate)
+ * GET /api/reports/admin
+ *
+ * @param {Object} params - { status, reason, page, limit }
+ */
+export const getAdminReports = async (params = {}) => {
+  const response = await axiosInstance.get("/reports/admin", { params });
+  return response.data;
+};
+
+/**
+ * Admin đồng ý báo cáo -> Gỡ bỏ tài liệu vi phạm
  * PATCH /api/reports/:id/resolve
  *
- * @param {string} reportId - Report ID
- * @param {Object} data
- * @param {string} data.action    - "DELETE_DOCUMENT" | "RESTORE_DOCUMENT"
- * @param {string} data.adminNote - Ghi chú của Admin (optional)
- * @returns {Promise}
+ * @param {string} reportId
+ * @param {Object} data - { adminNote? }
  */
-export const resolveReport = async (reportId, data) => {
-  try {
-    const response = await axiosInstance.patch(
-      `/reports/${reportId}/resolve`,
-      data,
-    );
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+export const resolveReport = async (reportId, data = {}) => {
+  const response = await axiosInstance.patch(
+    `/reports/${reportId}/resolve`,
+    data,
+  );
+  return response.data;
+};
+
+/**
+ * Admin bác bỏ báo cáo -> Khôi phục tài liệu
+ * PATCH /api/reports/:id/reject
+ *
+ * @param {string} reportId
+ * @param {Object} data - { adminNote? }
+ */
+export const rejectReport = async (reportId, data = {}) => {
+  const response = await axiosInstance.patch(
+    `/reports/${reportId}/reject`,
+    data,
+  );
+  return response.data;
 };
 
 // Mapping lý do báo cáo sang tiếng Việt
@@ -78,7 +76,9 @@ export const REPORT_REASON_LABELS = {
 const reportsAPI = {
   createReport,
   getReports,
+  getAdminReports,
   resolveReport,
+  rejectReport,
   REPORT_REASON_LABELS,
 };
 
