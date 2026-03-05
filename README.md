@@ -77,8 +77,8 @@ Hệ thống thư viện số của Trường Đại học Văn Lang — hỗ tr
 **1.1 — Clone repository về máy:**
 
 ```bash
-git clone https://github.com/<your-username>/vlu-digital-library.git
-cd vlu-digital-library
+git clone https://github.com/<your-username>/Source-code.git
+cd Source-code
 ```
 
 **1.2 — Cài đặt dependencies cho Backend:**
@@ -181,3 +181,114 @@ REACT_APP_AZURE_REDIRECT_URI=http://localhost:3000
 ```
 
 > 💡 Tất cả biến môi trường trong React **bắt buộc** phải có tiền tố `REACT_APP_` mới được nhận diện.
+
+---
+
+## 4. Thiết lập Microsoft Entra ID
+
+Phần này hướng dẫn tạo và cấu hình ứng dụng trên **Microsoft Azure** để cho phép đăng nhập bằng tài khoản Outlook `@vanlanguni.vn`.
+
+### Bước 1: Tạo App Registration trên Azure Portal
+
+1. Truy cập [https://portal.azure.com](https://portal.azure.com) và đăng nhập.
+2. Tìm kiếm **"Microsoft Entra ID"** (trước đây là Azure Active Directory) và chọn vào.
+3. Trong menu trái, chọn **App registrations** → **New registration**.
+4. Điền thông tin đăng ký:
+
+   | Trường | Giá trị |
+   |---|---|
+   | **Name** | `VLU Digital Library` (hoặc tên tuỳ ý) |
+   | **Supported account types** | `Any Microsoft Entra ID tenant + Personal Microsoft accounts` |
+   | **Redirect URI** | `Single-page application (SPA)` → `http://localhost:3000` |
+
+5. Nhấn **Register**.
+
+> ℹ️ Chọn **"Any Microsoft Entra ID tenant + Personal Microsoft accounts"**: cấu hình `authority: "common"` trong `authConfig.js` cho phép cả tài khoản trường (`@vanlanguni.vn`) lẫn tài khoản Microsoft cá nhân đăng nhập.
+
+---
+
+### Bước 2: Lấy thông tin Client ID và Tenant ID
+
+Sau khi đăng ký, Azure sẽ chuyển đến trang **Overview** của app. Lưu lại 2 giá trị sau:
+
+```
+Application (client) ID  →  dùng cho REACT_APP_AZURE_CLIENT_ID và AZURE_AD_CLIENT_ID
+Directory (tenant) ID    →  dùng cho REACT_APP_AZURE_TENANT_ID và AZURE_AD_TENANT_ID
+```
+
+---
+
+### Bước 3: Cấu hình Redirect URIs
+
+1. Trong trang app, chọn **Authentication** (menu trái).
+2. Tại mục **Single-page application**, đảm bảo đã có URI:
+   - `http://localhost:3000` *(cho môi trường development)*
+3. Khi deploy production, thêm URI của domain, ví dụ:
+   - `https://library.vanlanguni.vn`
+4. Tại mục **Implicit grant and hybrid flows**, **KHÔNG** tick vào `Access tokens` hay `ID tokens` — MSAL hiện đại dùng Authorization Code Flow with PKCE, không cần implicit flow.
+5. Nhấn **Save**.
+
+---
+
+### Bước 4: Cập nhật file cấu hình Frontend
+
+Mở file `vlu-library-frontend/src/config/authConfig.js` và đảm bảo `clientId` khớp với App Registration của bạn:
+
+```js
+export const msalConfig = {
+  auth: {
+    clientId: "your_client_id_here",           // ← Application (client) ID
+    authority: "https://login.microsoftonline.com/common",
+    redirectUri: "http://localhost:3000",       // ← Phải trùng với Redirect URI trên Azure
+  },
+  // ...
+};
+
+export const loginRequest = {
+  scopes: ["openid", "profile", "email", "User.Read"],
+};
+```
+
+---
+
+## 5. Chạy ứng dụng
+
+### Khởi động Backend
+
+Mở terminal, điều hướng vào thư mục backend và chạy:
+
+```bash
+cd vlu-library-backend
+npm run dev
+```
+
+Nếu thành công, bạn sẽ thấy:
+
+```
+[nodemon] starting `node index.js`
+🚀 Server đang chạy tại: http://localhost:5000
+✅ Kết nối MongoDB thành công
+```
+
+---
+
+### Khởi động Frontend
+
+Mở **terminal mới** (giữ nguyên terminal backend), điều hướng vào thư mục frontend:
+
+```bash
+cd vlu-library-frontend
+npm start
+```
+
+Trình duyệt sẽ tự động mở tại `http://localhost:3000`.
+
+---
+
+### Tổng quan cổng (Ports)
+
+| Dịch vụ | URL | Ghi chú |
+|---|---|---|
+| **Frontend** | `http://localhost:3000` | React dev server |
+| **Backend API** | `http://localhost:5000` | Express server |
+| **MongoDB Local** | `mongodb://localhost:27017` | Nếu dùng local |
