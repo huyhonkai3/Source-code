@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 /**
  * Kết nối đến MongoDB
@@ -13,18 +13,17 @@ const connectDB = async () => {
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     console.log(`📦 Database: ${conn.connection.name}`);
-    
+
     // Lắng nghe các sự kiện database
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
+    mongoose.connection.on("error", (err) => {
+      console.error("❌ MongoDB connection error:", err);
     });
 
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️  MongoDB disconnected');
+    mongoose.connection.on("disconnected", () => {
+      console.warn("⚠️  MongoDB disconnected");
     });
-
   } catch (error) {
-    console.error('❌ Error connecting to MongoDB:', error.message);
+    console.error("❌ Error connecting to MongoDB:", error.message);
     process.exit(1); // Thoát process với mã lỗi
   }
 };
