@@ -18,6 +18,7 @@ const userRoutes = require("./routes/user.routes"); // Route cho User thường
 const reviewRoutes = require("./routes/review.routes"); // Route cho Review
 const notificationRoutes = require("./routes/notification.routes"); // Route cho thông báo
 const reportRoutes = require("./routes/report.routes");
+const bookmarkRoutes = require("./routes/bookmark.routes");
 
 // Khởi tạo Express app
 const app = express();
@@ -101,6 +102,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/reports", reportRoutes);
 
 app.use("/uploads/authorizations", express.static("uploads/authorizations"));
+// Mount bookmark routes
+app.use("/api/bookmarks", bookmarkRoutes);
 
 /**
  * Error Handling Middleware

@@ -739,6 +739,7 @@ const DocumentDetailPage = () => {
                 }}
               >
                 <FileViewer
+                  documentId={document.id}
                   fileUrl={getFileUrl()}
                   fileName={document.fileName}
                   fileFormat={getFileFormat()}

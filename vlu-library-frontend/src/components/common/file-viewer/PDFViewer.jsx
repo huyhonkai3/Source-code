@@ -45,12 +45,15 @@ const PDFViewer = ({
   fileName = "document.pdf",
   showToolbar = true,
   showDownload = true,
+  initialLocation = null,
+  onLocationChange = null,
 }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   const [pdfDoc, setPdfDoc] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const initialPage = initialLocation ? parseInt(initialLocation, 10) || 1 : 1;
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.5);
   const [loading, setLoading] = useState(true);
@@ -119,7 +122,16 @@ const PDFViewer = ({
 
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
-      setCurrentPage(1);
+      // Dùng initialPage từ bookmark nếu có, clamp trong phạm vi hợp lệ
+      const restoredPage = initialLocation
+        ? Math.min(
+            Math.max(parseInt(initialLocation, 10) || 1, 1),
+            pdf.numPages,
+          )
+        : 1;
+      setCurrentPage(restoredPage);
+      // Thông báo ngay cho FileViewer biết vị trí khởi đầu
+      if (onLocationChange) onLocationChange(String(restoredPage));
       setLoading(false);
     } catch (err) {
       console.error("Error loading PDF:", err);
@@ -148,15 +160,20 @@ const PDFViewer = ({
     }
   };
 
+  const setPageAndNotify = (page) => {
+    setCurrentPage(page);
+    if (onLocationChange) onLocationChange(String(page));
+  };
+
   const goToPrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
+    if (currentPage > 1) setPageAndNotify(currentPage - 1);
   };
   const goToNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    if (currentPage < totalPages) setPageAndNotify(currentPage + 1);
   };
   const handlePageChange = (e) => {
     const pageNum = parseInt(e.target.value, 10);
-    if (pageNum >= 1 && pageNum <= totalPages) setCurrentPage(pageNum);
+    if (pageNum >= 1 && pageNum <= totalPages) setPageAndNotify(pageNum);
   };
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3.0));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));

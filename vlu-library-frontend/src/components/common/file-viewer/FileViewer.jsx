@@ -1,39 +1,30 @@
-/**
- * FileViewer Component
- * Smart wrapper component để hiển thị tài liệu PDF hoặc EPUB
- *
- * Đường dẫn: src/components/common/file-viewer/FileViewer.jsx
- *
- * Tính năng:
- * - Tự động detect format từ fileFormat prop hoặc file extension
- * - Hỗ trợ overlay cho preview mode (user chưa đăng nhập)
- * - Tích hợp với authentication
- */
-
-import { Box, Typography, Button, alpha, useTheme, Chip } from "@mui/material";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Box,
+  Typography,
+  Button,
+  alpha,
+  useTheme,
+  Chip,
+  Fab,
+  Snackbar,
+  Alert,
+  Tooltip,
+} from "@mui/material";
 import {
   Lock as LockIcon,
   PictureAsPdf as PdfIcon,
   MenuBook as EpubIcon,
+  Bookmark as BookmarkIcon,
+  BookmarkBorder as BookmarkBorderIcon,
 } from "@mui/icons-material";
 import PDFViewer from "./PDFViewer.jsx";
 import EpubViewer from "./EpubViewer.jsx";
+import { saveBookmark, getBookmark } from "../../../api/bookmarks.api";
+import { useAuth } from "../../../context/AuthContext";
 
-/**
- * FileViewer Component
- * Component điều hướng để chọn PDF hoặc EPUB viewer
- *
- * @param {string} fileUrl - URL đầy đủ của file (đã bao gồm base URL)
- * @param {string} fileName - Tên file để download
- * @param {string} fileFormat - Định dạng file ('pdf' | 'epub')
- * @param {string} title - Tiêu đề tài liệu (cho EPUB)
- * @param {boolean} isPreview - Hiển thị overlay yêu cầu đăng nhập
- * @param {Function} onLoginClick - Callback khi click nút đăng nhập
- * @param {boolean} showToolbar - Hiển thị toolbar (default: true)
- * @param {boolean} showDownload - Hiển thị nút download (default: true)
- * @param {boolean} showFormatBadge - Hiển thị badge format (default: false)
- */
 const FileViewer = ({
+  documentId,
   fileUrl,
   fileName = "document",
   fileFormat,
@@ -45,33 +36,108 @@ const FileViewer = ({
   showFormatBadge = false,
 }) => {
   const theme = useTheme();
+  const { isAuthenticated } = useAuth();
 
-  /**
-   * Xác định định dạng file
-   * Ưu tiên: fileFormat prop > file extension
-   */
+  // ── Bookmark state ─────────────────────────────────────────────────────────
+  const [initialLocation, setInitialLocation] = useState(null);
+  const [bookmarkReady, setBookmarkReady] = useState(false); // Gate: chặn viewer render cho đến khi API bookmark resolve
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [bookmarkSaved, setBookmarkSaved] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  // Ref để callback luôn đọc được giá trị location mới nhất
+  const currentLocationRef = useRef(null);
+
+  // ── Load bookmark trước khi mount viewer ──────────────────────────────────
+  useEffect(() => {
+    // Không có điều kiện load → mở viewer ngay
+    if (!documentId || !isAuthenticated || isPreview) {
+      setBookmarkReady(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadBookmark = async () => {
+      const position = await getBookmark(documentId);
+
+      if (cancelled) return; // Component unmount trong lúc fetch
+
+      if (position) {
+        console.log("[FileViewer] bookmark loaded:", position); // debug
+        setInitialLocation(position);
+        currentLocationRef.current = position;
+      } else {
+        console.log("[FileViewer] no bookmark found"); // debug
+      }
+
+      // Dù có hay không bookmark, mở khóa viewer
+      setBookmarkReady(true);
+    };
+
+    loadBookmark();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId, isAuthenticated, isPreview]);
+
+  // ── Location change callback ───────────────────────────────────────────────
+  const handleLocationChange = useCallback((location) => {
+    if (location) {
+      currentLocationRef.current = location;
+    }
+  }, []);
+
+  // ── Save bookmark ──────────────────────────────────────────────────────────
+  const handleSaveBookmark = async () => {
+    const loc = currentLocationRef.current;
+    if (!documentId || !loc) {
+      setSnackbar({
+        open: true,
+        message: "Chưa có vị trí để lưu",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setBookmarkLoading(true);
+    const result = await saveBookmark(documentId, loc);
+    setBookmarkLoading(false);
+
+    if (result) {
+      setBookmarkSaved(true);
+      setSnackbar({
+        open: true,
+        message: "Đã lưu vị trí đọc 🔖",
+        severity: "success",
+      });
+      setTimeout(() => setBookmarkSaved(false), 2000);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "Không thể lưu, vui lòng thử lại",
+        severity: "error",
+      });
+    }
+  };
+
+  // ── Format detection ───────────────────────────────────────────────────────
   const getFileFormat = () => {
-    // Ưu tiên dùng fileFormat từ prop
-    if (fileFormat) {
-      return fileFormat.toLowerCase();
-    }
-
-    // Fallback: check đuôi file từ fileName hoặc fileUrl
+    if (fileFormat) return fileFormat.toLowerCase();
     const name = fileName || fileUrl || "";
-    if (name.toLowerCase().endsWith(".epub")) {
-      return "epub";
-    }
-
-    // Mặc định là PDF
+    if (name.toLowerCase().endsWith(".epub")) return "epub";
     return "pdf";
   };
 
   const format = getFileFormat();
   const isEpub = format === "epub";
 
-  /**
-   * Render overlay yêu cầu đăng nhập
-   */
+  // ── Render helpers ─────────────────────────────────────────────────────────
   const renderLoginOverlay = () => (
     <Box
       sx={{
@@ -88,13 +154,12 @@ const FileViewer = ({
         zIndex: 10,
       }}
     >
-      {/* Icon placeholder */}
       <Box
         sx={{
           position: "absolute",
           top: "50%",
           left: "50%",
-          transform: "translate(-50%, -50%)",
+          transform: "translate(-50%,-50%)",
           opacity: 0.1,
           zIndex: 1,
         }}
@@ -105,8 +170,6 @@ const FileViewer = ({
           <PdfIcon sx={{ fontSize: 200, color: "white" }} />
         )}
       </Box>
-
-      {/* Login prompt */}
       <Box
         sx={{
           backgroundColor: alpha("#fff", 0.95),
@@ -119,30 +182,20 @@ const FileViewer = ({
         }}
       >
         <LockIcon
-          sx={{
-            fontSize: 48,
-            color: theme.palette.primary.main,
-            mb: 2,
-          }}
+          sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 2 }}
         />
-
         <Typography variant="h6" gutterBottom fontWeight={600}>
           Yêu cầu đăng nhập
         </Typography>
-
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Vui lòng đăng nhập để đọc tài liệu {isEpub ? "EPUB" : "PDF"} này. Bạn
-          cần có tài khoản để truy cập nội dung đầy đủ.
+          Vui lòng đăng nhập để đọc tài liệu {isEpub ? "EPUB" : "PDF"} này.
         </Typography>
-
         <Button
           variant="contained"
           onClick={onLoginClick}
           sx={{
             bgcolor: theme.palette.primary.main,
-            "&:hover": {
-              bgcolor: theme.palette.primary.dark,
-            },
+            "&:hover": { bgcolor: theme.palette.primary.dark },
             px: 4,
             py: 1,
           }}
@@ -153,18 +206,8 @@ const FileViewer = ({
     </Box>
   );
 
-  /**
-   * Render format badge
-   */
   const renderFormatBadge = () => (
-    <Box
-      sx={{
-        position: "absolute",
-        top: 8,
-        left: 8,
-        zIndex: 5,
-      }}
-    >
+    <Box sx={{ position: "absolute", top: 8, left: 8, zIndex: 5 }}>
       <Chip
         icon={isEpub ? <EpubIcon /> : <PdfIcon />}
         label={isEpub ? "EPUB" : "PDF"}
@@ -175,15 +218,13 @@ const FileViewer = ({
             : alpha(theme.palette.error.main, 0.9),
           color: "white",
           fontWeight: 600,
-          "& .MuiChip-icon": {
-            color: "white",
-          },
+          "& .MuiChip-icon": { color: "white" },
         }}
       />
     </Box>
   );
 
-  // Preview mode - chưa đăng nhập
+  // ── Preview mode ───────────────────────────────────────────────────────────
   if (isPreview) {
     return (
       <Box
@@ -202,7 +243,7 @@ const FileViewer = ({
     );
   }
 
-  // Đã đăng nhập - hiển thị viewer
+  // ── Full viewer ────────────────────────────────────────────────────────────
   return (
     <Box
       sx={{
@@ -215,15 +256,26 @@ const FileViewer = ({
     >
       {showFormatBadge && renderFormatBadge()}
 
-      {/* Viewer */}
+      {/* Viewer: chỉ mount sau khi bookmarkReady = true để initialLocation luôn có giá trị đúng */}
       <Box sx={{ flex: 1, position: "relative" }}>
-        {isEpub ? (
+        {!bookmarkReady ? (
+          // Placeholder tối màu giữ layout, không flash trắng
+          <Box
+            sx={{
+              height: "100%",
+              minHeight: 500,
+              background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
+            }}
+          />
+        ) : isEpub ? (
           <EpubViewer
             url={fileUrl}
             fileName={fileName || "document.epub"}
             title={title}
             showToolbar={showToolbar}
             showDownload={showDownload}
+            initialLocation={initialLocation}
+            onLocationChange={handleLocationChange}
           />
         ) : (
           <PDFViewer
@@ -231,9 +283,70 @@ const FileViewer = ({
             fileName={fileName || "document.pdf"}
             showToolbar={showToolbar}
             showDownload={showDownload}
+            initialLocation={initialLocation}
+            onLocationChange={handleLocationChange}
           />
         )}
       </Box>
+
+      {/* Bookmark FAB */}
+      {isAuthenticated && documentId && (
+        <Tooltip
+          title={bookmarkSaved ? "Đã lưu!" : "Lưu vị trí đọc"}
+          placement="left"
+          arrow
+        >
+          <Fab
+            size="medium"
+            onClick={handleSaveBookmark}
+            disabled={bookmarkLoading}
+            sx={{
+              position: "absolute",
+              bottom: 24,
+              right: 16,
+              zIndex: 20,
+              bgcolor: bookmarkSaved ? "#388E3C" : "#D32F2F",
+              color: "white",
+              boxShadow: bookmarkSaved
+                ? "0 4px 20px rgba(56,142,60,0.5)"
+                : "0 4px 20px rgba(211,47,47,0.4)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transform: bookmarkSaved ? "scale(1.1)" : "scale(1)",
+              "&:hover": {
+                bgcolor: bookmarkSaved ? "#2E7D32" : "#B71C1C",
+                transform: "scale(1.12)",
+              },
+              "&:disabled": {
+                bgcolor: "#9E9E9E",
+                color: "rgba(255,255,255,0.7)",
+              },
+            }}
+          >
+            {bookmarkSaved ? (
+              <BookmarkIcon sx={{ fontSize: 22 }} />
+            ) : (
+              <BookmarkBorderIcon sx={{ fontSize: 22 }} />
+            )}
+          </Fab>
+        </Tooltip>
+      )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ borderRadius: "12px", fontWeight: 600, fontSize: "0.9375rem" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

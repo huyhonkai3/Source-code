@@ -197,13 +197,13 @@ const LoginPage = () => {
             sx={{
               fontWeight: 800,
               mb: 3,
-              fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+              fontFamily: "'Inter', sans-serif",
               textShadow: "0 4px 20px rgba(0,0,0,0.3)",
               fontSize: { sm: "2.5rem", md: "3.5rem" },
               lineHeight: 1.2,
             }}
           >
-            Tri thức - Đạo đức - Sáng tạo
+            Đạo đức - Ý chí - Sáng tạo
           </Typography>
           <Typography
             variant="h6"

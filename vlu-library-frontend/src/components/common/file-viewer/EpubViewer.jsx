@@ -45,6 +45,8 @@ const EpubViewer = ({
   title = "",
   showToolbar = true,
   showDownload = true,
+  initialLocation = null,
+  onLocationChange = null,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -189,11 +191,29 @@ const EpubViewer = ({
             );
             if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
           }
+          // Emit CFI string ra FileViewer để có thể lưu bookmark
+          if (location?.start?.cfi && onLocationChange) {
+            onLocationChange(location.start.cfi);
+          }
         });
 
         rendition.on("rendered", () => applyFontSize(fontSize));
 
-        await rendition.display();
+        // Nếu có bookmark đã lưu (CFI string), nhảy đến vị trí đó
+        // Nếu không, display từ đầu
+        if (initialLocation && initialLocation.startsWith("epubcfi(")) {
+          try {
+            await rendition.display(initialLocation);
+          } catch (e) {
+            console.warn(
+              "[EpubViewer] Cannot restore bookmark position, starting from beginning:",
+              e.message,
+            );
+            await rendition.display();
+          }
+        } else {
+          await rendition.display();
+        }
         setBookReady(true);
       } catch (err) {
         console.error("[EpubViewer] Init error:", err);

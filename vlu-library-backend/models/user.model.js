@@ -81,7 +81,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       sparse: true,
       unique: true,
-      default: null,
+      // default: null,
     },
 
     /**
@@ -106,7 +106,7 @@ const userSchema = new mongoose.Schema(
  */
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
-userSchema.index({ microsoftId: 1 }, { sparse: true }); // THÊM: Index cho microsoftId
+userSchema.index({ microsoftId: 1 }, { unique: true, sparse: true });
 
 /**
  * Pre-save Hook: Tự động hash password trước khi lưu vào database
