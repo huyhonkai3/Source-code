@@ -357,7 +357,7 @@ const ProfilePage = () => {
   };
 
   /**
-   * Render Author Upgrade Banner - Design System v2.0
+   * Render Author Upgrade Banner
    */
   const renderAuthorBanner = () => {
     if (authUser?.role !== "User") {

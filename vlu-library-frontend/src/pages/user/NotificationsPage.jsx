@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Container,
+  Grid,
   Box,
   Typography,
   Accordion,
@@ -8,7 +9,6 @@ import {
   AccordionDetails,
   Button,
   Chip,
-  Avatar,
   Skeleton,
   Alert,
   Divider,
@@ -28,6 +28,7 @@ import {
   Cancel as CancelIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import Header from "../../components/common/Header";
 import UserSidebar from "../../components/user/UserSidebar";
 import {
   getNotifications,
@@ -37,7 +38,6 @@ import {
 
 // ============================================================
 // DATE FORMATTING HELPERS
-// (Dùng native JS thay vì date-fns)
 // ============================================================
 
 const formatRelativeTime = (dateStr) => {
@@ -76,7 +76,7 @@ const formatFullDate = (dateStr) => {
 // ============================================================
 
 const NotificationSkeleton = () => (
-  <Box sx={{ mb: 2 }}>
+  <Box>
     {[1, 2, 3, 4].map((i) => (
       <Box
         key={i}
@@ -113,7 +113,6 @@ const NotificationItem = ({ notification, onRead }) => {
     notification.title.includes("được duyệt") ||
     notification.title.includes("chấp thuận");
 
-  // Icon và màu theo type
   const typeConfig = {
     DOCUMENT_MODERATION: {
       icon: ArticleIcon,
@@ -135,7 +134,6 @@ const NotificationItem = ({ notification, onRead }) => {
 
   const handleChange = async (_, isExpanded) => {
     setExpanded(isExpanded);
-    // Đánh dấu đã đọc khi mở accordion
     if (isExpanded && !notification.isRead) {
       try {
         await markAsRead(notification.id);
@@ -174,16 +172,14 @@ const NotificationItem = ({ notification, onRead }) => {
           boxShadow: `0 4px 20px ${config.color}20`,
           borderColor: `${config.color}60`,
         },
-        "&::before": {
-          display: "none", // Xóa gạch ngang mặc định của Accordion
-        },
+        "&::before": { display: "none" },
         "&.Mui-expanded": {
           boxShadow: `0 6px 24px ${config.color}25`,
           borderColor: `${config.color}80`,
         },
       }}
     >
-      {/* ========== ACCORDION SUMMARY (Thu gọn) ========== */}
+      {/* ── Summary (thu gọn) ── */}
       <AccordionSummary
         expandIcon={
           <ExpandMoreIcon sx={{ color: config.color, fontSize: 22 }} />
@@ -193,9 +189,7 @@ const NotificationItem = ({ notification, onRead }) => {
           py: 0.5,
           minHeight: 72,
           bgcolor: notification.isRead ? "white" : alpha(config.color, 0.03),
-          "&:hover": {
-            bgcolor: alpha(config.color, 0.05),
-          },
+          "&:hover": { bgcolor: alpha(config.color, 0.05) },
           "& .MuiAccordionSummary-content": {
             my: 1.5,
             alignItems: "center",
@@ -203,7 +197,7 @@ const NotificationItem = ({ notification, onRead }) => {
           },
         }}
       >
-        {/* Icon Avatar */}
+        {/* Icon */}
         <Box
           sx={{
             width: 44,
@@ -219,10 +213,9 @@ const NotificationItem = ({ notification, onRead }) => {
           <TypeIcon sx={{ fontSize: 22, color: config.color }} />
         </Box>
 
-        {/* Title & Time */}
+        {/* Title & preview */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {/* Unread dot */}
             {!notification.isRead && (
               <Box
                 sx={{
@@ -263,7 +256,7 @@ const NotificationItem = ({ notification, onRead }) => {
           </Typography>
         </Box>
 
-        {/* Right: Chips & Time */}
+        {/* Right: chip + time */}
         <Box
           sx={{
             display: "flex",
@@ -292,7 +285,7 @@ const NotificationItem = ({ notification, onRead }) => {
         </Box>
       </AccordionSummary>
 
-      {/* ========== ACCORDION DETAILS (Mở rộng) ========== */}
+      {/* ── Details (mở rộng) ── */}
       <AccordionDetails
         sx={{
           px: 2.5,
@@ -313,17 +306,13 @@ const NotificationItem = ({ notification, onRead }) => {
           }}
         >
           <Typography
-            sx={{
-              fontSize: "0.9375rem",
-              color: "#2A2A3E",
-              lineHeight: 1.7,
-            }}
+            sx={{ fontSize: "0.9375rem", color: "#2A2A3E", lineHeight: 1.7 }}
           >
             {notification.message}
           </Typography>
         </Box>
 
-        {/* Info Grid */}
+        {/* Info grid */}
         <Box
           sx={{
             display: "grid",
@@ -412,7 +401,7 @@ const NotificationItem = ({ notification, onRead }) => {
             </Box>
           </Box>
 
-          {/* Tài liệu liên quan - chỉ hiện nếu có */}
+          {/* Tài liệu liên quan */}
           {notification.relatedDocument && (
             <Box
               sx={{
@@ -464,7 +453,7 @@ const NotificationItem = ({ notification, onRead }) => {
           )}
         </Box>
 
-        {/* Status Badge */}
+        {/* Status + CTA */}
         <Box
           sx={{
             display: "flex",
@@ -504,7 +493,6 @@ const NotificationItem = ({ notification, onRead }) => {
             )}
           </Box>
 
-          {/* CTA Button */}
           <Button
             size="small"
             variant="contained"
@@ -565,7 +553,6 @@ const NotificationsPage = () => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Callback khi 1 thông báo được đánh dấu đã đọc
   const handleRead = useCallback((id) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
@@ -573,7 +560,6 @@ const NotificationsPage = () => {
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
-  // Đánh dấu tất cả đã đọc
   const handleMarkAllRead = async () => {
     try {
       await markAllAsRead();
@@ -585,234 +571,246 @@ const NotificationsPage = () => {
   };
 
   return (
-    <Box sx={{ bgcolor: "#FAFAFC", minHeight: "100vh", py: 4 }}>
-      <Container maxWidth="xl">
-        <Box sx={{ display: "flex", gap: 3 }}>
-          {/* ========== SIDEBAR ========== */}
-          <Box sx={{ width: 280, flexShrink: 0 }}>
-            <UserSidebar active="notifications" />
-          </Box>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#FAFAFC" }}>
+      {/* ── Header giống các page khác ── */}
+      <Header />
 
-          {/* ========== MAIN CONTENT ========== */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* Page Header */}
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 6 }}>
+        <Grid container spacing={3}>
+          {/* ── Sidebar ── */}
+          <Grid item xs={12} md={3}>
+            <UserSidebar active="notifications" />
+          </Grid>
+
+          {/* ── Main content ── */}
+          <Grid item xs={12} md={9}>
+            {/* Page header card — giống ChangePasswordPage */}
             <Box
               sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                bgcolor: "white",
+                borderRadius: "20px",
+                border: "1px solid #F0F0F5",
+                boxShadow: "0 2px 12px rgba(26,26,46,0.06)",
+                overflow: "hidden",
                 mb: 3,
-                flexWrap: "wrap",
-                gap: 2,
               }}
             >
-              <Box>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1.5,
-                    mb: 0.5,
-                  }}
-                >
+              <Box
+                sx={{
+                  p: { xs: 3, md: 4 },
+                  borderBottom: "1px solid #F0F0F5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 2,
+                }}
+              >
+                {/* Title area */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                   <Box
                     sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "12px",
-                      bgcolor: alpha("#FFC107", 0.15),
+                      width: 56,
+                      height: 56,
+                      borderRadius: "14px",
+                      background:
+                        "linear-gradient(135deg, #FFC107 0%, #FF9800 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      boxShadow: "0 4px 14px rgba(255,193,7,0.35)",
+                      flexShrink: 0,
                     }}
                   >
-                    <NotificationsIcon
-                      sx={{ color: "#FFC107", fontSize: 22 }}
-                    />
+                    <NotificationsIcon sx={{ fontSize: 28, color: "white" }} />
                   </Box>
-                  <Typography
-                    variant="h5"
-                    sx={{ fontWeight: 700, color: "#1A1A2E" }}
+                  <Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography
+                        variant="h5"
+                        sx={{ fontWeight: 700, color: "#1A1A2E" }}
+                      >
+                        Thông báo
+                      </Typography>
+                      {unreadCount > 0 && (
+                        <Box
+                          sx={{
+                            px: 1.25,
+                            py: 0.25,
+                            bgcolor: "#D32F2F",
+                            color: "white",
+                            borderRadius: "20px",
+                            fontSize: "0.8125rem",
+                            fontWeight: 700,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {unreadCount} mới
+                        </Box>
+                      )}
+                    </Box>
+                    <Typography variant="body2" sx={{ color: "#8E8EA9" }}>
+                      Theo dõi tất cả hoạt động của tài khoản bạn
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Mark all read button */}
+                {unreadCount > 0 && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<DoneAllIcon />}
+                    onClick={handleMarkAllRead}
+                    sx={{
+                      borderColor: "#E0E0E0",
+                      color: "#4A4A68",
+                      borderRadius: "10px",
+                      fontWeight: 600,
+                      fontSize: "0.875rem",
+                      textTransform: "none",
+                      "&:hover": {
+                        borderColor: "#2196F3",
+                        color: "#2196F3",
+                        bgcolor: alpha("#2196F3", 0.04),
+                      },
+                    }}
                   >
-                    Thông báo
-                  </Typography>
-                  {unreadCount > 0 && (
+                    Đánh dấu tất cả đã đọc
+                  </Button>
+                )}
+              </Box>
+
+              {/* ── Content area bên trong card ── */}
+              <Box sx={{ p: { xs: 3, md: 4 } }}>
+                {loading ? (
+                  <NotificationSkeleton />
+                ) : error ? (
+                  <Alert
+                    severity="error"
+                    sx={{ borderRadius: "12px" }}
+                    action={
+                      <Button
+                        size="small"
+                        onClick={fetchNotifications}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        Thử lại
+                      </Button>
+                    }
+                  >
+                    {error}
+                  </Alert>
+                ) : notifications.length === 0 ? (
+                  // Empty state
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      py: 8,
+                    }}
+                  >
                     <Box
                       sx={{
-                        px: 1.25,
-                        py: 0.25,
-                        bgcolor: "#D32F2F",
-                        color: "white",
-                        borderRadius: "20px",
-                        fontSize: "0.8125rem",
-                        fontWeight: 700,
-                        lineHeight: 1.5,
+                        width: 80,
+                        height: 80,
+                        borderRadius: "24px",
+                        bgcolor: alpha("#FFC107", 0.1),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mb: 3,
                       }}
                     >
-                      {unreadCount} mới
+                      <NotificationsNoneIcon
+                        sx={{ fontSize: 40, color: "#FFC107" }}
+                      />
                     </Box>
-                  )}
-                </Box>
-                <Typography sx={{ color: "#8E8EA9", fontSize: "0.9375rem" }}>
-                  Theo dõi tất cả hoạt động của tài khoản bạn
-                </Typography>
-              </Box>
-
-              {unreadCount > 0 && (
-                <Button
-                  variant="outlined"
-                  startIcon={<DoneAllIcon />}
-                  onClick={handleMarkAllRead}
-                  sx={{
-                    borderColor: "#E0E0E0",
-                    color: "#4A4A68",
-                    borderRadius: "10px",
-                    fontWeight: 600,
-                    fontSize: "0.875rem",
-                    textTransform: "none",
-                    "&:hover": {
-                      borderColor: "#2196F3",
-                      color: "#2196F3",
-                      bgcolor: alpha("#2196F3", 0.04),
-                    },
-                  }}
-                >
-                  Đánh dấu tất cả đã đọc
-                </Button>
-              )}
-            </Box>
-
-            {/* ========== CONTENT AREA ========== */}
-            {loading ? (
-              <NotificationSkeleton />
-            ) : error ? (
-              <Alert
-                severity="error"
-                sx={{ borderRadius: "12px" }}
-                action={
-                  <Button
-                    size="small"
-                    onClick={fetchNotifications}
-                    sx={{ fontWeight: 600 }}
-                  >
-                    Thử lại
-                  </Button>
-                }
-              >
-                {error}
-              </Alert>
-            ) : notifications.length === 0 ? (
-              // Empty State
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  py: 10,
-                  bgcolor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #F0F0F5",
-                  boxShadow: "0 2px 12px rgba(26,26,46,0.05)",
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: "24px",
-                    bgcolor: alpha("#FFC107", 0.1),
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    mb: 3,
-                  }}
-                >
-                  <NotificationsNoneIcon
-                    sx={{ fontSize: 40, color: "#FFC107" }}
-                  />
-                </Box>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
-                >
-                  Chưa có thông báo nào
-                </Typography>
-                <Typography
-                  sx={{
-                    color: "#8E8EA9",
-                    fontSize: "0.9375rem",
-                    textAlign: "center",
-                    maxWidth: 320,
-                  }}
-                >
-                  Khi có cập nhật về tài liệu hoặc quyền hạn, bạn sẽ nhận được
-                  thông báo tại đây.
-                </Typography>
-              </Box>
-            ) : (
-              // Notification List
-              <Box>
-                {/* Unread Section */}
-                {notifications.some((n) => !n.isRead) && (
-                  <>
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 700, color: "#1A1A2E", mb: 1 }}
+                    >
+                      Chưa có thông báo nào
+                    </Typography>
                     <Typography
                       sx={{
-                        fontSize: "0.8125rem",
-                        fontWeight: 700,
                         color: "#8E8EA9",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        mb: 1.5,
+                        fontSize: "0.9375rem",
+                        textAlign: "center",
+                        maxWidth: 320,
                       }}
                     >
-                      Chưa đọc ({notifications.filter((n) => !n.isRead).length})
+                      Khi có cập nhật về tài liệu hoặc quyền hạn, bạn sẽ nhận
+                      được thông báo tại đây.
                     </Typography>
-                    {notifications
-                      .filter((n) => !n.isRead)
-                      .map((notification) => (
-                        <NotificationItem
-                          key={notification.id}
-                          notification={notification}
-                          onRead={handleRead}
-                        />
-                      ))}
-                    {notifications.some((n) => n.isRead) && (
-                      <Divider sx={{ my: 3, borderColor: "#F0F0F5" }} />
+                  </Box>
+                ) : (
+                  <Box>
+                    {/* Chưa đọc */}
+                    {notifications.some((n) => !n.isRead) && (
+                      <>
+                        <Typography
+                          sx={{
+                            fontSize: "0.8125rem",
+                            fontWeight: 700,
+                            color: "#8E8EA9",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            mb: 1.5,
+                          }}
+                        >
+                          Chưa đọc (
+                          {notifications.filter((n) => !n.isRead).length})
+                        </Typography>
+                        {notifications
+                          .filter((n) => !n.isRead)
+                          .map((notification) => (
+                            <NotificationItem
+                              key={notification.id}
+                              notification={notification}
+                              onRead={handleRead}
+                            />
+                          ))}
+                        {notifications.some((n) => n.isRead) && (
+                          <Divider sx={{ my: 3, borderColor: "#F0F0F5" }} />
+                        )}
+                      </>
                     )}
-                  </>
-                )}
 
-                {/* Read Section */}
-                {notifications.some((n) => n.isRead) && (
-                  <>
-                    <Typography
-                      sx={{
-                        fontSize: "0.8125rem",
-                        fontWeight: 700,
-                        color: "#8E8EA9",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        mb: 1.5,
-                      }}
-                    >
-                      Đã đọc ({notifications.filter((n) => n.isRead).length})
-                    </Typography>
-                    {notifications
-                      .filter((n) => n.isRead)
-                      .map((notification) => (
-                        <NotificationItem
-                          key={notification.id}
-                          notification={notification}
-                          onRead={handleRead}
-                        />
-                      ))}
-                  </>
+                    {/* Đã đọc */}
+                    {notifications.some((n) => n.isRead) && (
+                      <>
+                        <Typography
+                          sx={{
+                            fontSize: "0.8125rem",
+                            fontWeight: 700,
+                            color: "#8E8EA9",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            mb: 1.5,
+                          }}
+                        >
+                          Đã đọc ({notifications.filter((n) => n.isRead).length}
+                          )
+                        </Typography>
+                        {notifications
+                          .filter((n) => n.isRead)
+                          .map((notification) => (
+                            <NotificationItem
+                              key={notification.id}
+                              notification={notification}
+                              onRead={handleRead}
+                            />
+                          ))}
+                      </>
+                    )}
+                  </Box>
                 )}
               </Box>
-            )}
-          </Box>
-        </Box>
+            </Box>
+          </Grid>
+        </Grid>
       </Container>
     </Box>
   );

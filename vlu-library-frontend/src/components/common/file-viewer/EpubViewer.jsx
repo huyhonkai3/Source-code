@@ -1,11 +1,18 @@
 /**
  * EpubViewer Component - VLU Design System v2.0.1
- * Modern & Bold với Enhanced toolbar, Better visual hierarchy + Tăng font sizes
  *
- * Component hiển thị file EPUB sử dụng epubjs
- * Đường dẫn: src/components/common/file-viewer/EpubViewer.jsx
+ * FIXED:
+ * 1. Màn trắng khi đổi font size:
+ *    - Nguyên nhân: fontSize + applyFontSize nằm trong dep array của useEffect
+ *      init book → mỗi lần fontSize thay đổi, effect chạy lại, book bị
+ *      destroy & re-init → rendition mất, màn trắng, chuyển trang không được.
+ *    - Fix: dep array init effect chỉ còn [arrayBuffer].
+ *      Dùng fontSizeRef để event handler "rendered" luôn đọc được fontSize
+ *      mới nhất mà không cần fontSize trong dep.
+ *      Thêm useEffect riêng để apply font khi fontSize state thay đổi.
  *
- * @requires epubjs - yarn add epubjs
+ * 2. Thêm Select dropdown cho số chương và cỡ chữ, với disablePortal
+ *    để hoạt động đúng khi fullscreen.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -23,6 +30,8 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  Select,
+  MenuItem,
   alpha,
 } from "@mui/material";
 import {
@@ -31,13 +40,18 @@ import {
   GetApp as DownloadIcon,
   Fullscreen as FullscreenIcon,
   FullscreenExit as FullscreenExitIcon,
-  Add as ZoomInIcon,
-  Remove as ZoomOutIcon,
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
   Menu as MenuIcon,
   MenuBook as EpubIcon,
   Close as CloseIcon,
   Bookmark as BookmarkIcon,
 } from "@mui/icons-material";
+
+// Danh sách cỡ chữ có sẵn trong dropdown (%)
+const FONT_SIZE_OPTIONS = [
+  50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200,
+];
 
 const EpubViewer = ({
   url,
@@ -68,24 +82,51 @@ const EpubViewer = ({
   const isInitializedRef = useRef(false);
   const spineRef = useRef([]);
 
+  // ─── FIX 1: fontSizeRef để init effect đọc fontSize mới nhất
+  // mà không cần đưa fontSize vào dep array của init effect
+  const fontSizeRef = useRef(fontSize);
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
+
+  // ─── Apply font size qua epubjs themes API ────────────────────────────────
   const applyFontSize = useCallback((size) => {
     if (!renditionRef.current) return;
     try {
-      renditionRef.current.getContents().forEach((content) => {
-        if (content && content.document) {
-          const style = content.document.createElement("style");
-          style.id = "epub-font-size";
-          style.textContent = `body, p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a { font-size: ${size}% !important; }`;
-          const oldStyle = content.document.getElementById("epub-font-size");
-          if (oldStyle) oldStyle.remove();
-          content.document.head.appendChild(style);
-        }
-      });
+      renditionRef.current.themes.fontSize(`${size}%`);
     } catch (e) {
-      console.warn("[EpubViewer] Font size warning:", e.message);
+      // Fallback: manual inject style vào iframe
+      try {
+        renditionRef.current.getContents().forEach((content) => {
+          if (content?.document) {
+            let style = content.document.getElementById("epub-font-size");
+            if (!style) {
+              style = content.document.createElement("style");
+              style.id = "epub-font-size";
+              content.document.head.appendChild(style);
+            }
+            style.textContent = `
+              body, p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a {
+                font-size: ${size}% !important;
+              }
+            `;
+          }
+        });
+      } catch (e2) {
+        console.warn("[EpubViewer] applyFontSize fallback failed:", e2.message);
+      }
     }
   }, []);
 
+  // ─── FIX 1: useEffect riêng chỉ để apply font khi fontSize thay đổi
+  // Hoàn toàn tách biệt với init effect → không gây re-init book
+  useEffect(() => {
+    if (bookReady) {
+      applyFontSize(fontSize);
+    }
+  }, [fontSize, bookReady, applyFontSize]);
+
+  // ─── Fetch EPUB binary ────────────────────────────────────────────────────
   useEffect(() => {
     if (!url) {
       setError("Không có URL file");
@@ -143,6 +184,9 @@ const EpubViewer = ({
     };
   }, [url]);
 
+  // ─── Init epubjs book ─────────────────────────────────────────────────────
+  // ─── FIX 1: dep array CHỈ CÓ [arrayBuffer]
+  // Không có fontSize, không có applyFontSize → đổi font không trigger re-init
   useEffect(() => {
     if (!arrayBuffer || !viewerRef.current || isInitializedRef.current) return;
 
@@ -191,22 +235,24 @@ const EpubViewer = ({
             );
             if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
           }
-          // Emit CFI string ra FileViewer để có thể lưu bookmark
           if (location?.start?.cfi && onLocationChange) {
             onLocationChange(location.start.cfi);
           }
         });
 
-        rendition.on("rendered", () => applyFontSize(fontSize));
+        // Dùng fontSizeRef thay vì closure fontSize → luôn đọc được giá trị mới nhất
+        rendition.on("rendered", () => {
+          try {
+            renditionRef.current?.themes.fontSize(`${fontSizeRef.current}%`);
+          } catch (e) {}
+        });
 
-        // Nếu có bookmark đã lưu (CFI string), nhảy đến vị trí đó
-        // Nếu không, display từ đầu
         if (initialLocation && initialLocation.startsWith("epubcfi(")) {
           try {
             await rendition.display(initialLocation);
           } catch (e) {
             console.warn(
-              "[EpubViewer] Cannot restore bookmark position, starting from beginning:",
+              "[EpubViewer] Cannot restore bookmark, starting from beginning:",
               e.message,
             );
             await rendition.display();
@@ -214,6 +260,7 @@ const EpubViewer = ({
         } else {
           await rendition.display();
         }
+
         setBookReady(true);
       } catch (err) {
         console.error("[EpubViewer] Init error:", err);
@@ -232,7 +279,7 @@ const EpubViewer = ({
         renditionRef.current = null;
       }
     };
-  }, [arrayBuffer, applyFontSize, fontSize]);
+  }, [arrayBuffer]); // ← CHỈ arrayBuffer
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -246,6 +293,7 @@ const EpubViewer = ({
     };
   }, []);
 
+  // ─── Navigation ───────────────────────────────────────────────────────────
   const goToPrev = useCallback(() => {
     if (currentSpineIndex > 0) {
       const prevIndex = currentSpineIndex - 1;
@@ -268,16 +316,35 @@ const EpubViewer = ({
     }
   }, [currentSpineIndex, totalSpineItems]);
 
-  const changeFontSize = useCallback(
-    (delta) => {
-      setFontSize((prev) => {
-        const newSize = Math.max(50, Math.min(200, prev + delta));
-        applyFontSize(newSize);
-        return newSize;
-      });
-    },
-    [applyFontSize],
-  );
+  // Dropdown chọn chương
+  const handleSpineChange = useCallback((e) => {
+    const idx = parseInt(e.target.value, 10);
+    const spine = spineRef.current[idx];
+    if (spine && renditionRef.current) {
+      renditionRef.current.display(spine.href);
+      setCurrentSpineIndex(idx);
+    }
+  }, []);
+
+  const goToChapter = useCallback((href) => {
+    if (!renditionRef.current) return;
+    renditionRef.current.display(href);
+    const hrefBase = href.split("#")[0];
+    const spineIndex = spineRef.current.findIndex(
+      (item) => item.href.includes(hrefBase) || hrefBase.includes(item.href),
+    );
+    if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
+    setTocOpen(false);
+  }, []);
+
+  // ─── Font size handlers ───────────────────────────────────────────────────
+  const changeFontSize = useCallback((delta) => {
+    setFontSize((prev) => Math.max(50, Math.min(200, prev + delta)));
+  }, []);
+
+  const handleFontSizeSelect = useCallback((e) => {
+    setFontSize(parseInt(e.target.value, 10));
+  }, []);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
@@ -293,18 +360,7 @@ const EpubViewer = ({
     }
   }, [fileName]);
 
-  const goToChapter = useCallback((href) => {
-    if (!renditionRef.current) return;
-    renditionRef.current.display(href);
-    const hrefBase = href.split("#")[0];
-    const spineIndex = spineRef.current.findIndex(
-      (item) => item.href.includes(hrefBase) || hrefBase.includes(item.href),
-    );
-    if (spineIndex !== -1) setCurrentSpineIndex(spineIndex);
-    setTocOpen(false);
-  }, []);
-
-  // Toolbar button style
+  // ─── Shared styles ────────────────────────────────────────────────────────
   const toolbarButtonSx = {
     color: "white",
     bgcolor: "rgba(255,255,255,0.08)",
@@ -313,7 +369,41 @@ const EpubViewer = ({
     "&:disabled": { color: "rgba(255,255,255,0.3)" },
   };
 
-  // Loading state
+  const selectSx = {
+    color: "white",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.2)",
+      borderRadius: "8px",
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.4)",
+    },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: "#F59E0B",
+    },
+    "& .MuiSvgIcon-root": { color: "white" },
+  };
+
+  // disablePortal để dropdown hiển thị đúng trong fullscreen
+  const sharedMenuProps = (maxHeight = 300) => ({
+    disablePortal: true,
+    PaperProps: {
+      sx: {
+        maxHeight,
+        bgcolor: "#2D2D44",
+        "& .MuiMenuItem-root": {
+          color: "white",
+          fontSize: "0.875rem",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+          "&.Mui-selected": { bgcolor: alpha("#F59E0B", 0.3) },
+        },
+      },
+    },
+  });
+
+  // ─── Loading / Error states ───────────────────────────────────────────────
   if (loading) {
     return (
       <Box
@@ -350,7 +440,6 @@ const EpubViewer = ({
     );
   }
 
-  // Error state
   if (error) {
     return (
       <Box
@@ -432,6 +521,7 @@ const EpubViewer = ({
     );
   }
 
+  // ─── Main render ──────────────────────────────────────────────────────────
   return (
     <Box
       ref={containerRef}
@@ -443,7 +533,7 @@ const EpubViewer = ({
         position: "relative",
       }}
     >
-      {/* Enhanced Toolbar */}
+      {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       {showToolbar && (
         <Box
           sx={{
@@ -456,8 +546,12 @@ const EpubViewer = ({
             gap: 1,
             flexShrink: 0,
             borderBottom: "1px solid rgba(255,255,255,0.1)",
+            position: "relative",
+            zIndex: 10,
+            overflow: "visible",
           }}
         >
+          {/* Mục lục */}
           <Tooltip title="Mục lục" arrow>
             <IconButton
               size="small"
@@ -478,6 +572,7 @@ const EpubViewer = ({
             }}
           />
 
+          {/* ── Điều hướng chương có dropdown ── */}
           <Tooltip title="Chương trước" arrow>
             <span>
               <IconButton
@@ -491,35 +586,20 @@ const EpubViewer = ({
             </span>
           </Tooltip>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              px: 1.5,
-              py: 0.75,
-              bgcolor: "rgba(255,255,255,0.08)",
-              borderRadius: "8px",
-              minWidth: 100,
-              justifyContent: "center",
-            }}
+          <Select
+            value={currentSpineIndex}
+            onChange={handleSpineChange}
+            size="small"
+            sx={{ ...selectSx, minWidth: 110, height: 36 }}
+            MenuProps={sharedMenuProps(300)}
+            disabled={totalSpineItems === 0}
           >
-            <Typography
-              sx={{ color: "white", fontWeight: 600, fontSize: "0.9375rem" }}
-            >
-              {currentSpineIndex + 1}
-            </Typography>
-            <Typography
-              sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.9375rem" }}
-            >
-              /
-            </Typography>
-            <Typography
-              sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9375rem" }}
-            >
-              {totalSpineItems}
-            </Typography>
-          </Box>
+            {Array.from({ length: totalSpineItems }, (_, i) => (
+              <MenuItem key={i} value={i}>
+                {i + 1} / {totalSpineItems}
+              </MenuItem>
+            ))}
+          </Select>
 
           <Tooltip title="Chương sau" arrow>
             <span>
@@ -544,6 +624,7 @@ const EpubViewer = ({
             }}
           />
 
+          {/* ── Cỡ chữ có dropdown ── */}
           <Tooltip title="Giảm cỡ chữ" arrow>
             <span>
               <IconButton
@@ -557,24 +638,19 @@ const EpubViewer = ({
             </span>
           </Tooltip>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              px: 1.5,
-              py: 0.5,
-              bgcolor: "rgba(255,255,255,0.08)",
-              borderRadius: "8px",
-              minWidth: 60,
-              justifyContent: "center",
-            }}
+          <Select
+            value={fontSize}
+            onChange={handleFontSizeSelect}
+            size="small"
+            sx={{ ...selectSx, minWidth: 85, height: 36 }}
+            MenuProps={sharedMenuProps(280)}
           >
-            <Typography
-              sx={{ color: "white", fontWeight: 600, fontSize: "0.875rem" }}
-            >
-              {fontSize}%
-            </Typography>
-          </Box>
+            {FONT_SIZE_OPTIONS.map((size) => (
+              <MenuItem key={size} value={size}>
+                {size}%
+              </MenuItem>
+            ))}
+          </Select>
 
           <Tooltip title="Tăng cỡ chữ" arrow>
             <span>
@@ -591,6 +667,7 @@ const EpubViewer = ({
 
           <Box sx={{ flex: 1 }} />
 
+          {/* Fullscreen */}
           <Tooltip title={isFullscreen ? "Thoát" : "Toàn màn hình"} arrow>
             <IconButton
               size="small"
@@ -605,6 +682,7 @@ const EpubViewer = ({
             </IconButton>
           </Tooltip>
 
+          {/* Download */}
           {showDownload && (
             <Tooltip title="Tải xuống" arrow>
               <IconButton
@@ -623,11 +701,13 @@ const EpubViewer = ({
         </Box>
       )}
 
-      {/* TOC Drawer - Enhanced */}
+      {/* ── TOC Drawer ────────────────────────────────────────────────────── */}
       <Drawer
         anchor="left"
         open={tocOpen}
         onClose={() => setTocOpen(false)}
+        disablePortal={isFullscreen}
+        container={isFullscreen ? containerRef.current : undefined}
         PaperProps={{ sx: { width: 320, bgcolor: "#1A1A2E" } }}
       >
         <Box
@@ -711,11 +791,12 @@ const EpubViewer = ({
         </List>
       </Drawer>
 
-      {/* EPUB Viewer */}
+      {/* ── EPUB render area ─────────────────────────────────────────────── */}
       <Box
         ref={viewerRef}
         sx={{
           flex: 1,
+          minHeight: 0,
           overflow: "hidden",
           bgcolor: "#fff",
           "& iframe": { border: "none !important" },

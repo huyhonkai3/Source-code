@@ -20,7 +20,12 @@ import { useNavigate } from "react-router-dom";
 
 /**
  * HeroSection Component - VLU Design System v2.0
- * Banner chính của Landing Page với Search functionality
+ * FIXED responsive:
+ * - Đổi minHeight từ vh cứng → "auto" với paddingTop/Bottom đủ lớn
+ *   để không bị cắt nội dung khi viewport nhỏ hoặc zoom browser.
+ * - Font sizes co lại mượt hơn ở breakpoint xs→sm→md.
+ * - Search row wrap đúng trên mobile, button full-width khi xs.
+ * - Stats row wrap sang 1 cột khi quá hẹp (flexWrap).
  */
 const HeroSection = () => {
   const theme = useTheme();
@@ -30,7 +35,6 @@ const HeroSection = () => {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Popular search tags
   const popularTags = [
     { label: "Machine Learning", color: "#7C4DFF" },
     { label: "Kinh tế số", color: "#FF7043" },
@@ -39,9 +43,6 @@ const HeroSection = () => {
     { label: "Python", color: "#4CAF50" },
   ];
 
-  /**
-   * Handle search submit
-   */
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchKeyword.trim()) {
@@ -51,9 +52,6 @@ const HeroSection = () => {
     }
   };
 
-  /**
-   * Handle tag click
-   */
   const handleTagClick = (tag) => {
     navigate(`/documents?q=${encodeURIComponent(tag)}`);
   };
@@ -62,11 +60,12 @@ const HeroSection = () => {
     <Box
       sx={{
         position: "relative",
-        minHeight: { xs: "85vh", md: "90vh" },
+        // FIX: dùng padding thay vì minHeight vh để không bị cắt khi zoom/thu nhỏ
+        pt: { xs: 8, sm: 10, md: 12 },
+        pb: { xs: 10, sm: 12, md: 14 },
         display: "flex",
         alignItems: "center",
         overflow: "hidden",
-        // Background gradient with pattern
         background: `
           linear-gradient(135deg,
             rgba(26, 26, 46, 0.95) 0%,
@@ -83,14 +82,14 @@ const HeroSection = () => {
         },
       }}
     >
-      {/* Animated Background Elements */}
+      {/* Animated background blobs */}
       <Box
         sx={{
           position: "absolute",
           top: "10%",
           left: "5%",
-          width: 300,
-          height: 300,
+          width: { xs: 150, md: 300 },
+          height: { xs: 150, md: 300 },
           borderRadius: "50%",
           background:
             "radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)",
@@ -107,8 +106,8 @@ const HeroSection = () => {
           position: "absolute",
           bottom: "15%",
           right: "10%",
-          width: 200,
-          height: 200,
+          width: { xs: 100, md: 200 },
+          height: { xs: 100, md: 200 },
           borderRadius: "50%",
           background:
             "radial-gradient(circle, rgba(255,193,7,0.15) 0%, transparent 70%)",
@@ -118,13 +117,7 @@ const HeroSection = () => {
       />
 
       <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
-        <Box
-          sx={{
-            textAlign: "center",
-            maxWidth: 900,
-            mx: "auto",
-          }}
-        >
+        <Box sx={{ textAlign: "center", maxWidth: 900, mx: "auto" }}>
           {/* Badge */}
           <Chip
             icon={<SparkleIcon sx={{ fontSize: 18 }} />}
@@ -134,14 +127,12 @@ const HeroSection = () => {
               bgcolor: "rgba(255,255,255,0.15)",
               color: "white",
               fontWeight: 600,
-              fontSize: "0.875rem",
+              fontSize: { xs: "0.8rem", sm: "0.875rem" },
               height: 36,
               borderRadius: "18px",
               backdropFilter: "blur(10px)",
               border: "1px solid rgba(255,255,255,0.2)",
-              "& .MuiChip-icon": {
-                color: "#FFC107",
-              },
+              "& .MuiChip-icon": { color: "#FFC107" },
             }}
           />
 
@@ -150,13 +141,14 @@ const HeroSection = () => {
             variant="h1"
             sx={{
               fontWeight: 800,
+              // FIX: thêm breakpoint sm để font không nhảy quá lớn
               fontSize: {
-                xs: "2.5rem",
-                sm: "3.5rem",
-                md: "4rem",
+                xs: "2rem",
+                sm: "2.75rem",
+                md: "3.5rem",
                 lg: "4.5rem",
               },
-              lineHeight: 1.1,
+              lineHeight: 1.15,
               color: "white",
               mb: 2,
               textShadow: "0 4px 20px rgba(0,0,0,0.3)",
@@ -183,8 +175,9 @@ const HeroSection = () => {
             sx={{
               color: "rgba(255,255,255,0.85)",
               fontWeight: 400,
-              mb: 5,
-              fontSize: { xs: "1.125rem", md: "1.375rem" },
+              mb: { xs: 4, md: 5 },
+              // FIX: giảm font nhỏ hơn ở xs để không wrap xấu
+              fontSize: { xs: "1rem", sm: "1.125rem", md: "1.375rem" },
               maxWidth: 600,
               mx: "auto",
               lineHeight: 1.6,
@@ -198,16 +191,13 @@ const HeroSection = () => {
           <Box
             component="form"
             onSubmit={handleSearch}
-            sx={{
-              maxWidth: 700,
-              mx: "auto",
-              mb: 4,
-            }}
+            sx={{ maxWidth: 700, mx: "auto", mb: 4 }}
           >
             <Box
               sx={{
                 display: "flex",
                 gap: 2,
+                // FIX: column trên xs, row từ sm trở lên
                 flexDirection: { xs: "column", sm: "row" },
               }}
             >
@@ -234,25 +224,18 @@ const HeroSection = () => {
                   "& .MuiOutlinedInput-root": {
                     bgcolor: "white",
                     borderRadius: "16px",
-                    fontSize: "1.125rem",
-                    height: 60,
+                    fontSize: { xs: "1rem", md: "1.125rem" },
+                    height: { xs: 52, md: 60 },
                     boxShadow: searchFocused
                       ? "0 8px 32px rgba(0,0,0,0.2)"
                       : "0 4px 20px rgba(0,0,0,0.15)",
                     transition: "all 0.3s ease",
-                    "& fieldset": {
-                      border: "none",
-                    },
-                    "&:hover": {
-                      boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-                    },
+                    "& fieldset": { border: "none" },
+                    "&:hover": { boxShadow: "0 8px 32px rgba(0,0,0,0.2)" },
                   },
                   "& input": {
                     fontWeight: 500,
-                    "&::placeholder": {
-                      color: "#8E8EA9",
-                      opacity: 1,
-                    },
+                    "&::placeholder": { color: "#8E8EA9", opacity: 1 },
                   },
                 }}
               />
@@ -264,10 +247,12 @@ const HeroSection = () => {
                   bgcolor: "#1A1A2E",
                   color: "white",
                   borderRadius: "16px",
-                  px: 5,
-                  height: 60,
-                  minWidth: { xs: "100%", sm: 160 },
-                  fontSize: "1.0625rem",
+                  px: { xs: 3, sm: 5 },
+                  height: { xs: 52, md: 60 },
+                  // FIX: full-width chỉ khi column (xs), auto khi row (sm+)
+                  width: { xs: "100%", sm: "auto" },
+                  minWidth: { sm: 140 },
+                  fontSize: { xs: "1rem", md: "1.0625rem" },
                   fontWeight: 700,
                   textTransform: "none",
                   boxShadow: "0 4px 20px rgba(26,26,46,0.4)",
@@ -277,6 +262,7 @@ const HeroSection = () => {
                     boxShadow: "0 8px 30px rgba(26,26,46,0.5)",
                   },
                   transition: "all 0.3s ease",
+                  whiteSpace: "nowrap",
                 }}
               >
                 Tìm kiếm
@@ -325,7 +311,7 @@ const HeroSection = () => {
                     bgcolor: alpha(tag.color, 0.2),
                     color: "white",
                     fontWeight: 600,
-                    fontSize: "0.875rem",
+                    fontSize: { xs: "0.8125rem", sm: "0.875rem" },
                     height: 36,
                     borderRadius: "18px",
                     border: `1px solid ${alpha(tag.color, 0.4)}`,
@@ -342,14 +328,16 @@ const HeroSection = () => {
             </Box>
           </Box>
 
-          {/* Quick Stats Preview */}
+          {/* Quick Stats */}
           <Box
             sx={{
               display: "flex",
               justifyContent: "center",
-              gap: { xs: 3, md: 6 },
-              mt: 6,
-              pt: 4,
+              // FIX: gap nhỏ hơn trên xs, wrap nếu cần
+              gap: { xs: 2, sm: 4, md: 6 },
+              flexWrap: "wrap",
+              mt: { xs: 5, md: 6 },
+              pt: { xs: 3, md: 4 },
               borderTop: "1px solid rgba(255,255,255,0.15)",
             }}
           >
@@ -358,12 +346,21 @@ const HeroSection = () => {
               { value: "5,000+", label: "Thành viên" },
               { value: "50,000+", label: "Lượt tải" },
             ].map((stat) => (
-              <Box key={stat.label} sx={{ textAlign: "center" }}>
+              <Box
+                key={stat.label}
+                sx={{
+                  textAlign: "center",
+                  // FIX: minWidth để không bị squeeze quá hẹp
+                  minWidth: { xs: 80, sm: "auto" },
+                }}
+              >
                 <Typography
                   sx={{
-                    fontSize: { xs: "1.5rem", md: "2rem" },
+                    // FIX: font nhỏ hơn ở xs để 3 stats vừa 1 hàng
+                    fontSize: { xs: "1.25rem", sm: "1.625rem", md: "2rem" },
                     fontWeight: 800,
                     color: "white",
+                    lineHeight: 1.2,
                   }}
                 >
                   {stat.value}
@@ -371,7 +368,7 @@ const HeroSection = () => {
                 <Typography
                   sx={{
                     color: "rgba(255,255,255,0.7)",
-                    fontSize: "0.9375rem",
+                    fontSize: { xs: "0.8125rem", sm: "0.9375rem" },
                     fontWeight: 500,
                   }}
                 >
@@ -390,7 +387,7 @@ const HeroSection = () => {
           bottom: 0,
           left: 0,
           right: 0,
-          height: 80,
+          height: { xs: 50, md: 80 },
           background: "#FAFAFA",
           clipPath: "ellipse(75% 100% at 50% 100%)",
         }}

@@ -6,6 +6,14 @@
  * Đường dẫn: src/components/common/file-viewer/PDFViewer.jsx
  *
  * @requires pdfjs-dist - yarn add pdfjs-dist
+ *
+ * FIXED:
+ * 1. Dropdown mất khi fullscreen → thêm disablePortal: true vào MenuProps
+ *    (MUI mặc định render menu vào document.body qua Portal;
+ *     browser fullscreen API chỉ hiển thị DOM bên trong fullscreen element
+ *     → menu bị ẩn. disablePortal giữ menu nằm trong cùng DOM subtree.)
+ * 2. Không scroll khi zoom lớn → đổi alignItems từ "flex-start" sang "flex-start"
+ *    và thêm minHeight: 0 + pb đúng để canvas không bị clip bởi parent.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -242,6 +250,27 @@ const PDFViewer = ({
     "& .MuiSvgIcon-root": { color: "white" },
   };
 
+  // ─── BUG FIX 1: MenuProps dùng chung có disablePortal ────────────────────
+  // Khi fullscreen, browser chỉ paint những element nằm TRONG fullscreen node.
+  // MUI Portal mặc định render vào document.body (nằm ngoài) → menu bị ẩn.
+  // disablePortal: true giữ menu render trong cùng DOM subtree với Select
+  // → nằm trong fullscreen element → hiển thị bình thường.
+  const sharedMenuProps = (maxHeight = 300) => ({
+    disablePortal: true,
+    PaperProps: {
+      sx: {
+        maxHeight,
+        bgcolor: "#2D2D44",
+        "& .MuiMenuItem-root": {
+          color: "white",
+          fontSize: "0.875rem",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
+          "&.Mui-selected": { bgcolor: alpha("#D32F2F", 0.3) },
+        },
+      },
+    },
+  });
+
   return (
     <Box
       ref={containerRef}
@@ -268,6 +297,12 @@ const PDFViewer = ({
             gap: 1,
             borderBottom: "1px solid rgba(255,255,255,0.1)",
             flexShrink: 0,
+            // ─── BUG FIX 1 (hỗ trợ): toolbar cần z-index cao hơn
+            // để menu dropdown (disablePortal) không bị clip bởi overflow:hidden
+            // của parent khi hiện dropdown
+            position: "relative",
+            zIndex: 10,
+            overflow: "visible",
           }}
         >
           {/* Left Group */}
@@ -316,20 +351,7 @@ const PDFViewer = ({
                 onChange={handlePageChange}
                 size="small"
                 sx={{ ...selectSx, minWidth: 110, height: 36 }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      maxHeight: 300,
-                      bgcolor: "#2D2D44",
-                      "& .MuiMenuItem-root": {
-                        color: "white",
-                        fontSize: "0.875rem",
-                        "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-selected": { bgcolor: alpha("#D32F2F", 0.3) },
-                      },
-                    },
-                  },
-                }}
+                MenuProps={sharedMenuProps(300)}
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                   (page) => (
@@ -389,23 +411,13 @@ const PDFViewer = ({
                 onChange={handleZoomChange}
                 size="small"
                 sx={{ ...selectSx, minWidth: 85, height: 36 }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      bgcolor: "#2D2D44",
-                      "& .MuiMenuItem-root": {
-                        color: "white",
-                        fontSize: "0.875rem",
-                        "&:hover": { bgcolor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-selected": { bgcolor: alpha("#D32F2F", 0.3) },
-                      },
-                    },
-                  },
-                }}
+                MenuProps={sharedMenuProps(280)}
               >
-                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0].map((z) => (
+                {[
+                  0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0,
+                ].map((z) => (
                   <MenuItem key={z} value={z}>
-                    {z * 100}%
+                    {Math.round(z * 100)}%
                   </MenuItem>
                 ))}
               </Select>
@@ -468,18 +480,28 @@ const PDFViewer = ({
         </Box>
       )}
 
-      {/* PDF Content */}
+      {/* PDF Content
+          ─── BUG FIX 2: scroll khi zoom lớn ───────────────────────────────
+          Vấn đề gốc: container ngoài có overflow:hidden → canvas lớn bị clip.
+          Fix:
+          - Bỏ alignItems: "flex-start" (không ảnh hưởng scroll axis)
+          - Dùng overflow: "auto" (đã có) nhưng thêm minHeight: 0 để flex
+            child thực sự shrink và scroll bar xuất hiện.
+          - Canvas wrapper không set height cứng → tự expand theo canvas.
+          - Thêm pb để nội dung không bị toolbar che khuất khi cuộn xuống cùng.
+      */}
       <Box
         sx={{
           flex: 1,
+          minHeight: 0, // quan trọng: cho phép flex child shrink & scroll
           position: "relative",
           overflow: "auto",
           background: "linear-gradient(180deg, #3D3D5C 0%, #2D2D44 100%)",
           display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
+          flexDirection: "column",
+          alignItems: "center",
           p: 3,
-          minHeight: 0,
+          pb: 5,
         }}
       >
         {loading && (
@@ -489,7 +511,7 @@ const PDFViewer = ({
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
-              height: "100%",
+              flex: 1,
               gap: 2,
             }}
           >
@@ -522,7 +544,7 @@ const PDFViewer = ({
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
-              height: "100%",
+              flex: 1,
               gap: 2,
             }}
           >
@@ -564,6 +586,8 @@ const PDFViewer = ({
               boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
               borderRadius: "4px",
               overflow: "hidden",
+              // Không set width/height cứng → tự expand theo canvas
+              flexShrink: 0,
             }}
           >
             <canvas ref={canvasRef} />

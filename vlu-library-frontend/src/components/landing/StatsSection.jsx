@@ -10,7 +10,6 @@ import documentsAPI from "../../api/documents.api";
 
 /**
  * Animated Counter Hook
- * Tạo hiệu ứng đếm số từ 0 đến target
  */
 const useCountUp = (target, duration = 2000, startCounting = false) => {
   const [count, setCount] = useState(0);
@@ -24,44 +23,35 @@ const useCountUp = (target, duration = 2000, startCounting = false) => {
     const animate = (timestamp) => {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
-
-      // Easing function (ease-out)
       const easeOut = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(easeOut * target));
-
       if (progress < 1) {
         animationFrame = requestAnimationFrame(animate);
       }
     };
 
     animationFrame = requestAnimationFrame(animate);
-
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
+      if (animationFrame) cancelAnimationFrame(animationFrame);
     };
   }, [target, duration, startCounting]);
 
   return count;
 };
 
-/**
- * Format number with K/M suffix
- */
 const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M";
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K";
-  }
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+  if (num >= 1000) return (num / 1000).toFixed(1) + "K";
   return num.toLocaleString("vi-VN");
 };
 
 /**
  * StatsSection Component - VLU Design System v2.0
- * Hiển thị thống kê ấn tượng với animated counters
+ * FIXED responsive:
+ * - Grid xs=6 → xs=12 sm=6 md=3: mỗi stat chiếm full width khi màn quá hẹp
+ *   (tránh 2 stat chen nhau trong 50% viewport bé)
+ * - Font size số liệu giảm dần theo breakpoint
+ * - Padding card giảm trên xs
  */
 const StatsSection = () => {
   const [stats, setStats] = useState({
@@ -74,15 +64,11 @@ const StatsSection = () => {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef(null);
 
-  // Animated counts
   const documentsCount = useCountUp(stats.documents, 2000, isVisible);
   const usersCount = useCountUp(stats.users, 2000, isVisible);
   const viewsCount = useCountUp(stats.views, 2500, isVisible);
   const downloadsCount = useCountUp(stats.downloads, 2500, isVisible);
 
-  /**
-   * Fetch public stats
-   */
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -92,7 +78,6 @@ const StatsSection = () => {
         }
       } catch (err) {
         console.error("Error fetching stats:", err);
-        // Fallback data
         setStats({
           documents: 1250,
           users: 3500,
@@ -103,13 +88,9 @@ const StatsSection = () => {
         setLoading(false);
       }
     };
-
     fetchStats();
   }, []);
 
-  /**
-   * Intersection Observer for animation trigger
-   */
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -120,11 +101,7 @@ const StatsSection = () => {
       },
       { threshold: 0.3 },
     );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
+    if (sectionRef.current) observer.observe(sectionRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -166,9 +143,7 @@ const StatsSection = () => {
         py: { xs: 8, md: 10 },
         position: "relative",
         overflow: "hidden",
-        // Background gradient
         background: `linear-gradient(135deg, #1A1A2E 0%, #D32F2F 100%)`,
-        // Pattern overlay
         "&::before": {
           content: '""',
           position: "absolute",
@@ -177,7 +152,7 @@ const StatsSection = () => {
         },
       }}
     >
-      {/* Floating Elements */}
+      {/* Floating blobs */}
       <Box
         sx={{
           position: "absolute",
@@ -223,7 +198,7 @@ const StatsSection = () => {
             variant="h2"
             sx={{
               fontWeight: 800,
-              fontSize: { xs: "2rem", md: "2.5rem" },
+              fontSize: { xs: "1.625rem", sm: "2rem", md: "2.5rem" },
               color: "white",
             }}
           >
@@ -231,16 +206,23 @@ const StatsSection = () => {
           </Typography>
         </Box>
 
-        {/* Stats Grid */}
-        <Grid container spacing={4} justifyContent="center">
+        {/* Stats Grid
+            FIX: xs=12 (1 cột khi rất hẹp), sm=6 (2 cột), md=3 (4 cột)
+            Thay vì xs=6 cứng gây vỡ layout khi viewport < 400px */}
+        <Grid
+          container
+          spacing={{ xs: 2, sm: 3, md: 4 }}
+          justifyContent="center"
+        >
           {statsData.map((stat, index) => {
             const IconComponent = stat.icon;
             return (
-              <Grid item xs={6} md={3} key={index}>
+              <Grid item xs={12} sm={6} md={3} key={index}>
                 <Box
                   sx={{
                     textAlign: "center",
-                    p: { xs: 3, md: 4 },
+                    // FIX: padding nhỏ hơn ở xs
+                    p: { xs: 2.5, sm: 3, md: 4 },
                     borderRadius: "24px",
                     bgcolor: "rgba(255,255,255,0.08)",
                     backdropFilter: "blur(10px)",
@@ -256,8 +238,8 @@ const StatsSection = () => {
                   {/* Icon */}
                   <Box
                     sx={{
-                      width: 64,
-                      height: 64,
+                      width: { xs: 52, md: 64 },
+                      height: { xs: 52, md: 64 },
                       borderRadius: "16px",
                       bgcolor: alpha(stat.color, 0.2),
                       color: stat.color,
@@ -268,13 +250,14 @@ const StatsSection = () => {
                       mb: 2,
                     }}
                   >
-                    <IconComponent sx={{ fontSize: 32 }} />
+                    <IconComponent sx={{ fontSize: { xs: 26, md: 32 } }} />
                   </Box>
 
-                  {/* Value */}
+                  {/* Value
+                      FIX: font size nhỏ hơn ở xs/sm để không overflow card */}
                   <Typography
                     sx={{
-                      fontSize: { xs: "2rem", md: "2.75rem" },
+                      fontSize: { xs: "1.75rem", sm: "2.25rem", md: "2.75rem" },
                       fontWeight: 800,
                       color: "white",
                       lineHeight: 1,
@@ -300,7 +283,7 @@ const StatsSection = () => {
                   <Typography
                     sx={{
                       color: "rgba(255,255,255,0.8)",
-                      fontSize: "1rem",
+                      fontSize: { xs: "0.9375rem", md: "1rem" },
                       fontWeight: 500,
                     }}
                   >
