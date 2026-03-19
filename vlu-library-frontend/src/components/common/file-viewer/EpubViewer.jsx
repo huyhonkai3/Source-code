@@ -218,7 +218,9 @@ const EpubViewer = ({
 
         const rendition = book.renderTo(viewerRef.current, {
           width: "100%",
-          height: "100%",
+          // FIX: "paginated" (default) clip nội dung theo viewport height → phần dưới bị khuất.
+          // Đổi sang "scrolled-doc" để nội dung flow tự nhiên, container ngoài scroll.
+          flow: "scrolled-doc",
           spread: "none",
         });
         renditionRef.current = rendition;
@@ -526,7 +528,10 @@ const EpubViewer = ({
     <Box
       ref={containerRef}
       sx={{
+        // FIX: dùng height: "100%" + display flex column + minHeight: 0
+        // để container tham gia flex layout đúng và cho phép child scroll
         height: "100%",
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         bgcolor: "#FAFAFC",
@@ -792,14 +797,21 @@ const EpubViewer = ({
       </Drawer>
 
       {/* ── EPUB render area ─────────────────────────────────────────────── */}
+      {/* FIX: overflow: auto để scroll được khi nội dung dài hơn viewport.
+          epubjs scrolled-doc mode render nội dung vào iframe với chiều cao tự nhiên.
+          Container ngoài cần overflow: auto + minHeight: 0 (flex child) để scroll bar xuất hiện.
+          "& iframe" set height: 100% để iframe fill đúng chiều cao epubjs tính. */}
       <Box
         ref={viewerRef}
         sx={{
           flex: 1,
           minHeight: 0,
-          overflow: "hidden",
+          overflow: "auto",
           bgcolor: "#fff",
-          "& iframe": { border: "none !important" },
+          "& iframe": {
+            border: "none !important",
+            // epubjs scrolled-doc tự set height qua inline style → không override
+          },
         }}
       />
 
