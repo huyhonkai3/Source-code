@@ -3,11 +3,12 @@ import { LogLevel } from "@azure/msal-browser";
 
 export const msalConfig = {
   auth: {
-    // clientId: process.env.REACT_AUTH_ID,
-    clientId: "70b3d6de-90c4-4c53-a45c-316ad7661dee", // Application (client) ID từ Azure
-    authority: "https://login.microsoftonline.com/common", // "common" cho phép cả mail trường và mail cá nhân
-    redirectUri: "http://localhost:3000", // port chạy react
-    // redirectUri: process.env.REACT_REDIRECT_URI,
+    // clientId: "70b3d6de-90c4-4c53-a45c-316ad7661dee", // Application (client) ID từ Azure
+    // authority: "https://login.microsoftonline.com/common", // "common" cho phép cả mail trường và mail cá nhân
+    // redirectUri: "http://localhost:3000", // port chạy react
+    clientId: process.env.REACT_APP_AZURE_CLIENT_ID,
+    authority: process.env.REACT_APP_AZURE_AUTHORITY,
+    redirectUri: process.env.REACT_APP_REDIRECT_URI,
   },
   cache: {
     cacheLocation: "sessionStorage", // Hoặc "localStorage"
@@ -42,4 +43,5 @@ export const msalConfig = {
 
 export const loginRequest = {
   scopes: ["openid", "profile", "email", "User.Read"], // KHÔNG thêm User.Read hay Files.Read
+  prompt: "select_account",
 };

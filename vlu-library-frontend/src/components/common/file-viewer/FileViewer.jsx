@@ -40,7 +40,7 @@ const FileViewer = ({
 
   // ── Bookmark state ─────────────────────────────────────────────────────────
   const [initialLocation, setInitialLocation] = useState(null);
-  const [bookmarkReady, setBookmarkReady] = useState(false); // Gate: chặn viewer render cho đến khi API bookmark resolve
+  const [bookmarkReady, setBookmarkReady] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [bookmarkSaved, setBookmarkSaved] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -49,12 +49,10 @@ const FileViewer = ({
     severity: "success",
   });
 
-  // Ref để callback luôn đọc được giá trị location mới nhất
   const currentLocationRef = useRef(null);
 
-  // ── Load bookmark trước khi mount viewer ──────────────────────────────────
+  // ── Load bookmark ──────────────────────────────────────────────────────────
   useEffect(() => {
-    // Không có điều kiện load → mở viewer ngay
     if (!documentId || !isAuthenticated || isPreview) {
       setBookmarkReady(true);
       return;
@@ -64,23 +62,15 @@ const FileViewer = ({
 
     const loadBookmark = async () => {
       const position = await getBookmark(documentId);
-
-      if (cancelled) return; // Component unmount trong lúc fetch
-
+      if (cancelled) return;
       if (position) {
-        console.log("[FileViewer] bookmark loaded:", position); // debug
         setInitialLocation(position);
         currentLocationRef.current = position;
-      } else {
-        console.log("[FileViewer] no bookmark found"); // debug
       }
-
-      // Dù có hay không bookmark, mở khóa viewer
       setBookmarkReady(true);
     };
 
     loadBookmark();
-
     return () => {
       cancelled = true;
     };
@@ -88,9 +78,7 @@ const FileViewer = ({
 
   // ── Location change callback ───────────────────────────────────────────────
   const handleLocationChange = useCallback((location) => {
-    if (location) {
-      currentLocationRef.current = location;
-    }
+    if (location) currentLocationRef.current = location;
   }, []);
 
   // ── Save bookmark ──────────────────────────────────────────────────────────
@@ -248,7 +236,9 @@ const FileViewer = ({
     <Box
       sx={{
         height: "100%",
-        minHeight: 500,
+        // FIX: minHeight: 0 cho phép flex child shrink → scroll hoạt động đúng
+        // Không set minHeight cứng ở đây; parent DocumentDetailPage đã set height: 75vh
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         position: "relative",
@@ -256,14 +246,20 @@ const FileViewer = ({
     >
       {showFormatBadge && renderFormatBadge()}
 
-      {/* Viewer: chỉ mount sau khi bookmarkReady = true để initialLocation luôn có giá trị đúng */}
-      <Box sx={{ flex: 1, position: "relative" }}>
+      {/* Viewer wrapper
+          FIX: flex: 1 + minHeight: 0 là cặp đôi bắt buộc trong flex column.
+          flex: 1 → chiếm toàn bộ chiều cao còn lại.
+          minHeight: 0 → cho phép shrink xuống dưới content size → scroll bar xuất hiện.
+          Không dùng position: relative ở đây vì nó tạo stacking context mới
+          có thể ảnh hưởng Bookmark FAB (position: absolute). */}
+      <Box
+        sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+      >
         {!bookmarkReady ? (
-          // Placeholder tối màu giữ layout, không flash trắng
           <Box
             sx={{
               height: "100%",
-              minHeight: 500,
+              minHeight: 0,
               background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
             }}
           />
@@ -289,7 +285,7 @@ const FileViewer = ({
         )}
       </Box>
 
-      {/* Bookmark FAB */}
+      {/* Bookmark FAB — position absolute relative to FileViewer root */}
       {isAuthenticated && documentId && (
         <Tooltip
           title={bookmarkSaved ? "Đã lưu!" : "Lưu vị trí đọc"}

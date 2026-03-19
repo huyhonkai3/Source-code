@@ -281,7 +281,10 @@ const PDFViewer = ({
         flexDirection: "column",
         background: "linear-gradient(180deg, #1A1A2E 0%, #2D2D44 100%)",
         position: "relative",
-        overflow: "hidden",
+        // FIX: bỏ overflow: hidden ở root — nó chặn scroll của content area bên trong.
+        // Toolbar dùng overflow: visible riêng; content area tự quản lý overflow: auto.
+        overflow: "clip", // clip chỉ ngăn paint ngoài boundary, không tạo scroll context mới
+        minHeight: 0,
       }}
     >
       {/* Enhanced Toolbar */}
@@ -413,9 +416,7 @@ const PDFViewer = ({
                 sx={{ ...selectSx, minWidth: 85, height: 36 }}
                 MenuProps={sharedMenuProps(280)}
               >
-                {[
-                  0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0,
-                ].map((z) => (
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0].map((z) => (
                   <MenuItem key={z} value={z}>
                     {Math.round(z * 100)}%
                   </MenuItem>
