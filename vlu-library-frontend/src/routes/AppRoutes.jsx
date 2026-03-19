@@ -14,7 +14,6 @@ import UpgradeRequestsPage from "../pages/admin/UpgradeRequestsPage";
 import DocumentDetailPage from "../pages/public/DocumentDetailPage";
 import UsersManagementPage from "../pages/admin/UsersManagementPage";
 import ChangePasswordPage from "../pages/user/ChangePasswordPage";
-// Moderator Pages - Sử dụng UserSidebar
 import ModeratorModerationPage from "../pages/moderator/ModeratorModerationPage";
 import ModeratorReviewDocumentPage from "../pages/moderator/ModeratorReviewDocumentPage";
 import LandingPage from "../pages/public/LandingPage";
@@ -24,14 +23,9 @@ import NotificationsPage from "../pages/user/NotificationsPage";
 import RequestsManagementPage from "../pages/admin/RequestsManagementPage";
 import ReportsManagementPage from "../pages/admin/ReportsManagementPage";
 
-/**
- * ProtectedRoute Component
- * Bảo vệ các routes yêu cầu authentication
- */
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
+  if (loading)
     return (
       <div
         style={{
@@ -44,25 +38,16 @@ const ProtectedRoute = ({ children }) => {
         Loading...
       </div>
     );
-  }
-
   if (!isAuthenticated) {
-    // Lưu đường dẫn hiện tại để redirect sau khi login
     localStorage.setItem("redirectPath", window.location.pathname);
     return <Navigate to="/login" replace />;
   }
-
   return children;
 };
 
-/**
- * PublicRoute Component
- * Chuyển hướng về home nếu đã đăng nhập
- */
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
+  if (loading)
     return (
       <div
         style={{
@@ -75,24 +60,13 @@ const PublicRoute = ({ children }) => {
         Loading...
       </div>
     );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
+  if (isAuthenticated) return <Navigate to="/" replace />;
   return children;
 };
 
-/**
- * RoleBasedRoute Component
- * Bảo vệ routes theo role
- * @param {Array} allowedRoles - Danh sách roles được phép truy cập
- */
 const RoleBasedRoute = ({ children, allowedRoles = [] }) => {
   const { isAuthenticated, loading, user } = useAuth();
-
-  if (loading) {
+  if (loading)
     return (
       <div
         style={{
@@ -105,14 +79,10 @@ const RoleBasedRoute = ({ children, allowedRoles = [] }) => {
         Loading...
       </div>
     );
-  }
-
   if (!isAuthenticated) {
     localStorage.setItem("redirectPath", window.location.pathname);
     return <Navigate to="/login" replace />;
   }
-
-  // Check if user has required role
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
     return (
       <div
@@ -130,20 +100,13 @@ const RoleBasedRoute = ({ children, allowedRoles = [] }) => {
       </div>
     );
   }
-
   return children;
 };
 
-/**
- * AppRoutes Component
- * Định nghĩa tất cả routes của ứng dụng
- */
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* ============================================
-          PUBLIC ROUTES - Chỉ truy cập khi chưa đăng nhập
-          ============================================ */}
+      {/* ── Auth ── */}
       <Route
         path="/login"
         element={
@@ -152,7 +115,6 @@ const AppRoutes = () => {
           </PublicRoute>
         }
       />
-
       <Route
         path="/register"
         element={
@@ -162,23 +124,13 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Categories Page */}
+      {/* ── Public ── */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/documents" element={<SearchPage />} />
+      <Route path="/documents/:id" element={<DocumentDetailPage />} />
       <Route path="/categories" element={<CategoriesPage />} />
 
-      {/* ============================================
-          PROTECTED ROUTES - Yêu cầu đăng nhập
-          ============================================ */}
-
-      {/* Landing Page - Public (không cần đăng nhập) */}
-      <Route path="/" element={<LandingPage />} />
-
-      {/* Public Document Search Page */}
-      <Route path="/documents" element={<SearchPage />} />
-
-      {/* Public Document Detail Page */}
-      <Route path="/documents/:id" element={<DocumentDetailPage />} />
-
-      {/* User Profile Page - Protected */}
+      {/* ── User (Protected) ── */}
       <Route
         path="/profile"
         element={
@@ -187,8 +139,6 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* Change Password Page - Protected */}
       <Route
         path="/profile/change-password"
         element={
@@ -197,8 +147,6 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* Route Notifications */}
       <Route
         path="/user/notifications"
         element={
@@ -208,9 +156,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* ============================================
-          AUTHOR ROUTES
-          ============================================ */}
+      {/* ── Author ── */}
       <Route
         path="/my-documents"
         element={
@@ -219,8 +165,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Author Stats Page */}
       <Route
         path="/author/stats"
         element={
@@ -230,12 +174,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* ============================================
-          MODERATOR ROUTES - Sử dụng UserSidebar
-          Route riêng cho Moderator, KHÔNG dùng /admin prefix
-          ============================================ */}
-
-      {/* Moderator Moderation Page - Danh sách tài liệu cần duyệt */}
+      {/* ── Moderator ── */}
       <Route
         path="/moderation"
         element={
@@ -244,8 +183,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Moderator Review Document Page - Tái sử dụng ReviewDocumentPage */}
       <Route
         path="/moderation/:id"
         element={
@@ -255,7 +192,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Admin Dashboard Page - Admin Only */}
+      {/* ── Admin ── */}
       <Route
         path="/admin/dashboard"
         element={
@@ -264,8 +201,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Moderation Page - Admin Only (với AdminSidebar) */}
       <Route
         path="/admin/moderation"
         element={
@@ -274,8 +209,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Review Document Page - Admin Only */}
       <Route
         path="/admin/moderation/:id"
         element={
@@ -284,8 +217,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Categories Management Page - Admin only */}
       <Route
         path="/admin/categories"
         element={
@@ -294,8 +225,6 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Documents Management Page - Admin only */}
       <Route
         path="/admin/documents"
         element={
@@ -304,18 +233,14 @@ const AppRoutes = () => {
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Upgrade Requests Page - Admin only */}
       <Route
-        path="/admin/upgrade-requests"
+        path="/admin/users"
         element={
           <RoleBasedRoute allowedRoles={["Admin"]}>
-            <UpgradeRequestsPage />
+            <UsersManagementPage />
           </RoleBasedRoute>
         }
       />
-
-      {/* Admin Reports Management Page - Admin only */}
       <Route
         path="/admin/reports"
         element={
@@ -325,28 +250,30 @@ const AppRoutes = () => {
         }
       />
 
+      {/*
+        FIX: /admin/requests → RequestsManagementPage (trang mới, 2 tab)
+        Đổi từ ProtectedRoute → RoleBasedRoute Admin-only cho nhất quán
+      */}
       <Route
         path="/admin/requests"
         element={
-          <ProtectedRoute>
-            <RequestsManagementPage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Admin Users Management Page - Admin only */}
-      <Route
-        path="/admin/users"
-        element={
           <RoleBasedRoute allowedRoles={["Admin"]}>
-            <UsersManagementPage />
+            <RequestsManagementPage />
           </RoleBasedRoute>
         }
       />
 
-      {/* ============================================
-          404 NOT FOUND
-          ============================================ */}
+      {/*
+        FIX: /admin/upgrade-requests (route cũ, sidebar từng trỏ vào đây)
+        → redirect sang /admin/requests để không bị 404 nếu còn bookmark/link cũ
+        UpgradeRequestsPage giờ không còn được dùng từ sidebar nữa.
+      */}
+      <Route
+        path="/admin/upgrade-requests"
+        element={<Navigate to="/admin/requests" replace />}
+      />
+
+      {/* ── 404 ── */}
       <Route
         path="*"
         element={

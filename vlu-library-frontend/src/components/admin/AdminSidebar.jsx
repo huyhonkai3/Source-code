@@ -8,7 +8,6 @@ import {
   Typography,
   Box,
   Divider,
-  Badge,
   Collapse,
   alpha,
 } from "@mui/material";
@@ -17,7 +16,6 @@ import {
   Description as DescriptionIcon,
   Category as CategoryIcon,
   People as PeopleIcon,
-  PersonAdd as PersonAddIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   ExpandLess,
@@ -25,6 +23,8 @@ import {
   FiberManualRecord as DotIcon,
   AdminPanelSettings as AdminIcon,
   Flag as FlagIcon,
+  // FIX: đổi icon sang AssignmentTurnedIn để biểu thị "yêu cầu + phê duyệt"
+  AssignmentTurnedIn as RequestsIcon,
 } from "@mui/icons-material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -32,12 +32,13 @@ import { useAuth } from "../../context/AuthContext";
 
 /**
  * AdminSidebar Component - VLU Design System v2.0.1
- * Modern & Bold sidebar navigation cho Admin
- * UPDATED: Tăng font sizes để UX tốt hơn
  *
- * @param {string} active - Menu item đang active
- * @param {number} pendingCount - Số tài liệu chờ duyệt
- * @param {number} upgradeCount - Số yêu cầu nâng cấp Author
+ * FIXED:
+ * - Menu "Yêu cầu & Phê duyệt": path đổi từ /admin/upgrade-requests
+ *   sang /admin/requests (trỏ đúng vào RequestsManagementPage có 2 tab).
+ * - Label đổi thành "Yêu cầu & Phê duyệt" để phản ánh 2 chức năng:
+ *   (1) duyệt nâng cấp Author, (2) duyệt yêu cầu chỉnh sửa tài liệu.
+ * - Icon đổi sang AssignmentTurnedIn cho trực quan hơn.
  */
 const AdminSidebar = ({
   active = "dashboard",
@@ -47,12 +48,10 @@ const AdminSidebar = ({
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  // Dropdown states
   const [documentsOpen, setDocumentsOpen] = useState(
     active === "all-documents" || active === "moderation",
   );
 
-  // Admin menu items configuration
   const menuItems = [
     {
       id: "dashboard",
@@ -90,6 +89,14 @@ const AdminSidebar = ({
       section: "content",
     },
     {
+      id: "reports",
+      label: "Báo cáo vi phạm",
+      icon: <FlagIcon />,
+      path: "/admin/reports",
+      section: "content",
+      badge: null,
+    },
+    {
       id: "users",
       label: "Quản lý Người dùng",
       icon: <PeopleIcon />,
@@ -97,20 +104,17 @@ const AdminSidebar = ({
       section: "users",
     },
     {
+      // FIX 1: id giữ nguyên "upgrade-requests" để active highlight vẫn hoạt động
+      //        với các page đang truyền active="upgrade-requests"
       id: "upgrade-requests",
-      label: "Yêu cầu Nâng cấp",
-      icon: <PersonAddIcon />,
-      path: "/admin/upgrade-requests",
+      // FIX 2: label mới phản ánh đủ 2 chức năng trong trang
+      label: "Yêu cầu & Phê duyệt",
+      icon: <RequestsIcon />,
+      // FIX 3: path trỏ đúng vào RequestsManagementPage (có cả 2 tab)
+      //        thay vì /admin/upgrade-requests (UpgradeRequestsPage cũ, chỉ 1 tab)
+      path: "/admin/requests",
       section: "users",
       badge: upgradeCount > 0 ? upgradeCount : null,
-    },
-    {
-      id: "reports",
-      label: "Báo cáo vi phạm",
-      icon: <FlagIcon />,
-      path: "/admin/reports",
-      section: "content",
-      badge: null,
     },
     {
       id: "settings",
@@ -147,7 +151,6 @@ const AdminSidebar = ({
     return labels[section] || "";
   };
 
-  // Group items by section
   const sections = ["main", "content", "users", "system"];
   const groupedItems = sections.reduce((acc, section) => {
     acc[section] = menuItems.filter((item) => item.section === section);
@@ -165,7 +168,7 @@ const AdminSidebar = ({
         border: "1px solid #F0F0F5",
       }}
     >
-      {/* ========== HEADER ========== */}
+      {/* ── Header ── */}
       <Box
         sx={{
           p: 3,
@@ -191,33 +194,23 @@ const AdminSidebar = ({
           <Box>
             <Typography
               variant="h6"
-              sx={{
-                fontWeight: 700,
-                fontSize: "1.1875rem", // UPDATED: 19px (was 17.6px)
-                lineHeight: 1.2,
-              }}
+              sx={{ fontWeight: 700, fontSize: "1.1875rem", lineHeight: 1.2 }}
             >
               VLU Admin
             </Typography>
-            <Typography
-              sx={{
-                opacity: 0.9,
-                fontSize: "0.8125rem", // UPDATED: 13px (was 12px)
-              }}
-            >
+            <Typography sx={{ opacity: 0.9, fontSize: "0.8125rem" }}>
               Quản trị viên
             </Typography>
           </Box>
         </Box>
       </Box>
 
-      {/* ========== MENU LIST ========== */}
+      {/* ── Menu List ── */}
       <List sx={{ p: 2 }}>
         {sections.map((section, sectionIndex) => (
           <Box key={section}>
             {groupedItems[section].length > 0 && (
               <>
-                {/* Section Label */}
                 {sectionIndex > 0 && (
                   <>
                     <Divider sx={{ my: 2 }} />
@@ -227,7 +220,7 @@ const AdminSidebar = ({
                         px: 2,
                         py: 1,
                         display: "block",
-                        fontSize: "0.75rem", // UPDATED: 12px (was 10px)
+                        fontSize: "0.75rem",
                         fontWeight: 700,
                         color: "#8E8EA9",
                         letterSpacing: 1,
@@ -238,10 +231,8 @@ const AdminSidebar = ({
                   </>
                 )}
 
-                {/* Menu Items */}
                 {groupedItems[section].map((item) => (
                   <Box key={item.id}>
-                    {/* Parent Menu Item */}
                     <ListItem disablePadding sx={{ mb: 0.5 }}>
                       <ListItemButton
                         onClick={
@@ -257,16 +248,10 @@ const AdminSidebar = ({
                           "&.Mui-selected": {
                             bgcolor: "#D32F2F",
                             color: "white",
-                            "&:hover": {
-                              bgcolor: "#B71C1C",
-                            },
-                            "& .MuiListItemIcon-root": {
-                              color: "white",
-                            },
+                            "&:hover": { bgcolor: "#B71C1C" },
+                            "& .MuiListItemIcon-root": { color: "white" },
                           },
-                          "&:hover": {
-                            bgcolor: "#F0F0F5",
-                          },
+                          "&:hover": { bgcolor: "#F0F0F5" },
                         }}
                       >
                         <ListItemIcon
@@ -280,11 +265,10 @@ const AdminSidebar = ({
                         <ListItemText
                           primary={item.label}
                           primaryTypographyProps={{
-                            fontSize: "0.9375rem", // UPDATED: 15px (was 14px)
+                            fontSize: "0.9375rem",
                             fontWeight: active === item.id ? 600 : 500,
                           }}
                         />
-                        {/* Badge */}
                         {item.badge !== null && item.badge !== undefined && (
                           <Box
                             sx={{
@@ -303,16 +287,12 @@ const AdminSidebar = ({
                             }}
                           >
                             <Typography
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: "0.75rem", // UPDATED: 12px (was 11px)
-                              }}
+                              sx={{ fontWeight: 700, fontSize: "0.75rem" }}
                             >
                               {item.badge > 99 ? "99+" : item.badge}
                             </Typography>
                           </Box>
                         )}
-                        {/* Dropdown arrow */}
                         {item.hasDropdown &&
                           (documentsOpen ? (
                             <ExpandLess sx={{ color: "#8E8EA9" }} />
@@ -322,7 +302,6 @@ const AdminSidebar = ({
                       </ListItemButton>
                     </ListItem>
 
-                    {/* Dropdown Children */}
                     {item.hasDropdown && (
                       <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
@@ -343,13 +322,9 @@ const AdminSidebar = ({
                                   "&.Mui-selected": {
                                     bgcolor: "#D32F2F",
                                     color: "white",
-                                    "&:hover": {
-                                      bgcolor: "#B71C1C",
-                                    },
+                                    "&:hover": { bgcolor: "#B71C1C" },
                                   },
-                                  "&:hover": {
-                                    bgcolor: "#F0F0F5",
-                                  },
+                                  "&:hover": { bgcolor: "#F0F0F5" },
                                 }}
                               >
                                 <ListItemIcon
@@ -364,7 +339,7 @@ const AdminSidebar = ({
                                 <ListItemText
                                   primary={child.label}
                                   primaryTypographyProps={{
-                                    fontSize: "0.875rem", // UPDATED: 14px (was 13px)
+                                    fontSize: "0.875rem",
                                     fontWeight: active === child.id ? 600 : 500,
                                   }}
                                 />
@@ -391,7 +366,7 @@ const AdminSidebar = ({
                                       <Typography
                                         sx={{
                                           fontWeight: 700,
-                                          fontSize: "0.75rem", // UPDATED: 12px (was 11px)
+                                          fontSize: "0.75rem",
                                         }}
                                       >
                                         {child.badge > 99 ? "99+" : child.badge}
@@ -411,10 +386,8 @@ const AdminSidebar = ({
           </Box>
         ))}
 
-        {/* Divider before Logout */}
         <Divider sx={{ my: 2 }} />
 
-        {/* Logout Button */}
         <ListItem disablePadding>
           <ListItemButton
             onClick={handleLogout}
@@ -423,23 +396,16 @@ const AdminSidebar = ({
               py: 1.25,
               px: 2,
               color: "#D32F2F",
-              "&:hover": {
-                bgcolor: alpha("#D32F2F", 0.08),
-              },
+              "&:hover": { bgcolor: alpha("#D32F2F", 0.08) },
             }}
           >
-            <ListItemIcon
-              sx={{
-                minWidth: 40,
-                color: "#D32F2F",
-              }}
-            >
+            <ListItemIcon sx={{ minWidth: 40, color: "#D32F2F" }}>
               <LogoutIcon />
             </ListItemIcon>
             <ListItemText
               primary="Đăng xuất"
               primaryTypographyProps={{
-                fontSize: "0.9375rem", // UPDATED: 15px (was 14px)
+                fontSize: "0.9375rem",
                 fontWeight: 600,
               }}
             />
