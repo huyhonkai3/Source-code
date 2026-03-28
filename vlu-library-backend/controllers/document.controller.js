@@ -23,6 +23,7 @@ const {
  * HELPER FUNCTIONS CHO TÌM KIẾM THÔNG MINH
  * ========================================
  */
+const QUOTA_EXEMPT_ROLES = ["Admin", "Moderator"];
 
 /**
  * Escape các ký tự đặc biệt trong regex
@@ -122,7 +123,6 @@ const WIKIDATA_USER_AGENT = "VLU-Library-Bot/1.0 (contact@vlu.edu.vn)";
  */
 const uploadDocument = async (req, res) => {
   try {
-    // Với upload.fields(), file chính nằm trong req.files['file']
     const mainFile = req.files?.file?.[0];
 
     if (!mainFile) {
@@ -149,13 +149,12 @@ const uploadDocument = async (req, res) => {
       englishTitle,
       publishYear,
       language,
-      // [NEW] Copyright fields
       copyrightType,
       isTosAccepted,
       authorDeclaration,
     } = req.body;
 
-    // ==================== VALIDATIONS ====================
+    // ========== VALIDATIONS (giữ nguyên) ==========
 
     if (!title || !title.trim()) {
       return res.status(400).json({
@@ -175,7 +174,6 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // [NEW] Kiểm tra ToS
     const tosAccepted = isTosAccepted === "true" || isTosAccepted === true;
     if (!tosAccepted) {
       return res.status(400).json({
@@ -191,7 +189,6 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // [NEW] Validate copyrightType
     const validCopyrightTypes = [
       "OWN_CREATION",
       "PUBLIC_DOMAIN",
@@ -212,7 +209,6 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // [NEW] Nếu là bên thứ 3, bắt buộc có file giấy ủy quyền
     const authorizationFile = req.files?.authorizationFile?.[0];
     if (finalCopyrightType === "THIRD_PARTY_AUTHORIZED" && !authorizationFile) {
       return res.status(400).json({
@@ -229,7 +225,6 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // [NEW] OWN_CREATION bắt buộc cam đoan
     const isAuthorDeclaration =
       authorDeclaration === "true" || authorDeclaration === true;
     if (finalCopyrightType === "OWN_CREATION" && !isAuthorDeclaration) {
@@ -255,13 +250,11 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // Xác định file format
     let fileFormat = "pdf";
     if (mainFile.mimetype === "application/epub+zip") {
       fileFormat = "epub";
     }
 
-    // [NEW] Lấy URL của file giấy ủy quyền (nếu có)
     let authorizationFileUrl = null;
     if (authorizationFile) {
       authorizationFileUrl = getFileUrl(authorizationFile);
@@ -283,7 +276,6 @@ const uploadDocument = async (req, res) => {
       fileSize: mainFile.size,
       fileFormat: fileFormat,
       status: "pending",
-      // [NEW] Copyright fields
       copyrightType: finalCopyrightType,
       authorizationFileUrl: authorizationFileUrl,
       isTosAccepted: true,
@@ -296,6 +288,49 @@ const uploadDocument = async (req, res) => {
     await Category.findByIdAndUpdate(category, {
       $inc: { documentCount: 1 },
     });
+
+    // QUOTA LOGIC: Cập nhật vòng lặp upload của User
+    // Chỉ áp dụng cho User/Author — Admin/Moderator không tính vòng lặp
+    if (!QUOTA_EXEMPT_ROLES.includes(req.user.role)) {
+      try {
+        // Dùng findByIdAndUpdate với $inc để tránh race condition
+        // nếu user upload nhiều file cùng lúc (atomic operation)
+        const updatedUser = await User.findByIdAndUpdate(
+          req.user.id,
+          { $inc: { uploadCycleCount: 1 } },
+          { new: true }, // Trả về document sau khi đã update
+        );
+
+        // Kiểm tra xem đã đủ 3 upload trong vòng lặp chưa
+        if (updatedUser.uploadCycleCount >= 3) {
+          // FIX: Dùng $max để floor downloadAllowance về 0 trước khi $inc.
+          //
+          // Vấn đề: Nếu downloadAllowance đang là số âm trong DB (do bug cũ),
+          // $inc: 5 sẽ cộng từ giá trị âm → kết quả sai.
+          // Ví dụ: allowance = -1 → $inc(5) → 4 (thiếu 1 lượt)
+          //
+          // Fix: $max đảm bảo allowance không nhỏ hơn 0 trước khi cộng.
+          // MongoDB không hỗ trợ $max và $inc trên cùng field trong 1 operation
+          // → 2 step liên tiếp, chấp nhận được vì uploadCycleCount không thay đổi.
+          await User.findByIdAndUpdate(req.user.id, {
+            $max: { downloadAllowance: 0 }, // Floor về 0 nếu đang âm
+          });
+          await User.findByIdAndUpdate(req.user.id, {
+            $inc: { downloadAllowance: 5 },
+            $set: { uploadCycleCount: 0 },
+          });
+
+          console.log(
+            `[Quota] User ${req.user.id} completed upload cycle. +5 download allowance granted.`,
+          );
+        }
+      } catch (quotaError) {
+        // KHÔNG để lỗi quota làm fail request upload chính
+        // Log lại để debug sau
+        console.error("[Quota] Failed to update upload quota:", quotaError);
+      }
+    }
+    // END QUOTA LOGIC
 
     const populatedDoc = await Document.findById(savedDocument._id)
       .populate("uploadedBy", "name email role")
@@ -332,7 +367,6 @@ const uploadDocument = async (req, res) => {
           fileSize: populatedDoc.fileSize,
           fileFormat: populatedDoc.fileFormat,
           status: populatedDoc.status,
-          // [NEW]
           copyrightType: populatedDoc.copyrightType,
           authorizationFileUrl: populatedDoc.authorizationFileUrl,
           isTosAccepted: populatedDoc.isTosAccepted,
@@ -1326,7 +1360,7 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    // Check access permission
+    // ========== Check access permission ==========
     const isAdminOrModerator = ["Admin", "Moderator"].includes(userRole);
     const isOwner = document.uploadedBy?.toString() === userId;
     const isApproved = document.status === "approved";
@@ -1339,6 +1373,57 @@ const downloadDocument = async (req, res) => {
       });
     }
 
+    // Kiểm tra lượt tải trước khi stream file
+    // Admin/Moderator: bypass hoàn toàn
+    // User/Author: Kiểm tra downloadAllowance
+    if (!QUOTA_EXEMPT_ROLES.includes(userRole)) {
+      // FIX: Atomic check-and-decrement bằng findOneAndUpdate với condition.
+      //
+      // TRƯỚC (bug): 2 operation riêng biệt — không atomic:
+      //   1. findById → đọc allowance
+      //   2. findByIdAndUpdate $inc: -1 → trừ
+      //   → Race condition: 2 tab cùng lúc đều pass check rồi đều trừ
+      //   → allowance xuống âm (-1, -2, ...)
+      //
+      // SAU (fix): 1 atomic operation với điều kiện { downloadAllowance: { $gt: 0 } }:
+      //   - Nếu allowance > 0 → update thành công, trả về doc mới
+      //   - Nếu allowance = 0 → condition không match → trả về null → block
+      //   - Không bao giờ xuống âm vì check và decrement xảy ra cùng lúc
+      const deductedUser = await User.findOneAndUpdate(
+        {
+          _id: userId,
+          downloadAllowance: { $gt: 0 }, // Chỉ trừ khi còn lượt
+        },
+        {
+          $inc: { downloadAllowance: -1 },
+        },
+        { new: true, select: "downloadAllowance uploadCycleCount" },
+      );
+
+      if (!deductedUser) {
+        // Không update được → allowance đã = 0 → block
+        // Lấy thêm uploadCycleCount để trả về tiến độ cho frontend
+        const freshUser = await User.findById(userId).select(
+          "uploadCycleCount downloadAllowance",
+        );
+        return res.status(403).json({
+          status: "error",
+          code: 403,
+          message: "QUOTA_EXCEEDED",
+          detail:
+            "Bạn đã hết lượt tải. Vui lòng đóng góp thêm tài liệu để nhận lượt tải mới.",
+          currentCycle: freshUser?.uploadCycleCount ?? 0,
+          needed: 3 - (freshUser?.uploadCycleCount ?? 0),
+        });
+      }
+
+      console.log(
+        `[Quota] User ${userId} downloaded. Allowance: ${deductedUser.downloadAllowance + 1} → ${deductedUser.downloadAllowance}`,
+      );
+    }
+    // END QUOTA CHECK
+
+    // ========== stream file ==========
     let contentType = "application/pdf";
     if (
       document.fileFormat === "epub" ||
@@ -1352,11 +1437,9 @@ const downloadDocument = async (req, res) => {
     console.log("[DOWNLOAD] File URL:", document.fileUrl);
     console.log("[DOWNLOAD] Content-Type:", contentType);
 
-    // ========== S3 MODE: Redirect đến S3 URL với download param ==========
     if (document.fileUrl.includes(".amazonaws.com/")) {
       console.log("[DOWNLOAD] Proxying from S3...");
 
-      // Set headers cho DOWNLOAD (attachment)
       res.setHeader("Content-Type", contentType);
       res.setHeader(
         "Content-Disposition",
@@ -1399,7 +1482,6 @@ const downloadDocument = async (req, res) => {
       return;
     }
 
-    // ========== LOCAL MODE: Stream file từ local ==========
     const filePath = path.join(process.cwd(), document.fileUrl);
 
     if (!fs.existsSync(filePath)) {
@@ -1410,7 +1492,6 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    // Set headers for download
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(document.fileName)}"`,
@@ -1418,7 +1499,6 @@ const downloadDocument = async (req, res) => {
 
     res.setHeader("Content-Type", contentType);
 
-    // Stream file
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
 

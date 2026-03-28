@@ -1,17 +1,24 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import * as authAPI from "../api/auth.api";
 
-/**
- * Authentication Context
- * FIXED: Bỏ setLoading trong hàm login để tránh re-render gây mất state lỗi
- */
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // State quota tách riêng để update không trigger re-render toàn bộ user object
+  const [downloadAllowance, setDownloadAllowance] = useState(0);
+  const [uploadCycleCount, setUploadCycleCount] = useState(0);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,6 +31,10 @@ export const AuthProvider = ({ children }) => {
           const userData = JSON.parse(userStr);
           setUser(userData);
           setIsAuthenticated(true);
+
+          // Khôi phục quota state từ localStorage khi reload trang
+          setDownloadAllowance(userData.downloadAllowance ?? 0);
+          setUploadCycleCount(userData.uploadCycleCount ?? 0);
         }
       } catch (error) {
         console.error("Error checking auth:", error);
@@ -38,9 +49,19 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
+   * Helper: Lưu user vào state và localStorage
+   * Đảm bảo quota fields luôn được sync
+   */
+  const _persistUser = (userData) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+    setDownloadAllowance(userData.downloadAllowance ?? 0);
+    setUploadCycleCount(userData.uploadCycleCount ?? 0);
+    localStorage.setItem("user", JSON.stringify(userData));
+  };
+
+  /**
    * Hàm đăng nhập
-   * FIXED: KHÔNG setLoading ở đây - để component tự quản lý loading state
-   * Điều này tránh re-render gây mất apiError state
    */
   const login = async (email, password) => {
     try {
@@ -51,10 +72,9 @@ export const AuthProvider = ({ children }) => {
 
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", refreshToken);
-        localStorage.setItem("user", JSON.stringify(userData));
 
-        setUser(userData);
-        setIsAuthenticated(true);
+        // Dùng _persistUser thay vì setUser trực tiếp
+        _persistUser(userData);
 
         const redirectPath =
           localStorage.getItem("redirectPath") || "/documents";
@@ -66,7 +86,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Sai email hoặc mật khẩu");
       }
     } catch (error) {
-      // FIXED: Xử lý error message rõ ràng
       let errorMessage = "Sai email hoặc mật khẩu";
 
       if (error?.response?.data?.message) {
@@ -78,7 +97,6 @@ export const AuthProvider = ({ children }) => {
           "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.";
       }
 
-      // Throw error để LoginPage có thể catch và hiển thị
       throw new Error(errorMessage);
     }
   };
@@ -95,10 +113,9 @@ export const AuthProvider = ({ children }) => {
 
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", refreshToken);
-        localStorage.setItem("user", JSON.stringify(userData));
 
-        setUser(userData);
-        setIsAuthenticated(true);
+        // Dùng _persistUser
+        _persistUser(userData);
 
         if (userData.role === "Admin") {
           navigate("/admin/dashboard", { replace: true });
@@ -159,6 +176,10 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
 
+      // [MỚI] Reset quota state khi logout
+      setDownloadAllowance(0);
+      setUploadCycleCount(0);
+
       navigate("/login", { replace: true });
     }
   };
@@ -189,34 +210,42 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // updateQuota: Cập nhật quota state từ bên ngoài
   /**
-   * Cập nhật avatar
+   * Cập nhật quota state sau khi download thành công / bị từ chối.
+   * Được gọi từ useDownload hook.
+   *
+   * @param {number} allowance - Số lượt tải còn lại mới
+   * @param {number} cycle     - Số tài liệu đã upload trong vòng hiện tại
    */
+  const updateQuota = useCallback((allowance, cycle) => {
+    setDownloadAllowance(allowance);
+    setUploadCycleCount(cycle);
+
+    // Sync vào localStorage để reload trang không mất state
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userData = JSON.parse(userStr);
+        userData.downloadAllowance = allowance;
+        userData.uploadCycleCount = cycle;
+        localStorage.setItem("user", JSON.stringify(userData));
+      }
+    } catch (e) {
+      console.error("[AuthContext] Failed to sync quota to localStorage:", e);
+    }
+  }, []);
+
   const updateUserAvatar = (newAvatarUrl) => {
     if (!user) return;
-
-    const updatedUser = {
-      ...user,
-      avatarUrl: newAvatarUrl,
-    };
-
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    const updatedUser = { ...user, avatarUrl: newAvatarUrl };
+    _persistUser(updatedUser);
   };
 
-  /**
-   * Cập nhật thông tin user
-   */
   const updateUser = (updates) => {
     if (!user) return;
-
-    const updatedUser = {
-      ...user,
-      ...updates,
-    };
-
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    const updatedUser = { ...user, ...updates };
+    _persistUser(updatedUser);
   };
 
   const value = {
@@ -230,6 +259,10 @@ export const AuthProvider = ({ children }) => {
     refreshToken,
     updateUserAvatar,
     updateUser,
+    // Quota state và updater
+    downloadAllowance,
+    uploadCycleCount,
+    updateQuota,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

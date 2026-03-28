@@ -95,6 +95,28 @@ const userSchema = new mongoose.Schema(
       enum: ["local", "microsoft"],
       default: "local",
     },
+
+    /**
+     * uploadCycleCount: Số tài liệu đã upload trong vòng lặp hiện tại.
+     * Đếm từ 0 → 2. Khi đạt 3 sẽ reset về 0 và cộng 5 lượt tải.
+     * Chỉ áp dụng cho Role User/Author. Admin/Moderator không bị giới hạn.
+     */
+    uploadCycleCount: {
+      type: Number,
+      default: 0,
+      min: [0, "uploadCycleCount không thể âm"],
+    },
+
+    /**
+     * downloadAllowance: Số lượt tải xuống còn lại của user.
+     * Mỗi lần tải thành công trừ 1. Về 0 thì bị chặn cho đến khi upload thêm.
+     * Admin/Moderator không bị kiểm tra field này (bypass hoàn toàn).
+     */
+    downloadAllowance: {
+      type: Number,
+      default: 3,
+      min: [0, "downloadAllowance không thể âm"],
+    },
   },
   {
     timestamps: true,
@@ -109,8 +131,8 @@ userSchema.index({ status: 1 });
 userSchema.index({ microsoftId: 1 }, { unique: true, sparse: true });
 
 /**
- * Pre-save Hook: Tự động hash password trước khi lưu vào database
  * SỬA: Chỉ hash khi password tồn tại và được thay đổi
+ * Pre-save Hook: Tự động hash password trước khi lưu vào database
  */
 userSchema.pre("save", async function (next) {
   // Bỏ qua nếu passwordHash không được modified hoặc không có giá trị

@@ -27,24 +27,20 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getUnreadCount } from "../../api/notifications.api";
+import QuotaIndicator from "../common/QuotaIndicator";
 
 /**
  * UserSidebar Component - VLU Design System v2.1
- * Modern & Bold sidebar navigation
- * ✅ UPDATED: Thêm Badge thông báo chưa đọc
- *
- * @param {string} active - Menu item đang active
+ * UPDATED: Thêm QuotaIndicator hiển thị lượt tải và tiến độ upload
  */
 const UserSidebar = ({ active = "profile" }) => {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Check user roles
   const isAuthor = user && user.role === "Author";
   const isModerator = user && user.role === "Moderator";
 
-  // Fetch unread notification count
   useEffect(() => {
     const fetchCount = async () => {
       try {
@@ -57,7 +53,6 @@ const UserSidebar = ({ active = "profile" }) => {
     fetchCount();
   }, []);
 
-  // Role colors theo Design System v2.0
   const getRoleColor = (role) => {
     const colors = {
       Admin: "#D32F2F",
@@ -68,7 +63,6 @@ const UserSidebar = ({ active = "profile" }) => {
     return colors[role] || "#8E8EA9";
   };
 
-  // Menu items configuration
   const menuItems = [
     {
       id: "profile",
@@ -117,15 +111,13 @@ const UserSidebar = ({ active = "profile" }) => {
       path: "/user/notifications",
       show: true,
       color: "#FFC107",
-      badge: unreadCount, // ✅ Truyền badge count
+      badge: unreadCount,
     },
   ];
 
   const visibleMenuItems = menuItems.filter((item) => item.show);
 
-  const handleMenuClick = (path) => {
-    navigate(path);
-  };
+  const handleMenuClick = (path) => navigate(path);
 
   const handleLogout = async () => {
     try {
@@ -148,7 +140,7 @@ const UserSidebar = ({ active = "profile" }) => {
         top: 90,
       }}
     >
-      {/* ========== USER INFO HEADER ========== */}
+      {/* ── USER INFO HEADER ──────────────────────────────────────────────── */}
       <Box
         sx={{
           p: 2.5,
@@ -209,7 +201,7 @@ const UserSidebar = ({ active = "profile" }) => {
         </Box>
       </Box>
 
-      {/* ========== SECTION HEADER ========== */}
+      {/* ── SECTION HEADER ────────────────────────────────────────────────── */}
       <Box sx={{ px: 2.5, py: 2 }}>
         <Typography
           variant="caption"
@@ -229,7 +221,7 @@ const UserSidebar = ({ active = "profile" }) => {
         </Typography>
       </Box>
 
-      {/* ========== MENU LIST ========== */}
+      {/* ── MENU LIST ─────────────────────────────────────────────────────── */}
       <List sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
         {visibleMenuItems.map((item) => {
           const isActive = active === item.id;
@@ -251,7 +243,6 @@ const UserSidebar = ({ active = "profile" }) => {
                   transition: "all 0.2s ease",
                 }}
               >
-                {/* Active Indicator */}
                 {isActive && (
                   <Box
                     sx={{
@@ -281,7 +272,6 @@ const UserSidebar = ({ active = "profile" }) => {
                       justifyContent: "center",
                     }}
                   >
-                    {/* ✅ Badge cho Notifications */}
                     {item.badge > 0 ? (
                       <Badge
                         badgeContent={item.badge}
@@ -326,7 +316,6 @@ const UserSidebar = ({ active = "profile" }) => {
                   }}
                 />
 
-                {/* Badge text bên cạnh label */}
                 {item.badge > 0 && !isActive && (
                   <Box
                     sx={{
@@ -353,10 +342,14 @@ const UserSidebar = ({ active = "profile" }) => {
         })}
       </List>
 
-      {/* ========== DIVIDER ========== */}
+      {/* ── DIVIDER ───────────────────────────────────────────────────────── */}
       <Divider sx={{ mx: 2.5, borderColor: "#F0F0F5" }} />
 
-      {/* ========== LOGOUT BUTTON ========== */}
+      {/* ── QUOTA INDICATOR ───────────────────────────────────────────────── */}
+      {/* Chỉ hiển thị với User/Author — QuotaIndicator tự ẩn với Admin/Moderator */}
+      <QuotaIndicator />
+
+      {/* ── LOGOUT ────────────────────────────────────────────────────────── */}
       <Box sx={{ p: 1.5 }}>
         <ListItemButton
           onClick={handleLogout}
@@ -364,9 +357,7 @@ const UserSidebar = ({ active = "profile" }) => {
             py: 1.5,
             px: 2,
             borderRadius: "12px",
-            "&:hover": {
-              bgcolor: alpha("#D32F2F", 0.08),
-            },
+            "&:hover": { bgcolor: alpha("#D32F2F", 0.08) },
             transition: "all 0.2s ease",
           }}
         >

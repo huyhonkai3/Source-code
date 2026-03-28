@@ -147,7 +147,6 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation: Kiểm tra các trường bắt buộc
     if (!email || !password) {
       return res.status(400).json({
         status: "error",
@@ -156,10 +155,8 @@ const login = async (req, res) => {
       });
     }
 
-    // Tìm user bằng email
     const user = await User.findOne({ email: email.toLowerCase() });
 
-    // Nếu không tìm thấy user
     if (!user) {
       return res.status(401).json({
         status: "error",
@@ -168,7 +165,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Kiểm tra trạng thái user
     if (user.status === "locked") {
       return res.status(403).json({
         status: "error",
@@ -180,7 +176,6 @@ const login = async (req, res) => {
       });
     }
 
-    // So sánh password
     const isPasswordMatch = await user.comparePassword(password);
     if (!isPasswordMatch) {
       return res.status(401).json({
@@ -190,7 +185,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Tạo Access Token (JWT, expires: 1h)
     const accessToken = jwt.sign(
       {
         sub: user._id,
@@ -201,7 +195,6 @@ const login = async (req, res) => {
       { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1h" },
     );
 
-    // Tạo Refresh Token (JWT, expires: 7d)
     const refreshToken = jwt.sign(
       {
         sub: user._id,
@@ -210,9 +203,8 @@ const login = async (req, res) => {
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" },
     );
 
-    // Lưu Refresh Token vào database
     const refreshTokenExpiresAt = new Date();
-    refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7); // 7 ngày
+    refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
 
     await RefreshToken.createToken(
       user._id,
@@ -224,7 +216,6 @@ const login = async (req, res) => {
       },
     );
 
-    // Trả về response thành công
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -236,6 +227,9 @@ const login = async (req, res) => {
           email: user.email,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          // Thêm quota fields để frontend hiển thị ngay sau login
+          downloadAllowance: user.downloadAllowance,
+          uploadCycleCount: user.uploadCycleCount,
         },
         accessToken,
         refreshToken,
@@ -423,6 +417,9 @@ const me = async (req, res) => {
           avatarUrl: user.avatarUrl,
           status: user.status,
           createdAt: user.createdAt,
+          // Quota fields — frontend dùng để hiển thị indicator
+          downloadAllowance: user.downloadAllowance,
+          uploadCycleCount: user.uploadCycleCount,
         },
       },
     });
@@ -614,7 +611,6 @@ const loginWithMicrosoft = async (req, res) => {
   try {
     const { accessToken } = req.body;
 
-    // Validation
     if (!accessToken) {
       return res.status(400).json({
         status: "error",
@@ -623,8 +619,6 @@ const loginWithMicrosoft = async (req, res) => {
       });
     }
 
-    // 1. Gọi Microsoft Graph API để lấy thông tin user từ token
-    // Bước này giúp xác thực token là thật, do Microsoft cấp
     let msUser;
     try {
       const msResponse = await axios.get(
@@ -646,7 +640,6 @@ const loginWithMicrosoft = async (req, res) => {
       });
     }
 
-    // msUser sẽ có: { id, displayName, mail, userPrincipalName, ... }
     const email = (msUser.mail || msUser.userPrincipalName || "").toLowerCase();
 
     if (!email) {
@@ -657,7 +650,6 @@ const loginWithMicrosoft = async (req, res) => {
       });
     }
 
-    // 2. Kiểm tra domain email (Backend validation - bắt buộc)
     if (!email.endsWith("@vanlanguni.vn") && !email.endsWith("@vlu.edu.vn")) {
       return res.status(403).json({
         status: "error",
@@ -667,28 +659,24 @@ const loginWithMicrosoft = async (req, res) => {
       });
     }
 
-    // 3. Tìm user trong DB
     let user = await User.findOne({ email: email });
     let isNewUser = false;
 
     if (!user) {
-      // 4a. Nếu chưa có -> Tự động đăng ký (Register)
       isNewUser = true;
       user = new User({
-        name: msUser.displayName || email.split("@")[0], // Dùng đúng field 'name' như model
+        name: msUser.displayName || email.split("@")[0],
         email: email,
-        passwordHash: null, // Không cần password vì login qua Microsoft
+        passwordHash: null,
         status: "active",
-        role: "User", // Mặc định là User
-        authProvider: "microsoft", // Đánh dấu user này login qua MS
-        microsoftId: msUser.id, // Lưu Microsoft ID để tracking
+        role: "User",
+        authProvider: "microsoft",
+        microsoftId: msUser.id,
         avatarUrl: null,
       });
       await user.save();
       console.log(`[Microsoft Login] New user created: ${email}`);
     } else {
-      // 4b. Nếu user đã tồn tại
-      // Cập nhật microsoftId nếu chưa có (link account)
       if (!user.microsoftId) {
         user.microsoftId = msUser.id;
         user.authProvider = user.authProvider || "microsoft";
@@ -696,7 +684,6 @@ const loginWithMicrosoft = async (req, res) => {
         console.log(`[Microsoft Login] Linked Microsoft account: ${email}`);
       }
 
-      // Kiểm tra trạng thái user
       if (user.status === "locked") {
         return res.status(403).json({
           status: "error",
@@ -709,7 +696,6 @@ const loginWithMicrosoft = async (req, res) => {
       }
     }
 
-    // 5. Tạo JWT Token của hệ thống VLU Library
     const jwtAccessToken = jwt.sign(
       {
         sub: user._id,
@@ -720,7 +706,6 @@ const loginWithMicrosoft = async (req, res) => {
       { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1h" },
     );
 
-    // 6. Tạo Refresh Token
     const jwtRefreshToken = jwt.sign(
       {
         sub: user._id,
@@ -729,7 +714,6 @@ const loginWithMicrosoft = async (req, res) => {
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" },
     );
 
-    // 7. Lưu Refresh Token vào database
     const refreshTokenExpiresAt = new Date();
     refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7);
 
@@ -744,7 +728,6 @@ const loginWithMicrosoft = async (req, res) => {
       },
     );
 
-    // 8. Trả về response (format giống login thường để frontend xử lý thống nhất)
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -758,6 +741,9 @@ const loginWithMicrosoft = async (req, res) => {
           email: user.email,
           role: user.role,
           avatarUrl: user.avatarUrl,
+          // Quota fields
+          downloadAllowance: user.downloadAllowance,
+          uploadCycleCount: user.uploadCycleCount,
         },
         accessToken: jwtAccessToken,
         refreshToken: jwtRefreshToken,
