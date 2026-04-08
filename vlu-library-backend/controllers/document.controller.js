@@ -949,6 +949,7 @@ const getDocumentById = async (req, res) => {
           fileFormat: document.fileFormat,
           status: document.status,
           rejectionReason: document.rejectionReason,
+          copyrightType: document.copyrightType,
           reviewedBy: document.reviewedBy
             ? {
                 id: document.reviewedBy._id,

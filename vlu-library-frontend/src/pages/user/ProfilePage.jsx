@@ -402,8 +402,8 @@ const ProfilePage = () => {
               Yêu cầu đang chờ xét duyệt
             </Typography>
             <Typography variant="body2" sx={{ color: "#4A4A68" }}>
-              Yêu cầu trở thành Tác giả của bạn đang được Admin xem xét. Vui
-              lòng đợi từ 24-48 giờ.
+              Yêu cầu trở thành Người đăng tài liệu của bạn đang được Admin xem
+              xét. Vui lòng đợi từ 24-48 giờ.
             </Typography>
           </Box>
 
@@ -522,7 +522,7 @@ const ProfilePage = () => {
             variant="subtitle1"
             sx={{ fontWeight: 700, color: "#1A1A2E", mb: 0.5 }}
           >
-            Trở thành Tác giả
+            Trở thành Người đăng tài liệu ngay hôm nay!
           </Typography>
           <Typography variant="body2" sx={{ color: "#4A4A68" }}>
             Đăng ký để có thể chia sẻ tài liệu với cộng đồng VLU. Yêu cầu sẽ

@@ -8,6 +8,7 @@ import {
   CardMedia,
   Stack,
   alpha,
+  Alert,
 } from "@mui/material";
 import {
   Visibility as VisibilityIcon,
@@ -19,13 +20,22 @@ import {
   Business as PublisherIcon,
   Login as LoginIcon,
   TrendingUp as TrendingIcon,
+  Lock as LockIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 
 /**
  * DocumentInfo Component - VLU Design System v2.0
- * Modern & Bold hero section hiển thị thông tin chính của tài liệu
+ *
+ * UPDATED: Phân quyền tải xuống theo copyrightType
+ * - PUBLIC_DOMAIN       → Hiển thị nút Download bình thường
+ * - OWN_CREATION        → Ẩn nút Download, hiển thị Alert "Closed Access"
+ * - THIRD_PARTY_AUTHORIZED → Ẩn nút Download, hiển thị Alert "Closed Access"
+ *
+ * Logic này đồng bộ với backend guard trong downloadDocument controller.
+ * Mục đích ẩn nút ở frontend là để UX rõ ràng — backend vẫn chặn độc lập
+ * với mọi request thẳng qua API.
  */
 const DocumentInfo = ({
   document,
@@ -34,7 +44,6 @@ const DocumentInfo = ({
   onCategoryClick,
   isAuthenticated = false,
 }) => {
-  // Placeholder image với gradient
   const placeholderImage = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533' viewBox='0 0 400 533'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%231A1A2E;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%234A4A68;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='533' fill='url(%23grad)'/%3E%3Ctext x='200' y='266' font-family='Arial' font-size='48' fill='%238E8EA9' text-anchor='middle' dominant-baseline='middle'%3EVLU%3C/text%3E%3C/svg%3E`;
 
   const formatNumber = (num) => {
@@ -57,7 +66,14 @@ const DocumentInfo = ({
     return document.fileName.split(".").pop().toUpperCase();
   };
 
-  // Stats configuration
+  /**
+   * Kiểm tra tài liệu có được phép tải xuống không.
+   * Chỉ PUBLIC_DOMAIN mới cho tải — đồng bộ với backend guard.
+   * Khi isAuthenticated = false, nút sẽ redirect login trước nên
+   * chưa cần kiểm tra copyright ở đây (backend sẽ chặn sau khi login).
+   */
+  const canDownload = document?.copyrightType === "PUBLIC_DOMAIN";
+
   const stats = [
     {
       icon: VisibilityIcon,
@@ -96,7 +112,7 @@ const DocumentInfo = ({
       }}
     >
       <Grid container spacing={{ xs: 3, md: 4 }}>
-        {/* ========== LEFT - COVER IMAGE ========== */}
+        {/* ── COVER IMAGE ──────────────────────────────────────────────── */}
         <Grid item xs={12} md={3}>
           <Card
             elevation={0}
@@ -144,7 +160,7 @@ const DocumentInfo = ({
               }}
             />
 
-            {/* Trending Badge (if popular) */}
+            {/* Trending Badge */}
             {document.views > 1000 && (
               <Box
                 sx={{
@@ -167,7 +183,7 @@ const DocumentInfo = ({
           </Card>
         </Grid>
 
-        {/* ========== RIGHT - INFO ========== */}
+        {/* ── INFO ─────────────────────────────────────────────────────── */}
         <Grid item xs={12} md={9}>
           {/* Category Chip */}
           {document.category && (
@@ -185,9 +201,7 @@ const DocumentInfo = ({
                 color: "#D32F2F",
                 border: "1px solid",
                 borderColor: alpha("#D32F2F", 0.2),
-                "&:hover": {
-                  bgcolor: alpha("#D32F2F", 0.15),
-                },
+                "&:hover": { bgcolor: alpha("#D32F2F", 0.15) },
               }}
             />
           )}
@@ -213,13 +227,7 @@ const DocumentInfo = ({
             sx={{ mb: 3, flexWrap: "wrap", gap: 1 }}
           >
             {document.author && (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                 <PersonIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
                 <Typography variant="body2" sx={{ color: "#4A4A68" }}>
                   <Box component="span" sx={{ color: "#8E8EA9" }}>
@@ -232,13 +240,7 @@ const DocumentInfo = ({
               </Box>
             )}
             {document.publisher && (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                 <PublisherIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
                 <Typography variant="body2" sx={{ color: "#4A4A68" }}>
                   <Box component="span" sx={{ color: "#8E8EA9" }}>
@@ -251,13 +253,7 @@ const DocumentInfo = ({
               </Box>
             )}
             {document.publishYear && (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                 <CalendarIcon sx={{ fontSize: 18, color: "#8E8EA9" }} />
                 <Typography variant="body2" sx={{ color: "#4A4A68" }}>
                   <Box component="span" sx={{ color: "#8E8EA9" }}>
@@ -271,7 +267,7 @@ const DocumentInfo = ({
             )}
           </Stack>
 
-          {/* ========== STATS BAR ========== */}
+          {/* Stats Bar */}
           <Box
             sx={{
               display: "flex",
@@ -323,10 +319,7 @@ const DocumentInfo = ({
                     </Typography>
                     <Typography
                       variant="caption"
-                      sx={{
-                        color: "#8E8EA9",
-                        fontWeight: 500,
-                      }}
+                      sx={{ color: "#8E8EA9", fontWeight: 500 }}
                     >
                       {stat.label}
                     </Typography>
@@ -354,12 +347,13 @@ const DocumentInfo = ({
             </Typography>
           )}
 
-          {/* ========== ACTION BUTTONS ========== */}
+          {/* ── ACTION BUTTONS ─────────────────────────────────────────── */}
           <Stack
             direction="row"
             spacing={2}
             sx={{ flexWrap: "wrap", gap: 1.5 }}
           >
+            {/* Nút Đọc — luôn hiển thị */}
             <Button
               variant="contained"
               size="large"
@@ -384,34 +378,44 @@ const DocumentInfo = ({
               {isAuthenticated ? "Đọc trực tuyến" : "Đăng nhập để đọc"}
             </Button>
 
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={isAuthenticated ? <DownloadIcon /> : <LoginIcon />}
-              onClick={onDownload}
-              sx={{
-                borderColor: "#E0E0E0",
-                color: "#4A4A68",
-                borderRadius: "12px",
-                px: 4,
-                py: 1.5,
-                fontWeight: 600,
-                fontSize: "1rem",
-                textTransform: "none",
-                borderWidth: 2,
-                "&:hover": {
-                  borderColor: "#D32F2F",
+            {/*
+             * Nút Tải xuống — chỉ hiển thị khi:
+             *   1. Chưa đăng nhập (redirect login trước, backend guard sau)
+             *   2. Đã đăng nhập VÀ tài liệu là PUBLIC_DOMAIN
+             *
+             * Với tài liệu có bản quyền (OWN_CREATION / THIRD_PARTY_AUTHORIZED):
+             *   Ẩn nút + hiển thị Alert giải thích bên dưới.
+             */}
+            {(!isAuthenticated || canDownload) && (
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={isAuthenticated ? <DownloadIcon /> : <LoginIcon />}
+                onClick={onDownload}
+                sx={{
+                  borderColor: "#E0E0E0",
+                  color: "#4A4A68",
+                  borderRadius: "12px",
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  textTransform: "none",
                   borderWidth: 2,
-                  color: "#D32F2F",
-                  bgcolor: alpha("#D32F2F", 0.04),
-                },
-              }}
-            >
-              {isAuthenticated ? "Tải xuống" : "Đăng nhập để tải"}
-            </Button>
+                  "&:hover": {
+                    borderColor: "#D32F2F",
+                    borderWidth: 2,
+                    color: "#D32F2F",
+                    bgcolor: alpha("#D32F2F", 0.04),
+                  },
+                }}
+              >
+                {isAuthenticated ? "Tải xuống" : "Đăng nhập để tải"}
+              </Button>
+            )}
           </Stack>
 
-          {/* Login Note */}
+          {/* Login Note (chưa đăng nhập) */}
           {!isAuthenticated && (
             <Typography
               variant="caption"
@@ -424,6 +428,40 @@ const DocumentInfo = ({
             >
               * Bạn cần đăng nhập để đọc và tải tài liệu
             </Typography>
+          )}
+
+          {/*
+           * Closed Access Alert — chỉ hiển thị khi đã đăng nhập
+           * VÀ tài liệu không phải PUBLIC_DOMAIN.
+           *
+           * Khi chưa đăng nhập: ẩn alert này vì user có thể chưa biết
+           * họ có quyền gì, tránh gây hiểu nhầm trước khi họ login.
+           */}
+          {isAuthenticated && !canDownload && (
+            <Alert
+              severity="info"
+              icon={<LockIcon sx={{ fontSize: 20 }} />}
+              sx={{
+                mt: 2,
+                borderRadius: "12px",
+                bgcolor: alpha("#2196F3", 0.06),
+                border: "1px solid",
+                borderColor: alpha("#2196F3", 0.2),
+                "& .MuiAlert-icon": { color: "#2196F3" },
+                "& .MuiAlert-message": { color: "#1A1A2E" },
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
+                Tài liệu thuộc dạng Closed Access
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ color: "#4A4A68", lineHeight: 1.5 }}
+              >
+                Tài liệu này có bản quyền và không hỗ trợ tải xuống. Bạn vẫn có
+                thể đọc trực tuyến qua hệ thống.
+              </Typography>
+            </Alert>
           )}
         </Grid>
       </Grid>

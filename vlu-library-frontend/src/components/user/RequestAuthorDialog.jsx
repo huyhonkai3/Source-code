@@ -158,7 +158,7 @@ const RequestAuthorDialog = ({ open, onClose, onSubmit, loading = false }) => {
                   textShadow: "0 2px 10px rgba(0,0,0,0.2)",
                 }}
               >
-                Đăng ký trở thành Tác giả
+                Đăng ký trở thành Người đăng tài liệu
               </Typography>
               <Typography
                 variant="body2"

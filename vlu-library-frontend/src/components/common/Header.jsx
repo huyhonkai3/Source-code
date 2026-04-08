@@ -195,7 +195,7 @@ const Header = () => {
     const roles = {
       Admin: "Quản trị viên",
       Moderator: "Kiểm duyệt viên",
-      Author: "Tác giả",
+      Author: "Người đăng tài liệu",
       User: "Sinh viên",
     };
     return roles[role] || role;

@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import * as authAPI from "../api/auth.api";
+import userAPI from "../api/user.api";
 
 const AuthContext = createContext(null);
 
@@ -22,22 +23,26 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
         const accessToken = localStorage.getItem("accessToken");
-        const userStr = localStorage.getItem("user");
+        if (!accessToken) return;
 
-        if (accessToken && userStr) {
-          const userData = JSON.parse(userStr);
-          setUser(userData);
+        // Gọi API lấy user mới nhất — đồng bộ downloadAllowance, uploadCycleCount
+        const response = await userAPI.getProfile(); // GET /api/auth/me
+        if (response?.status === "success" && response.data?.user) {
+          const freshUser = response.data.user;
+          setUser(freshUser);
           setIsAuthenticated(true);
-
-          // Khôi phục quota state từ localStorage khi reload trang
-          setDownloadAllowance(userData.downloadAllowance ?? 0);
-          setUploadCycleCount(userData.uploadCycleCount ?? 0);
+          localStorage.setItem("user", JSON.stringify(freshUser)); // cập nhật cache
+        } else {
+          // Token hết hạn hoặc invalid
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("user");
         }
       } catch (error) {
-        console.error("Error checking auth:", error);
+        // Token invalid → clear
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
